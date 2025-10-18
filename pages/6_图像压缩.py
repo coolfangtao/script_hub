@@ -7,6 +7,7 @@ st.set_page_config(layout="wide", page_title="图片大小修改器")
 
 # --- 页面内容 ---
 st.title("🗜️ 智能图片大小修改器")
+st.write("使用此功能时尽量不要打开VPN，否则会很慢")
 st.write("上传一张图片，设定您期望的文件大小（单位MB），此工具将自动调整图片质量以逼近该目标大小。")
 st.write("")
 
