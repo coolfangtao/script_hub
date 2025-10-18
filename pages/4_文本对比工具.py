@@ -76,4 +76,5 @@ if st.button("🚀 开始对比", use_container_width=True):
 
 # --- 页脚 ---
 st.markdown("---")
-st.markdown("由 Gemini 和 Streamlit 强力驱动")
+st.markdown("待优化点：\n"
+            "网页为黑色背景下，对比结果看不清楚")
