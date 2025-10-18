@@ -80,4 +80,4 @@ else:
 # --- 页脚 ---
 st.write("")
 st.markdown("---")
-st.markdown("由 Gemini 和 Streamlit 强力驱动 | `rembg` 用于背景移除")
+st.markdown("待优化点：TODO")
