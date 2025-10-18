@@ -4,7 +4,7 @@ st.set_page_config(layout="wide")
 
 st.title("🚀 FT的脚本中心")
 
-# --- 假设你将文件名修改为了 1_提取B站标题.py 和 2_合并excel表格.py ---
+# --- 假设你将文件名修改为了 1_提取B站标题.py 和 2_合并多个ASIN的关键词结果.py ---
 
 col1, col2 = st.columns(2)
 
@@ -16,4 +16,4 @@ with col1:
 with col2:
     if st.button("📊 合并多个ASIN的关键词结果", help="合并多个Excel文件到一个Excel中", use_container_width=True):
         # 使用新的、有效的文件名
-        st.switch_page(r"pages/2_合并excel表格.py")
+        st.switch_page(r"pages/2_合并多个ASIN的关键词结果.py")
