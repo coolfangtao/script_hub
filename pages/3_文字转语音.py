@@ -18,6 +18,7 @@ LOCALE_MAP = {
     "th": "泰语",
     "vi": "越南语",
     "ar": "阿拉伯语",
+
     "pt": "葡萄牙语",
     "it": "意大利语",
     "hi": "印地语",
@@ -152,7 +153,7 @@ else:
 
 # --- 运行说明 ---
 st.info(
-    "如何运行本应用：\n"
-    "1. 确保已安装所需库: `pip install streamlit edge-tts langdetect`\n"
-    "2. 在终端运行: `streamlit run your_app_name.py`"
+    "待优化点：\n"
+    "1. 输入文本自动推荐对应语言声音`\n"
+    "2. 声音全部翻译成中文`"
 )
