@@ -40,11 +40,11 @@ def extract_and_clean_titles_for_shulun(html_text):
 
 
 def main():
-    st.title("HTML标题提取工具")
-    st.write("这是一个用于从HTML文本中提取标题的工具")
+    st.title("B站视频合集标题提取")
+    st.write("这是一个用于从B站视频合集中批量提取标题的工具")
 
     # 创建文件上传器
-    uploaded_file = st.file_uploader("上传HTML文件", type=['txt', 'html'])
+    uploaded_file = st.file_uploader("选择文件", type=['txt', 'html'])
 
     # 创建选择提取方法的单选按钮
     method = st.radio("选择提取方法:",
