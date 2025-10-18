@@ -2,3 +2,4 @@ streamlit
 edge-tts
 langdetect
 rembg
+onnxruntime
