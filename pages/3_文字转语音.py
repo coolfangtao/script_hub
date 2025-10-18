@@ -2,21 +2,27 @@ import streamlit as st
 import edge_tts
 import asyncio
 from io import BytesIO
+from langdetect import detect, LangDetectException
 
-# --- 语言代码到中文名称的映射 ---
+# --- 语言区域代码到中文名称的映射 ---
+# 用于在下拉菜单中显示更友好的语言名称
 LOCALE_MAP = {
-    "zh": "中文", "en": "英语", "ja": "日语", "ko": "韩语",
-    "fr": "法语", "de": "德语", "es": "西班牙语", "ru": "俄语",
-    "it": "意大利语", "pt": "葡萄牙语", "ar": "阿拉伯语", "hi": "印地语",
-    "tr": "土耳其语", "nl": "荷兰语", "sv": "瑞典语", "pl": "波兰语",
-    "th": "泰语", "vi": "越南语",
+    "zh": "中文（简体）",
+    "en": "英语",
+    "ja": "日语",
+    "ko": "韩语",
+    "fr": "法语",
+    "de": "德语",
+    "es": "西班牙语",
+    "ru": "俄语",
+    "th": "泰语",
+    "vi": "越南语",
+    "ar": "阿拉伯语",
+    "pt": "葡萄牙语",
+    "it": "意大利语",
+    "hi": "印地语",
+    # 可以根据需要添加更多语言
 }
-
-
-def get_language_name(locale_code: str) -> str:
-    """根据地区代码返回中文语言名称"""
-    lang_prefix = locale_code.split('-')[0]
-    return LOCALE_MAP.get(lang_prefix, lang_prefix)  # 如果找不到，则返回原始前缀
 
 
 # --- 核心功能函数 ---
@@ -37,25 +43,29 @@ async def text_to_speech_async(text: str, voice: str) -> BytesIO:
 @st.cache_data
 def get_voice_list() -> dict:
     """
-    获取所有可用的声音列表并缓存结果，返回一个显示名称到短名称的映射字典。
+    获取所有可用的声音列表并缓存结果。
+    返回一个从显示名称到声音短名称的映射字典，并按语言排序。
     """
     try:
         # 在异步环境中运行 list_voices
         voices = asyncio.run(edge_tts.list_voices())
-        # 创建一个更友好的显示名称，并按语言排序
-        voice_options = []
+        voice_map = {}
         for v in voices:
-            lang_name = get_language_name(v['Locale'])
-            display_name = (
-                f"{lang_name} ({v['Locale']}) - "
-                f"{v['ShortName'].split('-')[-1]} ({v['Gender']})"
-            )
-            voice_options.append((display_name, v['ShortName']))
+            # 解析语言代码，例如 "zh-CN" -> "zh"
+            lang_code_short = v['Locale'].split('-')[0]
+            # 从映射中获取中文名称，如果找不到则使用原始代码
+            lang_name = LOCALE_MAP.get(lang_code_short, lang_code_short)
 
-        # 按语言名称排序
-        voice_options.sort()
-        voice_map = {display: shortname for display, shortname in voice_options}
-        return voice_map
+            # 创建更友好的显示名称
+            display_name = (
+                f"【{lang_name}】{v['ShortName'].split('-')[-1]} "
+                f"({v['Gender']}) - {v['Locale']}"
+            )
+            voice_map[display_name] = v['ShortName']
+
+        # 按键（显示名称）排序，使得相同语言的声音聚在一起
+        return dict(sorted(voice_map.items()))
+
     except Exception as e:
         st.error(f"无法获取声音列表: {e}")
         return {}
@@ -66,44 +76,25 @@ def get_voice_list() -> dict:
 st.set_page_config(page_title="文本转语音生成器", layout="centered")
 
 st.title("🔊 文本转语音生成器")
-
-# --- 添加用户请求的启动代码 ---
-col1, col2 = st.columns([3, 2])
-
-with col1:
-    st.markdown("输入任何文本，选择一个声音，然后生成可以播放和下载的语音文件。")
-
-with col2:
-    if st.button("📊 合并多个ASIN的关键词结果", help="合并多个Excel文件到一个Excel中", use_container_width=True):
-        # 使用 st.switch_page 切换到指定页面
-        st.switch_page(r"pages/2_合并多个ASIN的关键词结果.py")
-
-st.divider()  # 添加分隔线以改善布局
-
-# --- 原有的应用功能 ---
+st.markdown("输入文本，选择匹配语言的声音，即可生成可播放和下载的语音文件。")
 
 # 获取并显示声音选择框
 voice_map = get_voice_list()
 if voice_map:
-    # 查找默认声音的新显示名称
-    default_voice_shortname = "en-US-JennyNeural"
-    default_display_name = None
-    for display, shortname in voice_map.items():
-        if shortname == default_voice_shortname:
-            default_display_name = display
-            break
-
-    # 如果找到了，就用它作为默认值
+    # 查找一个合适的中文声音作为默认选项
+    options = list(voice_map.keys())
     default_index = 0
-    if default_display_name:
-        try:
-            default_index = list(voice_map.keys()).index(default_display_name)
-        except ValueError:
-            default_index = 0  # 如果找不到，则默认为第一个
+    try:
+        # 寻找一个包含"Xiaoxiao"（一个常用的中文女声）的选项
+        preferred_voice = next(i for i, s in enumerate(options) if "zh-CN" in s and "Xiaoxiao" in s)
+        default_index = preferred_voice
+    except StopIteration:
+        # 如果找不到，就使用第一个
+        pass
 
     display_name = st.selectbox(
-        "请选择一个声音（已按语言分类）",
-        options=list(voice_map.keys()),
+        "请选择一个声音",
+        options=options,
         index=default_index
     )
     selected_voice = voice_map[display_name]
@@ -112,12 +103,31 @@ if voice_map:
     text_to_convert = st.text_area(
         "请输入要转换的文本",
         height=150,
-        placeholder="例如：你好，世界！或者 Hello, Streamlit!"
+        placeholder="例如：你好，欢迎使用这个文本转语音工具！"
     )
 
     # 生成按钮
     if st.button("生成语音", type="primary"):
         if text_to_convert:
+            # --- 语言检测与匹配逻辑 ---
+            try:
+                detected_lang = detect(text_to_convert).split('-')[0]  # 例如 'zh-cn' -> 'zh'
+                voice_lang = selected_voice.split('-')[0]  # 例如 'zh-CN-XiaoxiaoNeural' -> 'zh'
+
+                if detected_lang != voice_lang:
+                    st.warning(
+                        f"**语言不匹配警告！**\n\n"
+                        f"- 您输入的文本检测为：**{LOCALE_MAP.get(detected_lang, detected_lang)}**\n"
+                        f"- 您选择的声音是：**{LOCALE_MAP.get(voice_lang, voice_lang)}**\n\n"
+                        f"请选择与文本语言匹配的声音，否则可能无法生成或效果不佳。"
+                    )
+                    # 停止执行，防止程序因语言不匹配而报错
+                    st.stop()
+
+            except LangDetectException:
+                st.warning("文本过短，无法准确检测语言。将继续尝试生成，但请确保您选择了正确的语言。")
+
+            # --- 语音生成核心逻辑 ---
             with st.spinner("正在生成语音，请稍候..."):
                 try:
                     # 调用异步函数生成语音
@@ -141,4 +151,8 @@ else:
     st.error("无法加载声音列表，请检查网络连接或依赖项。")
 
 # --- 运行说明 ---
-st.info("如何运行本应用：\n1. 确保已安装所需库: pip install streamlit edge-tts\n2. 在终端运行: streamlit run app.py")
+st.info(
+    "如何运行本应用：\n"
+    "1. 确保已安装所需库: `pip install streamlit edge-tts langdetect`\n"
+    "2. 在终端运行: `streamlit run your_app_name.py`"
+)
