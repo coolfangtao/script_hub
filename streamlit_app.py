@@ -14,6 +14,6 @@ with col1:
         st.switch_page(r"pages/1_提取B站标题.py")
 
 with col2:
-    if st.button("📊 Excel合并工具", help="合并多个Excel文件", use_container_width=True):
+    if st.button("📊 合并多个ASIN的关键词结果", help="合并多个Excel文件到一个Excel中", use_container_width=True):
         # 使用新的、有效的文件名
         st.switch_page(r"pages/2_合并excel表格.py")

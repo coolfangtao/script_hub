@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.title("📊 Excel合并工具")
+st.title("📊 合并多个ASIN的关键词结果")
 
 if st.button("← 返回主页"):
     st.switch_page("streamlit_app.py")
