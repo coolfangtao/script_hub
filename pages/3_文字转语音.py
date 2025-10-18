@@ -47,7 +47,7 @@ st.markdown("输入任何文本，选择一个声音，然后生成可以播放�
 voice_map = get_voice_list()
 if voice_map:
     display_name = st.selectbox(
-        "请选择一个声音",
+        "请选择一个声音（zh开头为中文，en开头为英文，请务必选择正确）",
         options=list(voice_map.keys()),
         index=list(voice_map.keys()).index("en-US - JennyNeural (Female)")  # 默认选中一个常用声音
     )
