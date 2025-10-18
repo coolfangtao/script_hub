@@ -1,115 +1,83 @@
 import streamlit as st
-from PIL import Image
-import numpy as np
 from rembg import remove
+from PIL import Image
 import io
 
-# 设置页面标题和布局
-st.set_page_config(page_title="电商图片白底工具", layout="centered")
-st.title("🛍️ 电商图片白底工具")
-st.markdown("""
-**一键去除图片背景，替换为纯白色（RGB: 255,255,255）**  
-适用于商品主图、展示图等电商场景
-""")
+# --- 页面配置 ---
+# st.set_page_config 可以设置页面的标题、图标、布局等
+# layout="wide" 让页面内容占据更宽的屏幕空间
+st.set_page_config(layout="wide", page_title="图片白底小工具")
 
-# 文件上传区域
-uploaded_file = st.file_uploader(
-    "上传图片（支持PNG/JPG/JPEG）",
-    type=["png", "jpg", "jpeg"],
-    help="建议使用商品主体清晰的图片，效果更佳"
-)
+# --- 页面内容 ---
+st.title("🖼️ 图片背景替换为纯白色")
+st.write("上传一张图片，此工具将自动移除其原始背景并替换为纯白色(RGB: 255, 255, 255)。非常适合用于证件照或商品图。")
+st.write("")  # 添加一些空白间距
 
-# 侧边栏设置（可选参数）
-with st.sidebar:
-    st.header("⚙️ 高级设置")
-    bg_color = st.color_picker("背景颜色", "#FFFFFF")  # 默认为纯白
-    border_padding = st.slider("边缘留白（像素）", 0, 100, 10, help="在商品周围添加额外留白")
-    quality = st.slider("输出质量（仅JPG）", 50, 100, 90)
+# --- 主体功能 ---
 
+# 1. 创建文件上传组件
+uploaded_file = st.file_uploader("请在这里上传您的图片...", type=['png', 'jpg', 'jpeg', 'webp'])
 
-# 处理函数
-def process_image(uploaded_file, bg_color, padding):
-    # 将上传的文件转为PIL Image
-    input_img = Image.open(uploaded_file)
-
-    # 使用rembg去除背景（返回RGBA格式）
-    output_img = remove(input_img)
-
-    # 创建纯色背景
-    bg = Image.new("RGB", output_img.size, bg_color)
-
-    # 将去背景图片粘贴到纯色背景上
-    bg.paste(output_img, (0, 0), output_img)
-
-    # 添加留白（如果需要）
-    if padding > 0:
-        new_size = (bg.width + 2 * padding, bg.height + 2 * padding)
-        new_bg = Image.new("RGB", new_size, bg_color)
-        new_bg.paste(bg, (padding, padding))
-        bg = new_bg
-
-    return bg
-
-
-# 如果有文件上传，则进行处理
+# 2. 检查是否有文件被上传
 if uploaded_file is not None:
+
+    # 为了在内存中处理图片，我们使用io.BytesIO
+    input_bytes = uploaded_file.getvalue()
+
+    # 使用Pillow库打开图片
+    try:
+        input_image = Image.open(io.BytesIO(input_bytes))
+    except Exception as e:
+        st.error(f"无法读取图片文件，请确保文件格式正确。错误: {e}")
+        st.stop()
+
+    # 在页面上创建两列布局
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("原图")
-        st.image(uploaded_file, use_column_width=True)
+        st.header("原始图片")
+        st.image(input_image, use_column_width=True)
+
+    # 显示一个加载提示，优化用户体验
+    with st.spinner('正在处理中，请稍候...'):
+        # 3. 使用 rembg 库移除背景
+        # rembg 处理后会返回一个带Alpha通道的PNG格式图片（背景透明）
+        output_image_no_bg = remove(input_bytes)
+
+        # 将处理后的图片（bytes）转换回Pillow Image对象
+        output_image = Image.open(io.BytesIO(output_image_no_bg))
+
+        # 4. 创建一个纯白色的背景
+        # 新建一个和处理后图片大小相同的RGB模式图片
+        # "RGB" 表示红绿蓝三通道，(255, 255, 255) 是白色的颜色代码
+        white_background = Image.new("RGB", output_image.size, (255, 255, 255))
+
+        # 5. 将无背景图片粘贴到白色背景上
+        # 第三个参数 output_image 作为遮罩(mask)，可以确保只粘贴图片的非透明部分
+        white_background.paste(output_image, (0, 0), output_image)
+
+        # 将最终的图片转换成可供下载的bytes
+        final_image_bytes = io.BytesIO()
+        white_background.save(final_image_bytes, format="PNG")
+        final_image_bytes.seek(0)  # 将指针移到文件开头
 
     with col2:
-        st.subheader("白底效果")
-        with st.spinner("正在处理中，请稍候..."):
-            try:
-                # 处理图片
-                result_img = process_image(
-                    uploaded_file,
-                    bg_color,
-                    border_padding
-                )
+        st.header("白底图片")
+        st.image(white_background, use_column_width=True)
 
-                # 显示结果
-                st.image(result_img, use_column_width=True)
+    # 6. 创建下载按钮
+    st.download_button(
+        label="📥 下载白底图片",
+        data=final_image_bytes,
+        file_name=f"white_bg_{uploaded_file.name}.png",  # 为下载文件生成一个新名字
+        mime="image/png"
+    )
 
-                # 转换为字节流供下载
-                img_bytes = io.BytesIO()
-                format = "PNG" if uploaded_file.type.endswith("png") else "JPEG"
-                result_img.save(img_bytes, format=format, quality=quality)
-                img_bytes.seek(0)
+else:
+    # 如果没有文件上传，显示提示信息
+    st.info("等待您上传图片...")
 
-                # 下载按钮
-                st.download_button(
-                    label="下载处理后的图片",
-                    data=img_bytes,
-                    file_name=f"white_bg_{uploaded_file.name}",
-                    mime=f"image/{format.lower()}"
-                )
-
-            except Exception as e:
-                st.error(f"处理失败: {str(e)}")
-                st.error("请尝试更换图片或调整参数")
-
-# 使用说明折叠区域
-with st.expander("📚 使用说明与技巧"):
-    st.markdown("""
-    ### 最佳实践建议：
-    1. **图片选择**：商品主体清晰、与背景对比度高的图片效果最好
-    2. **复杂边缘处理**：对于毛发、透明材质等复杂边缘，可能需要后期手动修图
-    3. **文件格式**：
-       - PNG格式保留更多细节（文件较大）
-       - JPG格式适合网页使用（文件较小）
-    4. **批量处理**：如需处理多张图片，请逐个上传
-
-    ### 常见问题：
-    ❓ **为什么有些边缘有残留？**  
-    → 尝试增加"边缘留白"参数，或使用专业修图软件微调
-
-    ❓ **如何处理透明背景？**  
-    → 将背景颜色设置为透明色码`#00000000`（需输出PNG格式）
-    """)
-
-# 页脚
+# --- 页脚 ---
+st.write("")
 st.markdown("---")
-st.caption("© 2023 电商工具箱 | 使用技术: Python + rembg + Streamlit")
+st.markdown("由 Gemini 和 Streamlit 强力驱动 | `rembg` 用于背景移除")
