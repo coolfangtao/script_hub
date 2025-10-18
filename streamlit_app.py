@@ -1,24 +1,46 @@
 import streamlit as st
 
+# 页面基础设置
 st.set_page_config(layout="wide")
-
 st.title("🚀 FT的脚本中心")
 
-# --- 假设你将文件名修改为了 1_提取B站标题.py 和 2_合并多个ASIN的关键词结果.py ---
+# --- 优化点 1: 将所有脚本信息集中存放在一个列表中 ---
+# 以后每新增一个脚本，只需要在这里添加一个字典即可
+# 格式: {"label": "按钮上显示的文字", "help": "鼠标悬停时的提示", "path": "脚本文件路径"}
+scripts_config = [
+    {
+        "label": "📌 B站标题提取工具",
+        "help": "从HTML提取标题",
+        "path": r"pages/1_提取B站标题.py"
+    },
+    {
+        "label": "📊 合并多个ASIN的关键词结果",
+        "help": "合并多个Excel文件到一个Excel中",
+        "path": r"pages/2_合并多个ASIN的关键词结果.py"
+    },
+    {
+        "label": "🔊 文字转语音",
+        "help": "输入文字，输出语音",
+        "path": r"pages/3_文字转语音.py"
+    },
+    # --- 示例: 如果未来要添加第4个工具，只需在这里新增一行即可 ---
+    # {
+    #     "label": "💡 新工具名称",
+    #     "help": "这个新工具是用来做...",
+    #     "path": r"pages/4_新工具.py"
+    # },
+]
 
-col1, col2, col3 = st.columns(3)
+# --- 优化点 2: 动态创建列和按钮 ---
+# 你可以在这里轻松调整每行显示的列数
+NUM_COLUMNS = 3
+cols = st.columns(NUM_COLUMNS)
 
-with col1:
-    if st.button("📌 B站标题提取工具", help="从HTML提取标题", use_container_width=True):
-        # 使用新的、有效的文件名
-        st.switch_page(r"pages/1_提取B站标题.py")
-
-with col2:
-    if st.button("📊 合并多个ASIN的关键词结果", help="合并多个Excel文件到一个Excel中", use_container_width=True):
-        # 使用新的、有效的文件名
-        st.switch_page(r"pages/2_合并多个ASIN的关键词结果.py")
-
-with col3:
-    if st.button("🔊 文字转语音", help="输入文字，输出语音", use_container_width=True):
-        # 使用新的、有效的文件名
-        st.switch_page(r"pages/3_文字转语音.py")
+# 通过循环遍历配置列表，自动生成所有按钮
+for index, script in enumerate(scripts_config):
+    # 使用取模运算(%)来循环将按钮依次放入不同的列
+    # 比如第0个按钮放第0列，第1个放第1列，第2个放第2列，第3个再回到第0列...
+    col = cols[index % NUM_COLUMNS]
+    with col:
+        if st.button(script["label"], help=script["help"], use_container_width=True):
+            st.switch_page(script["path"])
