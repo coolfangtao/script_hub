@@ -3,8 +3,8 @@ import edge_tts
 import asyncio
 from io import BytesIO
 from langdetect import detect, LangDetectException
-from shared.sidebar import create_sidebar # <-- 1. 导入函数
-create_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
+from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # --- 语言区域代码到中文名称的映射 ---
 # 用于在下拉菜单中显示更友好的语言名称

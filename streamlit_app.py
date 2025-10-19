@@ -1,13 +1,13 @@
 # 文件路径: streamlit_app.py
 
 import streamlit as st
-from shared.sidebar import create_sidebar, SCRIPTS_BY_GROUP # <-- 1. 导入函数
+from shared.sidebar import create_common_sidebar, SCRIPTS_BY_GROUP # <-- 1. 导入函数
 
 # --- 页面基础设置 (必须是第一个st命令) ---
 st.set_page_config(layout="wide")
 
 # --- 创建侧边栏 ---
-create_sidebar() # <-- 2. 调用函数
+create_common_sidebar() # <-- 2. 调用函数
 
 # --- 页面主内容 ---
 st.title("🚀 FT的脚本中心")

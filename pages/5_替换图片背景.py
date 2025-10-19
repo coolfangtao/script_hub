@@ -2,8 +2,8 @@ import streamlit as st
 from rembg import remove
 from PIL import Image
 import io
-from shared.sidebar import create_sidebar # <-- 1. 导入函数
-create_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
+from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # --- 页面配置 ---
 # st.set_page_config 可以设置页面的标题、图标、布局等

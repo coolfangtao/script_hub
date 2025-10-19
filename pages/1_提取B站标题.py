@@ -1,8 +1,8 @@
 import streamlit as st
 import re
 
-from shared.sidebar import create_sidebar # <-- 1. 导入函数
-create_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
+from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # Main title of the application
 st.title("📌 B站标题提取工具")

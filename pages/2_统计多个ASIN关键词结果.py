@@ -3,8 +3,8 @@ import pandas as pd
 import plotly.express as px
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
-from shared.sidebar import create_sidebar # <-- 1. 导入函数
-create_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
+from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # --- 1. 核心功能函数 ---
 def load_merged_data(uploaded_file):

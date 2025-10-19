@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-from shared.sidebar import create_sidebar # <-- 1. 导入函数
-create_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
+from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 
 def load_data(uploaded_file):

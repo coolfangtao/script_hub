@@ -58,7 +58,7 @@ SCRIPTS_BY_GROUP = {
 }
 
 
-def create_sidebar():
+def create_common_sidebar():
     """
     在Streamlit应用的侧边栏中创建一个分组导航。
     """
@@ -74,6 +74,11 @@ def create_sidebar():
 
     # 2. 创建自定义的侧边栏内容
     st.sidebar.title("🛠️ 功能导航")
+    st.sidebar.divider()
+
+    # --- 新增代码: 添加返回主页的按钮 ---
+    # 假设你的主页文件名为 streamlit_app.py
+    st.sidebar.page_link("streamlit_app.py", label="🏠 返回主页")
     st.sidebar.divider()
 
     for group_name, scripts_in_group in SCRIPTS_BY_GROUP.items():

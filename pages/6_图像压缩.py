@@ -1,8 +1,8 @@
 import streamlit as st
 from PIL import Image
 import io
-from shared.sidebar import create_sidebar # <-- 1. 导入函数
-create_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
+from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # --- 页面配置 ---
 st.set_page_config(layout="wide", page_title="图片大小修改器")
