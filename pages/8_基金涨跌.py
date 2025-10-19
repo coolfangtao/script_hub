@@ -15,7 +15,6 @@ st.set_page_config(
 )
 
 # 定义我们感兴趣的板块及其对应的板块代码
-# 通过代码获取数据比通过名称更精确、更快速
 TARGET_SECTORS = {
     "国防军工": "BK0548",
     "半导体产业": "BK1031",
@@ -29,20 +28,16 @@ TARGET_SECTORS = {
 def is_trading_time():
     """检查当前是否为A股交易时间"""
     now = datetime.now()
-    if now.weekday() >= 5: return False  # 周末休市
+    if now.weekday() >= 5: return False
     now_time = now.time()
     is_morning = time(9, 30) <= now_time <= time(11, 30)
     is_afternoon = time(13, 0) <= now_time <= time(15, 0)
     return is_morning or is_afternoon
 
 
-@st.cache_data(ttl=60)  # 缓存60秒
+@st.cache_data(ttl=60)
 def fetch_data():
-    """
-    智能数据获取函数：
-    - 如果是交易时间，获取实时数据。
-    - 如果是非交易时间，获取最近一个交易日的收盘数据。
-    """
+    """智能数据获取函数"""
     if is_trading_time():
         return fetch_live_data()
     else:
@@ -50,57 +45,60 @@ def fetch_data():
 
 
 def fetch_live_data():
-    """在交易时间内从akshare获取实时数据"""
+    """在交易时间内获取实时数据"""
     try:
         spot_df = ak.stock_board_concept_spot_em()
-        # 直接通过板块代码进行筛选
         target_df = spot_df[spot_df['代码'].isin(TARGET_SECTORS.values())].copy()
 
-        # 为了获取迷你图的历史数据，我们仍然需要查询历史接口
         history_list = []
         end_date = datetime.now().strftime('%Y%m%d')
         start_date = (datetime.now() - timedelta(days=60)).strftime('%Y%m%d')
         for code in target_df['代码']:
             hist_df = ak.stock_board_concept_hist_em(symbol=code, start_date=start_date, end_date=end_date)
-            history_list.append(hist_df['收盘'].tolist())
+            # --- 【同样增加安全检查】 ---
+            history_list.append(hist_df['收盘'].tolist() if not hist_df.empty else [])
 
         target_df['history'] = history_list
         target_df = target_df.rename(columns={'名称': 'name', '代码': 'code', '最新价': 'price', '涨跌幅': 'change_rate'})
         return target_df[['name', 'code', 'price', 'change_rate', 'history']]
     except Exception as e:
         st.error(f"获取实时数据失败: {e}. 将尝试获取收盘数据。")
-        return fetch_latest_closing_data()  # 如果实时接口失败，则自动降级
+        return fetch_latest_closing_data()
 
 
 def fetch_latest_closing_data():
     """在非交易时间获取最近交易日的收盘数据"""
     all_data = []
     end_date = datetime.now().strftime('%Y%m%d')
-    start_date = (datetime.now() - timedelta(days=90)).strftime('%Y%m%d')  # 获取更长周期确保有足够数据
+    start_date = (datetime.now() - timedelta(days=90)).strftime('%Y%m%d')
 
     for name, code in TARGET_SECTORS.items():
         try:
             hist_df = ak.stock_board_concept_hist_em(symbol=code, start_date=start_date, end_date=end_date)
-            if hist_df.empty: continue
 
-            latest_data = hist_df.iloc[-1]  # 最后一行即为最近交易日数据
-            all_data.append({
-                "name": name,
-                "code": code,
-                "price": latest_data['收盘'],
-                "change_rate": latest_data['涨跌幅'],
-                "history": hist_df['收盘'].tail(60).tolist()  # 取最近60天作为迷你图数据
-            })
+            # --- 【关键修改】在这里增加安全检查 ---
+            # 只有当返回的hist_df不是空的时候，才执行后续操作
+            if not hist_df.empty:
+                latest_data = hist_df.iloc[-1]
+                all_data.append({
+                    "name": name,
+                    "code": code,
+                    "price": latest_data['收盘'],
+                    "change_rate": latest_data['涨跌幅'],
+                    "history": hist_df['收盘'].tail(60).tolist()
+                })
+            else:
+                # 如果是空的，就打印一个警告，然后继续处理下一个板块
+                st.warning(f"未能获取板块 '{name}' 的历史数据，数据源可能暂时不可用。")
+
         except Exception as e:
-            st.warning(f"获取板块 '{name}' 的历史数据失败: {e}")
+            st.warning(f"处理板块 '{name}' 时发生错误: {e}")
 
     return pd.DataFrame(all_data)
 
 
-# --- 界面渲染函数 ---
-
+# --- 界面渲染函数 (此部分无变化) ---
 def create_sparkline(data, is_positive):
-    """创建一个迷你的Plotly趋势图"""
     if not data or len(data) < 2: return go.Figure()
     color = "#d62728" if is_positive else "#2ca02c"
     fig = go.Figure(go.Scatter(
@@ -116,31 +114,23 @@ def create_sparkline(data, is_positive):
 
 
 def display_dashboard(df):
-    """根据给定的DataFrame渲染整个仪表盘"""
     st.title("📈 中国股市板块监控")
-
     if is_trading_time():
         st.caption(f"当前显示为 **实时行情** (自动刷新中, 最后更新: {datetime.now().strftime('%H:%M:%S')})")
     else:
         st.caption(f"当前为非交易时段，显示 **最近交易日收盘数据**")
-
     if df.empty:
         st.warning("未能获取到任何板块数据，请稍后刷新或检查网络。")
         return
-
-    # 按照我们定义的顺序显示
     df['name'] = pd.Categorical(df['name'], categories=TARGET_SECTORS.keys(), ordered=True)
     df = df.sort_values('name')
-
     for _, row in df.iterrows():
         name, code, price, change_rate, history = row['name'], row['code'], row['price'], row['change_rate'], row[
             'history']
         is_positive = change_rate >= 0
         color = "#d62728" if is_positive else "#2ca02c"
-
         st.markdown("---")
         col1, col2, col3 = st.columns([2.5, 2, 2])
-
         with col1:
             st.markdown(f"""
             <div style="font-size: 1.2em; font-weight: bold; line-height: 1.5;">{name}</div>
@@ -159,12 +149,7 @@ def display_dashboard(df):
 
 
 # --- 主逻辑 ---
-# 统一调用智能数据获取函数
 data_to_display = fetch_data()
-
-# 渲染界面
 display_dashboard(data_to_display)
-
-# 仅在交易时间执行自动刷新
 if is_trading_time():
     st.rerun()
