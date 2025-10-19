@@ -124,23 +124,37 @@ def display_key_metrics(df: pd.DataFrame, is_consolidated: bool = False, asin: s
         st.info(f"当前数据为单个ASIN **{asin}** 的分析结果。")
 
 
-def plot_keyword_traffic(df):
+def plot_keyword_traffic(df: pd.DataFrame):
     """
     展示关键词流量的堆叠条形图。
-
-    Args:
-        df (pd.DataFrame): 包含关键词数据的DataFrame。
+    此函数会先聚合数据，以正确处理单文件和合并后文件的情况。
     """
     st.subheader("关键词流量 (Keyword Traffic)")
 
-    # 选取流量占比最高的前20个关键词
-    top_20_traffic = df.sort_values(by="流量占比", ascending=False).head(20)
+    # 过滤掉流量占比为0的数据
+    df_filtered = df[df['流量占比'] > 0].copy()
+    if df_filtered.empty:
+        st.warning("没有有效的流量数据可供展示。")
+        return
 
-    # 计算自然流量和广告流量的绝对占比
-    top_20_traffic["自然流量绝对占比"] = top_20_traffic["流量占比"] * top_20_traffic["自然流量占比"]
-    top_20_traffic["广告流量绝对占比"] = top_20_traffic["流量占比"] * top_20_traffic["广告流量占比"]
+    # --- 新增聚合逻辑 ---
+    # 无论处理单文件还是多文件，都先按关键词聚合，以处理重复关键词（尤其是在合并数据中）
+    # 1. 首先计算每行的绝对流量贡献
+    df_filtered["自然流量绝对占比"] = df_filtered["流量占比"] * df_filtered["自然流量占比"]
+    df_filtered["广告流量绝对占比"] = df_filtered["流量占比"] * df_filtered["广告流量占比"]
 
-    # 融化DataFrame以适配Plotly的格式
+    # 2. 按“流量词”分组并合计相关指标
+    aggregated_df = df_filtered.groupby("流量词").agg({
+        "流量占比": "sum",
+        "自然流量绝对占比": "sum",
+        "广告流量绝对占比": "sum"
+    }).reset_index()
+    # --- 聚合逻辑结束 ---
+
+    # 从聚合后的数据中选取Top 20
+    top_20_traffic = aggregated_df.sort_values(by="流量占比", ascending=False).head(20)
+
+    # 融化聚合后的DataFrame以适配Plotly的格式
     plot_df = top_20_traffic.melt(
         id_vars=["流量词"],
         value_vars=["自然流量绝对占比", "广告流量绝对占比"],
@@ -148,41 +162,20 @@ def plot_keyword_traffic(df):
         value_name="占比"
     )
 
-    # 绘制图表
     fig = px.bar(
-        plot_df,
-        y="流量词",
-        x="占比",
-        color="流量类型",
-        orientation='h',
+        plot_df, y="流量词", x="占比", color="流量类型", orientation='h',
         title="Top 20 关键词流量分布",
         labels={"流量词": "关键词", "占比": "流量占比"},
-        color_discrete_map={
-            "自然流量绝对占比": "#636EFA",
-            "广告流量绝对占比": "#EF553B"
-        },
-        text="占比"  # 添加文本显示
+        color_discrete_map={"自然流量绝对占比": "#636EFA", "广告流量绝对占比": "#EF553B"},
+        text="占比"
     )
-
-    # 格式化文本显示
-    fig.update_traces(
-        texttemplate='%{text:.1%}',  # 显示为百分比格式，保留1位小数
-        textposition='inside',  # 文本显示在柱子内部
-        insidetextanchor='middle'  # 文本在柱子中间
-    )
-
+    fig.update_traces(texttemplate='%{text:.2%}', textposition='inside', insidetextanchor='middle')
     fig.update_layout(
-        xaxis_title="流量占比",
-        yaxis_title="关键词",
-        yaxis={'categoryorder': 'total ascending'},
-        height=800,
+        xaxis_title="流量占比", yaxis_title="关键词",
+        yaxis={'categoryorder': 'total ascending'}, height=800,
         legend_title_text='流量类型',
-        xaxis=dict(
-            tickformat=".1%",  # x轴刻度显示为百分比
-            range=[0, top_20_traffic["流量占比"].max() * 1.1]  # 调整x轴范围
-        )
+        xaxis=dict(tickformat=".2%")
     )
-
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -239,6 +232,22 @@ def display_frequency_table(freq_df):
         height=600,
         use_container_width=True
     )
+
+def display_aggregated_word_frequency(df: pd.DataFrame):
+    """展示单词频率表格和词云。"""
+    # --- 词频分析 ---
+    # 1. 计算词频 (公共逻辑)
+    text = ' '.join(df['流量词'].dropna())
+    words = re.findall(r'\b\w+\b', text.lower())
+    word_counts = Counter(words)
+    total_words = sum(word_counts.values())
+    freq_df = pd.DataFrame(word_counts.items(), columns=["单词", "出现次数"])
+    freq_df["频率"] = freq_df["出现次数"] / total_words
+    freq_df = freq_df.sort_values(by="出现次数", ascending=False)
+
+    # 2. 依次展示词云和表格
+    display_word_cloud(word_counts)
+    display_frequency_table(freq_df)
 
 def plot_search_volume_and_purchases(df: pd.DataFrame):
     """展示关键词搜索量和购买量的堆叠条形图。"""
@@ -309,23 +318,6 @@ def plot_asin_traffic_contribution(df: pd.DataFrame):
     fig.update_traces(texttemplate='%{text:,.0f}', textposition='outside')
     fig.update_layout(xaxis_tickangle=-45)
     st.plotly_chart(fig, use_container_width=True)
-
-
-def display_aggregated_word_frequency(df: pd.DataFrame):
-    """为合并数据展示单词频率表格和词云。"""
-    # --- 词频分析 ---
-    # 1. 计算词频 (公共逻辑)
-    text = ' '.join(df['流量词'].dropna())
-    words = re.findall(r'\b\w+\b', text.lower())
-    word_counts = Counter(words)
-    total_words = sum(word_counts.values())
-    freq_df = pd.DataFrame(word_counts.items(), columns=["单词", "出现次数"])
-    freq_df["频率"] = freq_df["出现次数"] / total_words
-    freq_df = freq_df.sort_values(by="出现次数", ascending=False)
-
-    # 2. 依次展示词云和表格
-    display_word_cloud(word_counts)
-    display_frequency_table(freq_df)
 
 
 # --- Streamlit 页面主函数 ---
