@@ -9,7 +9,11 @@ SCRIPTS_BY_GROUP = {
         {
             "label": "AI对话",
             "path": r"pages/7_AI_对话页面.py"  # 假设新文件放在pages目录下
-        }
+        },
+        {
+            "label": "英语语音现象分析",
+            "path": r"pages/3_英语句子语音现象分析.py"
+        },
     ],
     "📊 运营维护": [
         {
@@ -49,10 +53,6 @@ SCRIPTS_BY_GROUP = {
         {
             "label": "文本对比",
             "path": r"pages/4_文本对比.py"
-        },
-        {
-            "label": "句子语音现象分析",
-            "path": r"pages/3_英语句子语音现象分析.py"
         },
     ],
     "🖼️ 图像处理": [
