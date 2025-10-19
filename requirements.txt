@@ -6,3 +6,5 @@ onnxruntime
 openpyxl
 wordcloud
 plotly
+googletrans
+easyocr
