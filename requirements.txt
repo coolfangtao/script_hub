@@ -10,3 +10,5 @@ googletrans
 easyocr
 deep-translator
 google-generativeai
+streamlit
+st-connections-turso
