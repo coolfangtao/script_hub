@@ -14,6 +14,16 @@ scripts_config = [
         "path": r"pages/1_提取B站标题.py"
     },
     {
+        "label": "🔊 文字转语音",
+        "help": "输入文字，输出语音",
+        "path": r"pages/3_文字转语音.py"
+    },
+    {
+        "label": "🔎 文本对比",
+        "help": "对比两段文本，发现修改的内容",
+        "path": r"pages/4_文本对比.py"
+    },
+    {
         "label": "📊 统计单个ASIN关键词结果",
         "help": "📊 统计单个ASIN关键词结果",
         "path": r"pages/2_统计单个ASIN关键词结果.py"
@@ -27,16 +37,6 @@ scripts_config = [
         "label": "📊 合并多个ASIN的关键词结果",
         "help": "合并多个Excel文件到一个Excel中",
         "path": r"pages/2_合并多个ASIN关键词结果.py"
-    },
-    {
-        "label": "🔊 文字转语音",
-        "help": "输入文字，输出语音",
-        "path": r"pages/3_文字转语音.py"
-    },
-    {
-        "label": "🔎 文本对比",
-        "help": "对比两段文本，发现修改的内容",
-        "path": r"pages/4_文本对比.py"
     },
     {
         "label": "🖼️ 替换图片背景",
