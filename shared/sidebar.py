@@ -5,7 +5,7 @@ import streamlit as st
 # --- 核心数据结构: 统一管理所有脚本和分组 ---
 # 这是你项目中唯一的"数据源"，所有页面都从这里读取导航信息
 SCRIPTS_BY_GROUP = {
-"🤖 AI工具": [
+    "🤖 AI工具": [
         {
             "label": "AI 对话页面",
             "path": r"pages/7_AI_对话页面.py"  # 假设新文件放在pages目录下

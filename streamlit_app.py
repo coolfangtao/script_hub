@@ -56,7 +56,7 @@ with col4:
     with st.container(border=True):
         st.markdown("<h5>🤖 AI工具</h5>", unsafe_allow_html=True)
         st.write("在没有VPN的情况下也能使用Gemini 2.5 Pro功能")
-        if st.button("立即开始", key="tts", use_container_width=True):
+        if st.button("立即开始", key="ai", use_container_width=True):
             st.switch_page(r"pages/7_AI_对话页面.py")
 
 st.markdown("---")
