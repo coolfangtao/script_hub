@@ -60,7 +60,7 @@ SCRIPTS_BY_GROUP = {
 
 def create_common_sidebar():
     """
-    在Streamlit应用的侧边栏中创建一个分组导航。
+    在Streamlit应用的侧边栏中创建一个公共分组导航。
     """
 
     # 1. 注入CSS以隐藏默认的Streamlit导航
