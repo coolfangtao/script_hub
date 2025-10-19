@@ -81,8 +81,8 @@ def plot_keyword_traffic(df):
 def display_word_cloud(word_counts):
     st.write("单词词云")
     wordcloud = WordCloud(
-        # width=1600,  # 增大画布尺寸
-        height=1200,
+        width=1600,  # 增大画布尺寸
+        height=900,
         background_color=None,
         mode="RGBA",
         # max_words=200,  # 限制单词数量
@@ -94,7 +94,7 @@ def display_word_cloud(word_counts):
     ).generate_from_frequencies(word_counts)
 
     # 创建图形时设置更高的DPI
-    fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
+    fig, ax = plt.subplots(figsize=(12, 9), dpi=300)
     ax.imshow(wordcloud, interpolation='bilinear')
     ax.axis('off')
 
