@@ -36,7 +36,7 @@ with col1:
         st.markdown("<h5>📊 关键词结果合并</h5>", unsafe_allow_html=True)
         st.write("一键将多个ASIN的关键词分析Excel文件合并成一个总表，方便后续分析。")
         if st.button("立即开始", key="merge_asin", use_container_width=True):
-            st.switch_page(r"pages/2_合并多个ASIN关键词结果.py")
+            st.switch_page(r"pages/2_关键词统计.py")
 
 with col2:
     with st.container(border=True):
