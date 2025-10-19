@@ -54,6 +54,7 @@ st.markdown("""
         border-radius: 5px;
         font-size: 1.1em;
         line-height: 1.6;
+        color: #212529; /* <--  已修复：为这个框设置固定的深色文字 */
     }
     .phonetic-analysis strong {
         color: #005A9C;
@@ -95,7 +96,7 @@ def analyze_phonetics_with_gemini(text: str, model_name: str) -> str:
         return ""
 
     try:
-        model = genai.GenerativeModel(model_name) # <-- 使用传入的模型名称
+        model = genai.GenerativeModel(model_name)
         prompt = f"""
         请作为一名专业的英语语音教师，分析以下句子的语音现象。
 
@@ -136,7 +137,7 @@ def process_and_display_results(sentence: str, selected_model: str):
     with col1:
         st.subheader("语音现象分析")
         with st.spinner("🤖 正在分析中，请稍候..."):
-            analysis_result = analyze_phonetics_with_gemini(sentence, selected_model) # <-- 传递模型名称
+            analysis_result = analyze_phonetics_with_gemini(sentence, selected_model)
             st.markdown(f'<div class="phonetic-analysis">{analysis_result}</div>', unsafe_allow_html=True)
 
     with col2:
@@ -169,7 +170,7 @@ def main():
                 "- 插读 (Intrusion): 在插入音素的位置使用 `+` 号，例如 go+w away\n"
                 "- 停顿: | 符号表示自然的语调停顿。")
 
-    # 新增：模型选择框
+    # 模型选择框
     selected_model = st.selectbox(
         "**请选择一个分析模型：**",
         options=MODEL_OPTIONS,
@@ -185,7 +186,7 @@ def main():
         submitted = st.form_submit_button("分析并生成语音", type="primary")
 
     if submitted:
-        # 移除侧边栏API配置，改为直接从secrets读取
+        # 从secrets读取API密钥
         try:
             api_key = st.secrets["API_KEY"]
             genai.configure(api_key=api_key)
@@ -196,7 +197,7 @@ def main():
             st.error(f"API 密钥配置失败，请检查您的密钥是否正确。错误: {e}", icon="🚨")
             return
 
-        # 开始处理并展示结果，传入选择的模型
+        # 开始处理并展示结果
         process_and_display_results(sentence, selected_model)
 
 
