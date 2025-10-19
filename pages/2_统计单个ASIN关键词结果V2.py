@@ -1,196 +1,214 @@
-import pandas as pd
 import streamlit as st
-import altair as alt
+import pandas as pd
+import plotly.express as px
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
-import re
 from collections import Counter
+import re
 from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
 create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 
-def load_data(uploaded_file):
+def display_key_metrics(df):
     """
-    从上传的Excel文件中加载数据，并从文件名中提取ASIN等信息。
+    展示关键指标总览。
+
+    Args:
+        df (pd.DataFrame): 包含关键词数据的DataFrame。
     """
-    file_details = {}
-    file_name = uploaded_file.name
-    # 使用正则表达式从文件名解析信息
-    match = re.search(r"ReverseASIN-([A-Z]{2})-([A-Z0-9]+)\((\d+)\)-(\d+)", file_name)
-    if match:
-        file_details['country'] = match.group(1)
-        file_details['asin'] = match.group(2)
-        file_details['keyword_count'] = int(match.group(3))
-        file_details['date'] = match.group(4)
+    st.subheader("关键指标总览 (Key Metrics)")
 
-    # 读取Excel文件的第一个sheet
-    df = pd.read_excel(uploaded_file, sheet_name=0)
-
-    # 数据清洗和类型转换
-    numeric_cols = ['流量占比', '预估周曝光量', '自然流量占比', '广告流量占比', '月搜索量', 'SPR', '需供比', '购买率']
-    for col in numeric_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-
-    df.dropna(subset=numeric_cols, inplace=True)
-    return df, file_details
-
-
-def calculate_word_frequency(df):
-    """
-    从'流量词'列计算单词频率。
-    """
-    # 将所有流量词合并成一个长字符串，并转换为小写
-    text = ' '.join(df['流量词'].dropna().astype(str)).lower()
-    # 使用正则表达式找到所有单词
-    words = re.findall(r'\b[a-z]+\b', text)
-    # 计算每个单词的频率
-    word_counts = Counter(words)
-    # 转换为DataFrame
-    word_df = pd.DataFrame(word_counts.items(), columns=['词语', '出现频次']).sort_values(by='出现频次', ascending=False)
-    return word_df
-
-
-def display_metrics(df):
-    """
-    计算并以列的形式显示关键指标。
-    """
-    st.header("关键指标总览 (Key Metrics)")
-
-    total_weekly_impressions = df['预估周曝光量'].sum()
-
-    if df['流量占比'].sum() > 0:
-        weighted_natural_traffic = (df['自然流量占比'] * df['流量占比']).sum() / df['流量占比'].sum()
-        weighted_ad_traffic = (df['广告流量占比'] * df['流量占比']).sum() / df['流量占比'].sum()
-    else:
-        weighted_natural_traffic = 0
-        weighted_ad_traffic = 0
-
-    avg_spr = df['SPR'].mean()
-    avg_supply_demand_ratio = df['需供比'].mean()
-    avg_purchase_rate = df['购买率'].mean()
-    total_monthly_search = df['月搜索量'].sum()
+    total_keywords = len(df)
+    total_weekly_impressions = df["预估周曝光量"].sum()
+    total_monthly_searches = df["月搜索量"].sum()
+    total_purchases = df["购买量"].sum()
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("预估周曝光总量", f"{total_weekly_impressions:,.0f}")
-    col2.metric("平均自然流量占比", f"{weighted_natural_traffic:.2%}")
-    col3.metric("平均广告流量占比", f"{weighted_ad_traffic:.2%}")
-    col4.metric("月搜索总量", f"{total_monthly_search:,.0f}")
-
-    col5, col6, col7 = st.columns(3)
-    col5.metric("平均SPR", f"{avg_spr:.2f}")
-    col6.metric("平均供需比", f"{avg_supply_demand_ratio:.2f}")
-    col7.metric("平均购买率", f"{avg_purchase_rate:.2%}")
+    col1.metric("关键词总数", f"{total_keywords}")
+    col2.metric("预估周曝光量总计", f"{int(total_weekly_impressions):,}")
+    col3.metric("月搜索量总计", f"{int(total_monthly_searches):,}")
+    col4.metric("购买量总计", f"{int(total_purchases):,}")
 
 
-def display_top_keywords_chart(df):
+def plot_keyword_traffic(df):
     """
-    显示流量占比最高的10个关键词的横向柱状图。
-    """
-    st.header("流量占比Top 10关键词")
-    top_10_keywords = df.nlargest(10, '流量占比')
+    展示关键词流量的堆叠条形图。
 
-    chart = alt.Chart(top_10_keywords).mark_bar().encode(
-        x=alt.X('流量占比:Q', title='流量占比', axis=alt.Axis(format='%')),
-        y=alt.Y('流量词:N', sort='-x', title='关键词'),
-        tooltip=['流量词', '流量占比', '预估周曝光量', '月搜索量']
-    ).properties(
-        title='流量占比Top 10关键词'
+    Args:
+        df (pd.DataFrame): 包含关键词数据的DataFrame。
+    """
+    st.subheader("关键词流量 (Keyword Traffic)")
+
+    # 选取流量占比最高的前20个关键词
+    top_20_traffic = df.sort_values(by="流量占比", ascending=False).head(20)
+
+    # 计算自然流量和广告流量的绝对占比
+    top_20_traffic["自然流量绝对占比"] = top_20_traffic["流量占比"] * top_20_traffic["自然流量占比"]
+    top_20_traffic["广告流量绝对占比"] = top_20_traffic["流量占比"] * top_20_traffic["广告流量占比"]
+
+    # 融化DataFrame以适配Plotly的格式
+    plot_df = top_20_traffic.melt(
+        id_vars=["流量词"],
+        value_vars=["自然流量绝对占比", "广告流量绝对占比"],
+        var_name="流量类型",
+        value_name="占比"
     )
-    st.altair_chart(chart, use_container_width=True)
 
-
-def display_traffic_source_distribution(df):
-    """
-    显示总体流量来源分布的饼图。
-    """
-    st.header("总体流量来源分布")
-
-    if df['流量占比'].sum() > 0:
-        natural_traffic_total = (df['自然流量占比'] * df['流量占比']).sum()
-        ad_traffic_total = (df['广告流量占比'] * df['流量占比']).sum()
-    else:
-        natural_traffic_total = 0
-        ad_traffic_total = 0
-
-    source_data = pd.DataFrame({
-        '来源': ['自然流量', '广告流量'],
-        '占比': [natural_traffic_total, ad_traffic_total]
-    })
-
-    chart = alt.Chart(source_data).mark_arc(innerRadius=50).encode(
-        theta=alt.Theta(field="占比", type="quantitative"),
-        color=alt.Color(field="来源", type="nominal", title="流量来源"),
-        tooltip=['来源', '占比']
-    ).properties(
-        title='自然流量 vs. 广告流量'
+    # 绘制图表
+    fig = px.bar(
+        plot_df,
+        y="流量词",
+        x="占比",
+        color="流量类型",
+        orientation='h',
+        title="Top 20 关键词流量分布",
+        labels={"流量词": "关键词", "占比": "流量占比"},
+        color_discrete_map={
+            "自然流量绝对占比": "#636EFA",
+            "广告流量绝对占比": "#EF553B"
+        }
     )
-    st.altair_chart(chart, use_container_width=True)
+
+    fig.update_layout(
+        xaxis_title="流量占比",
+        yaxis_title="关键词",
+        yaxis={'categoryorder': 'total ascending'},
+        height=800,
+        legend_title_text='流量类型'
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
-def display_word_cloud(word_df):
+def display_word_frequency(df):
     """
-    根据单词频率数据生成并显示词云，同时显示包含频率和占比的表格。
+    展示组成关键词的单词频率，包括词云和表格。
+
+    Args:
+        df (pd.DataFrame): 包含关键词数据的DataFrame。
     """
-    st.header("关键词词云")
+    st.subheader("组成关键词的单词频率 (Word Frequency)")
 
-    # 词云图只显示频率最高的100个词
-    word_df_top100 = word_df.head(100)
-    word_freq = dict(zip(word_df_top100['词语'], word_df_top100['出现频次']))
+    # 将所有流量词合并为一个长字符串
+    text = ' '.join(df['流量词'].dropna())
 
-    if word_freq:
-        wordcloud = WordCloud(width=800, height=400, background_color='white',
-                              collocations=False).generate_from_frequencies(word_freq)
+    # 使用正则表达式找到所有单词
+    words = re.findall(r'\b\w+\b', text.lower())
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+    # 统计词频
+    word_counts = Counter(words)
+    total_words = sum(word_counts.values())
+
+    # 创建词频DataFrame
+    freq_df = pd.DataFrame(word_counts.items(), columns=["单词", "出现次数"])
+    freq_df["频率"] = freq_df["出现次数"] / total_words
+    freq_df = freq_df.sort_values(by="出现次数", ascending=False)
+
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.write("单词词云")
+        wordcloud = WordCloud(
+            width=800,
+            height=600,
+            background_color='white'
+        ).generate_from_frequencies(word_counts)
+
+        fig, ax = plt.subplots()
         ax.imshow(wordcloud, interpolation='bilinear')
         ax.axis('off')
         st.pyplot(fig)
-    else:
-        st.warning("没有找到可以生成词云的关键词。")
 
-    st.subheader("单词频率详情")
-    total_words = word_df['出现频次'].sum()
-    if total_words > 0:
-        word_df['占比'] = (word_df['出现频次'] / total_words)
-        st.dataframe(word_df[['词语', '出现频次', '占比']].style.format({'占比': '{:.2%}'}))
-    else:
-        st.write("无法计算单词频率。")
+    with col2:
+        st.write("单词频率统计")
+        st.dataframe(freq_df.head(20), height=600, use_container_width=True)
+
+
+def plot_search_volume_and_clicks(df):
+    """
+    展示关键词搜索量和购买量的堆叠条形图。
+
+    Args:
+        df (pd.DataFrame): 包含关键词数据的DataFrame。
+    """
+    st.subheader("关键词搜索量和购买量 (Search Volume and Purchases)")
+
+    # 选取月搜索量最高的前20个关键词
+    top_20_search = df.sort_values(by="月搜索量", ascending=False).head(20)
+
+    # 计算未购买的量
+    top_20_search["未购买量"] = top_20_search["月搜索量"] - top_20_search["购买量"]
+
+    # 融化DataFrame
+    plot_df = top_20_search.melt(
+        id_vars=["流量词", "购买率"],
+        value_vars=["购买量", "未购买量"],
+        var_name="类型",
+        value_name="数量"
+    )
+
+    # 绘制图表
+    fig = px.bar(
+        plot_df,
+        y="流量词",
+        x="数量",
+        color="类型",
+        orientation='h',
+        title="Top 20 关键词搜索量与购买量",
+        labels={"流量词": "关键词", "数量": "月搜索量"},
+        color_discrete_map={
+            "购买量": "#00CC96",
+            "未购买量": "#FECB52"
+        },
+        text=plot_df.apply(lambda row: f'购买率: {row["购买率"]:.2%}' if row["类型"] == '购买量' else '', axis=1)
+    )
+
+    fig.update_layout(
+        xaxis_title="月搜索量",
+        yaxis_title="关键词",
+        yaxis={'categoryorder': 'total ascending'},
+        height=800,
+        legend_title_text='类型'
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def main():
     """
-    运行Streamlit应用的主函数。
+    Streamlit应用的主函数。
     """
-    st.set_page_config(layout="wide")
-    st.title("ASIN关键词分析看板")
+    st.set_page_config(layout="wide", page_title="ASIN关键词分析")
+    st.title("ASIN反查关键词分析工具")
 
-    # 将文件上传组件放在主页面
-    uploaded_file = st.file_uploader("请在此处上传您的ASIN反查关键词Excel文件", type=["xlsx"])
+    uploaded_file = st.file_uploader("请上传你的Excel或CSV文件", type=["xlsx", "csv"])
 
-    if uploaded_file:
-        # 加载和处理数据
-        df, file_details = load_data(uploaded_file)
+    if uploaded_file is not None:
+        if st.button("开始分析"):
+            try:
+                # 根据文件类型读取数据
+                if uploaded_file.name.endswith('.csv'):
+                    # 假设第一个sheet是主数据
+                    df = pd.read_csv(uploaded_file)
+                else:
+                    # 对于Excel，我们读取第一个sheet
+                    df = pd.read_excel(uploaded_file, sheet_name=0)
 
-        # 从主数据中计算词频
-        word_df = calculate_word_frequency(df)
+                with st.spinner('正在分析数据，请稍候...'):
+                    # 显示关键指标
+                    display_key_metrics(df)
 
-        st.header(f"ASIN: {file_details.get('asin', 'N/A')} 的分析报告")
+                    # 显示关键词流量图
+                    plot_keyword_traffic(df)
 
-        # 显示各个分析模块
-        display_metrics(df)
-        st.markdown("---")
-        display_top_keywords_chart(df)
-        st.markdown("---")
+                    # 显示词频分析
+                    display_word_frequency(df)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            display_traffic_source_distribution(df)
-        with col2:
-            display_word_cloud(word_df)
+                    # 显示搜索量和购买量
+                    plot_search_volume_and_clicks(df)
 
-    else:
-        st.info("请上传一个Excel文件以开始分析。")
+                st.success("分析完成！")
+
+            except Exception as e:
+                st.error(f"处理文件时出错: {e}")
 
 
 if __name__ == "__main__":
