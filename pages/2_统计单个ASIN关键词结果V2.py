@@ -89,7 +89,7 @@ def display_word_cloud(word_counts):
         max_font_size=200,  # 设置最大字体
         min_font_size=10,  # 设置最小字体
         prefer_horizontal=0.9,  # 调整水平显示偏好
-        relative_scaling=0.5,  # 调整缩放比例
+        # relative_scaling=0.5,  # 调整缩放比例
         collocations=False  # 禁用词组
     ).generate_from_frequencies(word_counts)
 
