@@ -85,7 +85,7 @@ def display_word_cloud(word_counts):
         height=1200,
         background_color=None,
         mode="RGBA",
-        max_words=200,  # 限制单词数量
+        # max_words=200,  # 限制单词数量
         max_font_size=200,  # 设置最大字体
         min_font_size=10,  # 设置最小字体
         prefer_horizontal=0.9,  # 调整水平显示偏好
