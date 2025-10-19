@@ -179,7 +179,7 @@ def main():
         # 创建一个容器来展示当前文件信息和清除按钮，使布局更美观
         header_container = st.container()
         with header_container:
-            col1, col2 = st.columns([0.8, 0.2])  # 分配列的宽度比例
+            col1, col2 = st.columns([0.9, 0.1])  # 分配列的宽度比例
             with col1:
                 if info['asin']:
                     st.success(
