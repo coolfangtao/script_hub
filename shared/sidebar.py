@@ -17,7 +17,7 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/2_统计单个ASIN关键词结果.py"
         },
         {
-            "label": "统计单个ASIN关键词结果",
+            "label": "统计单个ASIN关键词结果V2",
             "path": r"pages/2_统计单个ASIN关键词结果V2.py"
         },
         {
