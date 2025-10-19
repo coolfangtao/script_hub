@@ -12,3 +12,4 @@ deep-translator
 google-generativeai
 libsql-client
 sqlalchemy
+turso-python
