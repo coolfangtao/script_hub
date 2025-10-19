@@ -14,6 +14,11 @@ scripts_config = [
         "path": r"pages/1_提取B站标题.py"
     },
     {
+        "label": "📊 统计ASIN关键词结果",
+        "help": "📊 统计ASIN关键词结果",
+        "path": r"pages/2_统计ASIN关键词结果.py"
+    },
+    {
         "label": "📊 合并多个ASIN的关键词结果",
         "help": "合并多个Excel文件到一个Excel中",
         "path": r"pages/2_合并多个ASIN的关键词结果.py"
