@@ -79,24 +79,23 @@ def plot_keyword_traffic(df):
 
 
 def display_word_cloud(word_counts):
-    """
-    根据词频数据生成并展示词云。
-
-    Args:
-        word_counts (Counter): 包含单词及其出现次数的Counter对象。
-    """
     st.write("单词词云")
     wordcloud = WordCloud(
         width=800,
         height=600,
-        background_color='black', # 设置为None以获得透明背景
-        mode="RGBA" # 确保使用RGBA模式以支持透明度
+        background_color=None,  # 必须使用None
+        mode="RGBA"
     ).generate_from_frequencies(word_counts)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(10, 8))
     ax.imshow(wordcloud, interpolation='bilinear')
     ax.axis('off')
-    st.pyplot(fig)
+
+    # 设置图形背景透明
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+
+    st.pyplot(fig, bbox_inches='tight', pad_inches=0)
 
 
 def display_frequency_table(freq_df):
