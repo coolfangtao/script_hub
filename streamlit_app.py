@@ -1,7 +1,7 @@
 # 文件路径: streamlit_app.py
 
 import streamlit as st
-from shared.sidebar import create_sidebar # <-- 1. 导入函数
+from shared.sidebar import create_sidebar, SCRIPTS_BY_GROUP # <-- 1. 导入函数
 
 # --- 页面基础设置 (必须是第一个st命令) ---
 st.set_page_config(layout="wide")
@@ -18,12 +18,8 @@ st.markdown("---")
 # 为了简单起见，这里先省略，你可以自行优化
 # 完整的代码应该从 shared.sidebar 导入 scripts_by_group 字典
 
-# 这里我们直接用之前的代码示例
-scripts_by_group = {
-    # ... (和sidebar.py里完全一样的字典内容) ...
-}
 NUM_COLUMNS = 3
-for group_name, scripts_in_group in scripts_by_group.items():
+for group_name, scripts_in_group in SCRIPTS_BY_GROUP.items():
     with st.expander(group_name, expanded=True):
         cols = st.columns(NUM_COLUMNS)
         for index, script in enumerate(scripts_in_group):
