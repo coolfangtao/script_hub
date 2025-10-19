@@ -332,6 +332,11 @@ def main():
         accept_multiple_files=True
     )
 
+    if uploaded_files:
+        with st.expander("查看已上传的文件列表"):
+            for uploaded_file in uploaded_files:
+                st.write(f"- {uploaded_file.name}")
+
     if not uploaded_files:
         st.info("请上传文件以开始分析。")
         return
@@ -396,7 +401,7 @@ def main():
         if choice == "合并后文件统计信息":
             display_key_metrics(consolidated_df, is_consolidated=True) # todo:新建特定函数
             plot_asin_traffic_contribution(consolidated_df)
-            plot_keyword_traffic(consolidated_df) # todo:有问题，要修改
+            plot_keyword_traffic(consolidated_df)
             st.subheader("聚合后组成关键词的单词频率 (Word Frequency)")
             display_aggregated_word_frequency(consolidated_df)
             display_raw_data(consolidated_df, title="合并后的数据表 (Consolidated Data)")
