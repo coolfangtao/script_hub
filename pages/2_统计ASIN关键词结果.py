@@ -40,6 +40,20 @@ def display_metrics(df):
     """
     st.header("核心指标概览")
 
+    # --- 错误修复 START ---
+    # 在计算前，强制将相关列转换为数字格式。
+    # errors='coerce' 会将任何无法转换的值（如'-'）变为NaN，这样在计算时会被自动忽略。
+    df['预估周曝光量'] = pd.to_numeric(df['预估周曝光量'], errors='coerce')
+    df['需供比'] = pd.to_numeric(df['需供比'], errors='coerce')
+    df['购买量'] = pd.to_numeric(df['购买量'], errors='coerce')
+    # '购买率' 可能包含百分号，需要先移除
+    if df['购买率'].dtype == 'object':
+         df['购买率'] = pd.to_numeric(df['购买率'].str.replace('%', ''), errors='coerce') / 100
+    else:
+        df['购买率'] = pd.to_numeric(df['购买率'], errors='coerce')
+
+    # --- 错误修复 END ---
+
     # 计算指标
     total_weekly_impressions = df['预估周曝光量'].sum()
     average_supply_demand_ratio = df['需供比'].mean()
@@ -60,6 +74,10 @@ def plot_top_keywords_by_traffic(df):
     绘制流量占比最高的TOP 10关键词条形图。
     """
     st.subheader("流量占比 TOP 10 关键词")
+
+    # 在绘图前，确保'流量占比'列是数字类型
+    df['流量占比'] = pd.to_numeric(df['流量占比'], errors='coerce')
+
     # 按“流量占比”降序排序并选取前10
     top_10_keywords = df.sort_values(by='流量占比', ascending=False).head(10)
 
@@ -77,7 +95,8 @@ def plot_top_keywords_by_traffic(df):
     fig.update_layout(
         yaxis={'categoryorder':'total ascending'}, # 让流量最高的在顶部
         xaxis_title="流量占比",
-        yaxis_title="关键词"
+        yaxis_title="关键词",
+        xaxis_tickformat=".2%" # 将X轴格式化为百分比
     )
     fig.update_traces(texttemplate='%{x:.2%}', textposition='outside')
     st.plotly_chart(fig, use_container_width=True)
@@ -106,8 +125,12 @@ def generate_word_cloud(df):
     根据“流量词”生成并展示词云。
     """
     st.subheader("关键词词云")
-    # 将所有“流量词”合并成一个长字符串
-    text = " ".join(keyword for keyword in df['流量词'].astype(str))
+    # 将所有“流量词”合并成一个长字符串，并处理NaN值
+    text = " ".join(keyword for keyword in df['流量词'].dropna().astype(str))
+
+    if not text:
+        st.warning("关键词数据为空，无法生成词云。")
+        return
 
     try:
         # 创建词云对象
@@ -124,7 +147,7 @@ def generate_word_cloud(df):
         ax.axis('off')
         st.pyplot(fig)
     except Exception as e:
-        st.warning("无法生成词云，可能是因为关键词数据为空。")
+        st.error(f"生成词云时出错: {e}")
 
 
 # --- 2. Streamlit 页面主函数 ---
