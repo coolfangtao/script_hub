@@ -11,7 +11,7 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/7_AI_对话页面.py"  # 假设新文件放在pages目录下
         },
         {
-            "label": "英语语音现象分析",
+            "label": "AI分析语音现象",
             "path": r"pages/3_英语句子语音现象分析.py"
         },
     ],
