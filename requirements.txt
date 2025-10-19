@@ -11,6 +11,3 @@ easyocr
 deep-translator
 google-generativeai
 libsql
-libsql-client
-st-libsql-client
-sqlalchemy
