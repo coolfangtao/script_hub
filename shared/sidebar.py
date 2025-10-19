@@ -17,12 +17,12 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/2_统计单个ASIN关键词结果.py"
         },
         {
-            "label": "统计多个ASIN关键词结果",
-            "path": r"pages/2_统计多个ASIN关键词结果.py"
-        },
-        {
             "label": "合并多个ASIN的关键词结果",
             "path": r"pages/2_合并多个ASIN关键词结果.py"
+        },
+        {
+            "label": "统计多个ASIN关键词结果",
+            "path": r"pages/2_统计多个ASIN关键词结果.py"
         },
         {
             "label": "根据ASIN关键词结果自动生成Listing标题",
