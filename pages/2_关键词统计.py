@@ -332,11 +332,6 @@ def main():
         accept_multiple_files=True
     )
 
-    if uploaded_files:
-        with st.expander("查看已上传的文件列表"):
-            for uploaded_file in uploaded_files:
-                st.write(f"- {uploaded_file.name}")
-
     if not uploaded_files:
         st.info("请上传文件以开始分析。")
         return
