@@ -10,4 +10,5 @@ googletrans
 easyocr
 deep-translator
 google-generativeai
+libsql-client
 sqlalchemy
