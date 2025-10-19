@@ -65,7 +65,15 @@ def plot_keyword_traffic(df):
         color_discrete_map={
             "自然流量绝对占比": "#636EFA",
             "广告流量绝对占比": "#EF553B"
-        }
+        },
+        text="占比"  # 添加文本显示
+    )
+
+    # 格式化文本显示
+    fig.update_traces(
+        texttemplate='%{text:.1%}',  # 显示为百分比格式，保留1位小数
+        textposition='inside',  # 文本显示在柱子内部
+        insidetextanchor='middle'  # 文本在柱子中间
     )
 
     fig.update_layout(
@@ -73,8 +81,13 @@ def plot_keyword_traffic(df):
         yaxis_title="关键词",
         yaxis={'categoryorder': 'total ascending'},
         height=800,
-        legend_title_text='流量类型'
+        legend_title_text='流量类型',
+        xaxis=dict(
+            tickformat=".1%",  # x轴刻度显示为百分比
+            range=[0, top_20_traffic["流量占比"].max() * 1.1]  # 调整x轴范围
+        )
     )
+
     st.plotly_chart(fig, use_container_width=True)
 
 
