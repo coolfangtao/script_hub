@@ -199,33 +199,6 @@ def calculate_word_frequency(df: pd.DataFrame) -> Tuple[Dict[str, int], pd.DataF
     return word_counts, freq_df
 
 
-def display_word_frequency_analysis(df: pd.DataFrame):
-    """展示单词频率词云和表格。"""
-    st.subheader("组成关键词的单词频率 (Word Frequency)")
-    word_counts, freq_df = calculate_word_frequency(df)
-
-    if not word_counts:
-        st.warning("没有有效的流量词来生成单词频率分析。")
-        return
-
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.write("单词词云")
-        wordcloud = WordCloud(
-            width=800, height=500, background_color='white',
-            max_words=150, collocations=False
-        ).generate_from_frequencies(word_counts)
-        fig, ax = plt.subplots()
-        ax.imshow(wordcloud, interpolation='bilinear')
-        ax.axis('off')
-        st.pyplot(fig)
-    with col2:
-        st.write("单词频率统计 (Top 20)")
-        st.dataframe(
-            freq_df.head(20).style.format({"频率": "{:.2%}"}),
-            height=500, use_container_width=True
-        )
-
 def display_word_cloud(word_counts):
     st.write("单词词云")
     wordcloud = WordCloud(
@@ -252,7 +225,6 @@ def display_word_cloud(word_counts):
 
     # 保存为高分辨率图像
     st.pyplot(fig, bbox_inches='tight', pad_inches=0, dpi=300)
-
 
 def display_frequency_table(freq_df):
     """
