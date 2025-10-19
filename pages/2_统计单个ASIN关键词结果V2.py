@@ -89,7 +89,7 @@ def display_word_cloud(word_counts):
     wordcloud = WordCloud(
         width=800,
         height=600,
-        background_color=None, # 设置为None以获得透明背景
+        background_color='black', # 设置为None以获得透明背景
         mode="RGBA" # 确保使用RGBA模式以支持透明度
     ).generate_from_frequencies(word_counts)
 
