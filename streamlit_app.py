@@ -29,7 +29,7 @@ st.markdown("---")
 st.subheader("🌟 核心功能一览")
 st.write("从左侧导航栏选择一个工具开始使用，或通过下方卡片快速进入核心功能。")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     with st.container(border=True):
@@ -51,6 +51,13 @@ with col3:
         st.write("输入任意文本，选择多种音色，快速生成高质量的语音文件，支持多语言。")
         if st.button("立即开始", key="tts", use_container_width=True):
             st.switch_page(r"pages/3_文字转语音.py")
+
+with col4:
+    with st.container(border=True):
+        st.markdown("<h5>🤖 AI工具</h5>", unsafe_allow_html=True)
+        st.write("在没有VPN的情况下也能使用Gemini 2.5 Pro功能")
+        if st.button("立即开始", key="tts", use_container_width=True):
+            st.switch_page(r"pages/7_AI_对话页面.py")
 
 st.markdown("---")
 
