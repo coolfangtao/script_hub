@@ -3,3 +3,4 @@ edge-tts
 langdetect
 rembg
 onnxruntime
+openpyxl
