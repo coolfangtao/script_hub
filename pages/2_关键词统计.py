@@ -124,20 +124,23 @@ def display_key_metrics(df: pd.DataFrame, is_consolidated: bool = False, asin: s
         st.info(f"当前数据为单个ASIN **{asin}** 的分析结果。")
 
 
-def plot_keyword_traffic(df: pd.DataFrame):
-    """展示关键词流量的堆叠条形图。"""
+def plot_keyword_traffic(df):
+    """
+    展示关键词流量的堆叠条形图。
+
+    Args:
+        df (pd.DataFrame): 包含关键词数据的DataFrame。
+    """
     st.subheader("关键词流量 (Keyword Traffic)")
 
-    # 过滤掉流量占比为0的数据
-    df_filtered = df[df['流量占比'] > 0].copy()
-    if df_filtered.empty:
-        st.warning("没有有效的流量数据可供展示。")
-        return
+    # 选取流量占比最高的前20个关键词
+    top_20_traffic = df.sort_values(by="流量占比", ascending=False).head(20)
 
-    top_20_traffic = df_filtered.sort_values(by="流量占比", ascending=False).head(20)
+    # 计算自然流量和广告流量的绝对占比
     top_20_traffic["自然流量绝对占比"] = top_20_traffic["流量占比"] * top_20_traffic["自然流量占比"]
     top_20_traffic["广告流量绝对占比"] = top_20_traffic["流量占比"] * top_20_traffic["广告流量占比"]
 
+    # 融化DataFrame以适配Plotly的格式
     plot_df = top_20_traffic.melt(
         id_vars=["流量词"],
         value_vars=["自然流量绝对占比", "广告流量绝对占比"],
@@ -145,20 +148,41 @@ def plot_keyword_traffic(df: pd.DataFrame):
         value_name="占比"
     )
 
+    # 绘制图表
     fig = px.bar(
-        plot_df, y="流量词", x="占比", color="流量类型", orientation='h',
+        plot_df,
+        y="流量词",
+        x="占比",
+        color="流量类型",
+        orientation='h',
         title="Top 20 关键词流量分布",
         labels={"流量词": "关键词", "占比": "流量占比"},
-        color_discrete_map={"自然流量绝对占比": "#636EFA", "广告流量绝对占比": "#EF553B"},
-        text="占比"
+        color_discrete_map={
+            "自然流量绝对占比": "#636EFA",
+            "广告流量绝对占比": "#EF553B"
+        },
+        text="占比"  # 添加文本显示
     )
-    fig.update_traces(texttemplate='%{text:.2%}', textposition='inside', insidetextanchor='middle')
+
+    # 格式化文本显示
+    fig.update_traces(
+        texttemplate='%{text:.1%}',  # 显示为百分比格式，保留1位小数
+        textposition='inside',  # 文本显示在柱子内部
+        insidetextanchor='middle'  # 文本在柱子中间
+    )
+
     fig.update_layout(
-        xaxis_title="流量占比", yaxis_title="关键词",
-        yaxis={'categoryorder': 'total ascending'}, height=800,
+        xaxis_title="流量占比",
+        yaxis_title="关键词",
+        yaxis={'categoryorder': 'total ascending'},
+        height=800,
         legend_title_text='流量类型',
-        xaxis=dict(tickformat=".2%")
+        xaxis=dict(
+            tickformat=".1%",  # x轴刻度显示为百分比
+            range=[0, top_20_traffic["流量占比"].max() * 1.1]  # 调整x轴范围
+        )
     )
+
     st.plotly_chart(fig, use_container_width=True)
 
 
@@ -202,6 +226,47 @@ def display_word_frequency_analysis(df: pd.DataFrame):
             height=500, use_container_width=True
         )
 
+def display_word_cloud(word_counts):
+    st.write("单词词云")
+    wordcloud = WordCloud(
+        width=1600,  # 增大画布尺寸
+        height=900,
+        background_color=None,
+        mode="RGBA",
+        # max_words=200,  # 限制单词数量
+        max_font_size=200,  # 设置最大字体
+        min_font_size=10,  # 设置最小字体
+        prefer_horizontal=0.9,  # 调整水平显示偏好
+        # relative_scaling=0.5,  # 调整缩放比例
+        collocations=False  # 禁用词组
+    ).generate_from_frequencies(word_counts)
+
+    # 创建图形时设置更高的DPI
+    fig, ax = plt.subplots(figsize=(12, 9), dpi=300)
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis('off')
+
+    # 设置图形背景透明
+    fig.patch.set_alpha(0)
+    ax.patch.set_alpha(0)
+
+    # 保存为高分辨率图像
+    st.pyplot(fig, bbox_inches='tight', pad_inches=0, dpi=300)
+
+
+def display_frequency_table(freq_df):
+    """
+    展示格式化后的单词频率统计表格。
+
+    Args:
+        freq_df (pd.DataFrame): 包含单词、出现次数和频率的DataFrame。
+    """
+    st.write("单词频率统计")
+    st.dataframe(
+        freq_df.head(20).style.format({"频率": "{:.2%}"}),
+        height=600,
+        use_container_width=True
+    )
 
 def plot_search_volume_and_purchases(df: pd.DataFrame):
     """展示关键词搜索量和购买量的堆叠条形图。"""
@@ -325,9 +390,25 @@ def main():
             st.success(f"成功加载文件: **{uploaded_file.name}**")
 
             # 单文件仪表盘
-            display_key_metrics(df, asin=asin)
+            display_key_metrics(df, asin=asin) # todo：新增专用函数
             plot_keyword_traffic(df)
-            display_word_frequency_analysis(df)
+
+            # --- 词频分析 ---
+            st.subheader("组成关键词的单词频率 (Word Frequency)")
+
+            # 1. 计算词频 (公共逻辑)
+            text = ' '.join(df['流量词'].dropna())
+            words = re.findall(r'\b\w+\b', text.lower())
+            word_counts = Counter(words)
+            total_words = sum(word_counts.values())
+            freq_df = pd.DataFrame(word_counts.items(), columns=["单词", "出现次数"])
+            freq_df["频率"] = freq_df["出现次数"] / total_words
+            freq_df = freq_df.sort_values(by="出现次数", ascending=False)
+
+            # 2. 依次展示词云和表格
+            display_word_cloud(word_counts)
+            display_frequency_table(freq_df)
+
             plot_search_volume_and_purchases(df)
             display_raw_data(df)
 
