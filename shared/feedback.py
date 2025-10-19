@@ -20,8 +20,8 @@ def connect_to_db():
         if not auth_token:
             auth_token = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NjA4NzM5MjUsImlkIjoiODJlZjRkOTctMTEwYy00MjFiLTk1ZTQtNjViNzFkMjQ4ZjgzIiwicmlkIjoiODYxNTdhM2EtYjM4Yi00NzFkLWJjNzAtMDRlZmM0YjVjZTY3In0.k7MFDokocMs-Mhk0reor8i3YLu0Jr3KoES8oawi7UcDx6tVh0xVRiEWLu1iZOmH0kPIh-qHWJiMYtGRjNVv7Dw"
 
-        # 错误修正：应该使用 create_client 工厂函数来创建实例，而不是直接调用 Client 类
-        return turso_client.create_client(url=url, auth_token=auth_token)
+        # 错误修正：添加 in_thread=True 参数，让客户端在同步环境（如Streamlit）中正确运行
+        return turso_client.create_client(url=url, auth_token=auth_token, in_thread=True)
     except Exception as e:
         # 如果连接失败，在页面上显示错误信息
         st.error(f"数据库连接失败，请检查配置。错误: {e}")
