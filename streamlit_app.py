@@ -39,6 +39,11 @@ scripts_config = [
         "path": r"pages/2_合并多个ASIN关键词结果.py"
     },
     {
+        "label": "📊 根据ASIN关键词结果自动生成Listing标题",
+        "help": "根据ASIN关键词结果自动生成Listing标题",
+        "path": r"pages/2_根据ASIN关键词结果自动生成Listing标题.py"
+    },
+    {
         "label": "🖼️ 替换图片背景",
         "help": "替换图片背景",
         "path": r"pages/5_替换图片背景.py"
