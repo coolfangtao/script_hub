@@ -3,7 +3,7 @@
 import streamlit as st
 from shared.sidebar import create_common_sidebar  # 导入我们创建的侧边栏函数
 from shared.changelog import show_changelog
-# from shared.feedback import render_feedback_section # <-- 1. 导入新的反馈函数
+from shared.feedback import render_feedback_section # <-- 1. 导入新的反馈函数
 
 # --- 页面基础设置 (必须是第一个st命令) ---
 st.set_page_config(
@@ -61,4 +61,4 @@ show_changelog() # <-- 2. 在这里调用函数
 st.markdown("---")
 
 # --- 4. 联系与反馈 ---
-# render_feedback_section() # <-- 2. 在这里调用函数、
+render_feedback_section() # <-- 2. 在这里调用函数、
