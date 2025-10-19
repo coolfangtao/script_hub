@@ -31,7 +31,7 @@ def display_key_metrics(df):
 
 def plot_keyword_traffic(df):
     """
-    展示关键词流量的堆叠条形图。
+    展示关键词流量的条形图（只显示总流量占比）。
 
     Args:
         df (pd.DataFrame): 包含关键词数据的DataFrame。
@@ -41,37 +41,20 @@ def plot_keyword_traffic(df):
     # 选取流量占比最高的前20个关键词
     top_20_traffic = df.sort_values(by="流量占比", ascending=False).head(20)
 
-    # 计算自然流量和广告流量的绝对占比
-    top_20_traffic["自然流量绝对占比"] = top_20_traffic["流量占比"] * top_20_traffic["自然流量占比"]
-    top_20_traffic["广告流量绝对占比"] = top_20_traffic["流量占比"] * top_20_traffic["广告流量占比"]
-
-    # 融化DataFrame以适配Plotly的格式
-    plot_df = top_20_traffic.melt(
-        id_vars=["流量词"],
-        value_vars=["自然流量绝对占比", "广告流量绝对占比"],
-        var_name="流量类型",
-        value_name="占比"
-    )
-
-    # 绘制图表
+    # 绘制图表（只使用总流量占比）
     fig = px.bar(
-        plot_df,
+        top_20_traffic,
         y="流量词",
-        x="占比",
-        color="流量类型",
+        x="流量占比",
         orientation='h',
         title="Top 20 关键词流量分布",
-        labels={"流量词": "关键词", "占比": "流量占比"},
-        color_discrete_map={
-            "自然流量绝对占比": "#636EFA",
-            "广告流量绝对占比": "#EF553B"
-        },
-        text="占比"  # 添加文本显示
+        labels={"流量词": "关键词", "流量占比": "流量占比"},
+        color_discrete_sequence=["#636EFA"]  # 统一使用蓝色
     )
 
     # 格式化文本显示
     fig.update_traces(
-        texttemplate='%{text:.1%}',  # 显示为百分比格式，保留1位小数
+        texttemplate='%{x:.1%}',  # 显示为百分比格式，保留1位小数
         textposition='inside',  # 文本显示在柱子内部
         insidetextanchor='middle'  # 文本在柱子中间
     )
@@ -81,7 +64,7 @@ def plot_keyword_traffic(df):
         yaxis_title="关键词",
         yaxis={'categoryorder': 'total ascending'},
         height=800,
-        legend_title_text='流量类型',
+        showlegend=False,  # 不显示图例
         xaxis=dict(
             tickformat=".1%",  # x轴刻度显示为百分比
             range=[0, top_20_traffic["流量占比"].max() * 1.1]  # 调整x轴范围
