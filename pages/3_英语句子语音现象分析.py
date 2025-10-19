@@ -60,7 +60,7 @@ def analyze_phonetics_with_gemini(text: str) -> str:
         3.  **格式化输出**：
             - 使用 Markdown 格式。
             - 用颜色和符号来高亮显示语音现象。例如：
-              - 连读 (Liaison): 使用下划线 `_` 连接单词，并用 `lian` class 包裹，例如 `<span class="lian">an‿apple</span>`。
+              - 连读 (Liaison): 使用下划线 `_` 连接单词，例如 an‿apple`。
               - 略读 (Elision): 在被省略的音素位置使用删除线 `~`，例如 `las~t night`。
               - 插读 (Intrusion): 在插入音素的位置使用 `+` 号，例如 `go+w away`。
             - 在句子下方，用列表形式逐一解释每个标记的具体语音现象和规则。
@@ -135,10 +135,10 @@ def display_main_content():
     st.title("🗣️ 英语句子语音现象分析器")
     st.markdown("输入一个英语句子，即可生成标准发音，并由 Gemini AI 分析其中包含的连读、略读等语音现象。\n"
                 "**部分符号说明：**\n"
-                "- 连读 (Liaison): 使用上括号 `‿` 连接单词，例如 next‿two\n"
+                "- 连读 (Liaison): 使用上括号 `‿` 连接单词，例如 an‿apple\n"
                 "- 略读 (Elision): 在被省略的音素位置使用删除线 `~`，例如 las~t night\n"
                 "- 插读 (Intrusion): 在插入音素的位置使用 `+` 号，例如 go+w away\n"
-                "- | 符号表示自然的语调停顿。")
+                "- 停顿: | 符号表示自然的语调停顿。")
 
     with st.form("input_form"):
         sentence = st.text_input(
