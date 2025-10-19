@@ -463,7 +463,19 @@ def main():
             if selected_asin_df is not None:
                 display_key_metrics(selected_asin_df, asin=choice)
                 plot_keyword_traffic(selected_asin_df)
-                display_word_frequency_analysis(selected_asin_df)
+
+                # 1. 计算词频 (公共逻辑)
+                text = ' '.join(selected_asin_df['流量词'].dropna())
+                words = re.findall(r'\b\w+\b', text.lower())
+                word_counts = Counter(words)
+                total_words = sum(word_counts.values())
+                freq_df = pd.DataFrame(word_counts.items(), columns=["单词", "出现次数"])
+                freq_df["频率"] = freq_df["出现次数"] / total_words
+                freq_df = freq_df.sort_values(by="出现次数", ascending=False)
+                # 2. 依次展示词云和表格
+                display_word_cloud(word_counts)
+                display_frequency_table(freq_df)
+
                 plot_search_volume_and_purchases(selected_asin_df)
                 display_raw_data(selected_asin_df)
 
