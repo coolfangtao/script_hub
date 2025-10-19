@@ -8,7 +8,7 @@ create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边�
 
 # --- 核心配置 ---
 st.set_page_config(
-    page_title="中国股市板块实时监控",
+    page_title="中国股市板块实时监控（待优化）",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="collapsed"
