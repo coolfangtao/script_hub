@@ -19,6 +19,11 @@ scripts_config = [
         "path": r"pages/3_文字转语音.py"
     },
     {
+        "label": "🔊 句子语音现象分析",
+        "help": "句子语音现象分析",
+        "path": r"pages/3_英语句子语音现象分析.py"
+    },
+    {
         "label": "🔎 文本对比",
         "help": "对比两段文本，发现修改的内容",
         "path": r"pages/4_文本对比.py"
