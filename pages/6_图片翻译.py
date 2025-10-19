@@ -76,7 +76,7 @@ def remove_original_text(image_np, ocr_results):
     return inpainted_image
 
 
-def draw_translated_text(image_np, translated_results, font_path='arial.ttf'):
+def draw_translated_text(image_np, translated_results, font_path='Arial.ttf'):
     """
     在图片上绘制翻译后的文本。
     :param image_np: NumPy格式的图像数组 (通常是已经移除了原文的)。
@@ -154,7 +154,7 @@ def main():
 
                     # 3. 将翻译文本绘制到新图上
                     final_image_pil = draw_translated_text(inpainted_image_cv, translation_results,
-                                                           font_path='arial.ttf')
+                                                           font_path='Arial.ttf')
 
                     # --- 显示结果 ---
                     st.subheader(f"处理结果: {uploaded_file.name}")
