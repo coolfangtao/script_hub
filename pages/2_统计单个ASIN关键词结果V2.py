@@ -4,13 +4,14 @@ import altair as alt
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 import re
+from collections import Counter
 from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
 create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 
 def load_data(uploaded_file):
     """
-    从上传的CSV文件中加载数据，并从文件名中提取ASIN等信息。
+    从上传的Excel文件中加载数据，并从文件名中提取ASIN等信息。
     """
     file_details = {}
     file_name = uploaded_file.name
@@ -22,18 +23,32 @@ def load_data(uploaded_file):
         file_details['keyword_count'] = int(match.group(3))
         file_details['date'] = match.group(4)
 
-    df = pd.read_csv(uploaded_file)
+    # 读取Excel文件的第一个sheet
+    df = pd.read_excel(uploaded_file, sheet_name=0)
 
     # 数据清洗和类型转换
     numeric_cols = ['流量占比', '预估周曝光量', '自然流量占比', '广告流量占比', '月搜索量', 'SPR', '需供比', '购买率']
     for col in numeric_cols:
         if col in df.columns:
-            # errors='coerce' 会将无法转换的设置为NaT
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
-    # 删除关键数字列为空的行
     df.dropna(subset=numeric_cols, inplace=True)
     return df, file_details
+
+
+def calculate_word_frequency(df):
+    """
+    从'流量词'列计算单词频率。
+    """
+    # 将所有流量词合并成一个长字符串，并转换为小写
+    text = ' '.join(df['流量词'].dropna().astype(str)).lower()
+    # 使用正则表达式找到所有单词
+    words = re.findall(r'\b[a-z]+\b', text)
+    # 计算每个单词的频率
+    word_counts = Counter(words)
+    # 转换为DataFrame
+    word_df = pd.DataFrame(word_counts.items(), columns=['词语', '出现频次']).sort_values(by='出现频次', ascending=False)
+    return word_df
 
 
 def display_metrics(df):
@@ -44,8 +59,6 @@ def display_metrics(df):
 
     total_weekly_impressions = df['预估周曝光量'].sum()
 
-    # 计算加权平均流量占比
-    # 避免分母为0的情况
     if df['流量占比'].sum() > 0:
         weighted_natural_traffic = (df['自然流量占比'] * df['流量占比']).sum() / df['流量占比'].sum()
         weighted_ad_traffic = (df['广告流量占比'] * df['流量占比']).sum() / df['流量占比'].sum()
@@ -58,7 +71,6 @@ def display_metrics(df):
     avg_purchase_rate = df['购买率'].mean()
     total_monthly_search = df['月搜索量'].sum()
 
-    # 将指标分为两行展示
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("预估周曝光总量", f"{total_weekly_impressions:,.0f}")
     col2.metric("平均自然流量占比", f"{weighted_natural_traffic:.2%}")
@@ -116,39 +128,34 @@ def display_traffic_source_distribution(df):
     st.altair_chart(chart, use_container_width=True)
 
 
-def load_word_frequency(uploaded_word_file):
-    """
-    从上传的CSV文件加载单词频率数据。
-    """
-    return pd.read_csv(uploaded_word_file)
-
-
 def display_word_cloud(word_df):
     """
     根据单词频率数据生成并显示词云，同时显示包含频率和占比的表格。
     """
     st.header("关键词词云")
 
-    # 准备词云数据
-    # 需要确保'词语'列是字符串类型
-    word_df['词语'] = word_df['词语'].astype(str)
-    word_freq = dict(zip(word_df['词语'], word_df['出现频次']))
+    # 词云图只显示频率最高的100个词
+    word_df_top100 = word_df.head(100)
+    word_freq = dict(zip(word_df_top100['词语'], word_df_top100['出现频次']))
 
-    # 生成词云
-    wordcloud = WordCloud(width=800, height=400, background_color='white',
-                          collocations=False).generate_from_frequencies(word_freq)
+    if word_freq:
+        wordcloud = WordCloud(width=800, height=400, background_color='white',
+                              collocations=False).generate_from_frequencies(word_freq)
 
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.imshow(wordcloud, interpolation='bilinear')
-    ax.axis('off')
-    st.pyplot(fig)
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.imshow(wordcloud, interpolation='bilinear')
+        ax.axis('off')
+        st.pyplot(fig)
+    else:
+        st.warning("没有找到可以生成词云的关键词。")
 
-    # 显示包含频率和占比的表格
     st.subheader("单词频率详情")
     total_words = word_df['出现频次'].sum()
-    word_df['占比'] = (word_df['出现频次'] / total_words)
-    # 使用st.dataframe以交互式表格显示
-    st.dataframe(word_df[['词语', '出现频次', '占比']].style.format({'占比': '{:.2%}'}))
+    if total_words > 0:
+        word_df['占比'] = (word_df['出现频次'] / total_words)
+        st.dataframe(word_df[['词语', '出现频次', '占比']].style.format({'占比': '{:.2%}'}))
+    else:
+        st.write("无法计算单词频率。")
 
 
 def main():
@@ -158,23 +165,24 @@ def main():
     st.set_page_config(layout="wide")
     st.title("ASIN关键词分析看板")
 
-    st.sidebar.header("上传文件")
-    # 添加唯一的key参数避免冲突
-    uploaded_file = st.sidebar.file_uploader("上传关键词CSV主文件", type=["csv"], key="main_csv")
-    uploaded_word_file = st.sidebar.file_uploader("上传单词频率CSV文件", type=["csv"], key="words_csv")
+    # 将文件上传组件放在主页面
+    uploaded_file = st.file_uploader("请在此处上传您的ASIN反查关键词Excel文件", type=["xlsx"])
 
-    if uploaded_file and uploaded_word_file:
+    if uploaded_file:
+        # 加载和处理数据
         df, file_details = load_data(uploaded_file)
-        word_df = load_word_frequency(uploaded_word_file)
+
+        # 从主数据中计算词频
+        word_df = calculate_word_frequency(df)
 
         st.header(f"ASIN: {file_details.get('asin', 'N/A')} 的分析报告")
 
+        # 显示各个分析模块
         display_metrics(df)
         st.markdown("---")
         display_top_keywords_chart(df)
         st.markdown("---")
 
-        # 将饼图和词云并列显示
         col1, col2 = st.columns(2)
         with col1:
             display_traffic_source_distribution(df)
@@ -182,7 +190,7 @@ def main():
             display_word_cloud(word_df)
 
     else:
-        st.info("请上传关键词主文件和单词频率文件以开始分析。")
+        st.info("请上传一个Excel文件以开始分析。")
 
 
 if __name__ == "__main__":
