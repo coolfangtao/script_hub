@@ -113,20 +113,22 @@ def main():
     st.title("🚀 亚马逊Listing智能生成器")
     st.markdown("---")
 
-    # 左侧边栏用于放置输入控件
-    with st.sidebar:
-        st.header("⚙️ 设置")
+    # --- 修改部分 START ---
+    # 将控件直接放在主页面上
+    st.header("⚙️ 设置与上传")
 
-        # 获取API Key
-        # api_key = st.text_input("请输入你的Google Gemini API密钥:\n链接：https://aistudio.google.com/app/api-keys", type="password", help="在此输入您的Gemini API密钥。")
-        api_key = st.secrets["API_KEY"]
+    # 获取API Key (从secrets中读取)
+    api_key = st.secrets.get("API_KEY")
 
-        # 文件上传
-        uploaded_file = st.file_uploader(
-            "上传关键词反查Excel文件",
-            type=['xlsx'],
-            help="请上传包含多个ASIN关键词反查结果的Excel文件。"
-        )
+    # 文件上传
+    uploaded_file = st.file_uploader(
+        "上传关键词反查Excel文件",
+        type=['xlsx'],
+        help="请上传包含关键词数据的Excel文件。"
+    )
+    st.markdown("---")
+    # --- 修改部分 END ---
+
 
     # 主区域用于展示结果
     if uploaded_file is not None and api_key:
@@ -161,16 +163,16 @@ def main():
 
                     # 展示标题
                     st.subheader("建议标题:")
-                    st.text_area("标题", generated_title, height=100)
+                    st.text_area("标题", generated_title, height=150)
 
                     # 展示五点
                     st.subheader("建议五点描述:")
-                    st.text_area("五点描述", generated_bullets, height=300)
+                    st.text_area("五点描述", generated_bullets, height=350)
 
     elif uploaded_file is None:
-        st.info("请在左侧边栏上传您的Excel文件以开始。")
+        st.info("请上传您的Excel文件以开始。")
     elif not api_key:
-        st.warning("请输入您的Google Gemini API密钥以启用生成功能。\n链接：https://aistudio.google.com/app/api-keys")
+        st.warning("未配置Google Gemini API密钥，无法启用生成功能。")
 
 
 if __name__ == "__main__":
