@@ -20,7 +20,6 @@ def connect_to_db():
         if not auth_token:
             auth_token = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NjA4NzM5MjUsImlkIjoiODJlZjRkOTctMTEwYy00MjFiLTk1ZTQtNjViNzFkMjQ4ZjgzIiwicmlkIjoiODYxNTdhM2EtYjM4Yi00NzFkLWJjNzAtMDRlZmM0YjVjZTY3In0.k7MFDokocMs-Mhk0reor8i3YLu0Jr3KoES8oawi7UcDx6tVh0xVRiEWLu1iZOmH0kPIh-qHWJiMYtGRjNVv7Dw"
 
-        # 解决方案：移除 in_thread 参数，我们将通过 asyncio 手动管理异步调用
         return turso_client.create_client(url=url, auth_token=auth_token)
     except Exception as e:
         st.error(f"数据库连接失败，请检查配置。错误: {e}")
@@ -34,7 +33,6 @@ async def init_db_async(client):
     """
     if client:
         try:
-            # 使用 await 关键字等待异步操作完成
             await client.execute(
                 """
                 CREATE TABLE IF NOT EXISTS feedback (
@@ -51,10 +49,10 @@ async def init_db_async(client):
 
 
 # --- 渲染反馈提交表单 ---
-def render_feedback_form(client):
+def render_feedback_form(client, loop):
     """
     在页面上渲染一个用于提交新反馈的表单。
-    表单提交的数据库操作将是异步的。
+    表单提交的数据库操作将使用传入的事件循环来执行。
     """
     st.subheader("💬 提点建议或反馈")
     st.write("你的每个建议都是我们前进的动力！无论是功能建议、Bug报告还是使用体验，都欢迎你告诉我们。")
@@ -73,19 +71,19 @@ def render_feedback_form(client):
             if not message or not message.strip():
                 st.warning("反馈内容不能为空哦！")
             else:
-                try:
-                    # 创建一个嵌套的异步函数来执行数据库插入
-                    async def submit_data():
+                # 定义一个异步函数来处理数据插入
+                async def submit_data_async():
+                    try:
                         await client.execute(
                             "INSERT INTO feedback (name, feedback_type, message) VALUES (?, ?, ?)",
                             (name if name else "匿名用户", feedback_type, message)
                         )
+                        st.success("感谢你的反馈！我们已经收到了，会尽快查看。")
+                    except Exception as e:
+                        st.error(f"提交失败，请稍后再试。错误: {e}")
 
-                    # 使用 asyncio.run() 来执行这个异步任务
-                    asyncio.run(submit_data())
-                    st.success("感谢你的反馈！我们已经收到了，会尽快查看。")
-                except Exception as e:
-                    st.error(f"提交失败，请稍后再试。错误: {e}")
+                # 使用传入的事件循环来运行异步提交函数
+                loop.run_until_complete(submit_data_async())
 
 
 # --- 展示历史反馈 (异步版本) ---
@@ -95,7 +93,6 @@ async def display_feedback_wall_async(client):
     """
     st.subheader("📣 大家的建议墙")
     try:
-        # 使用 await 关键字等待异步查询完成
         results = await client.execute(
             "SELECT name, feedback_type, message, created_at FROM feedback ORDER BY created_at DESC")
 
@@ -118,20 +115,29 @@ async def display_feedback_wall_async(client):
         st.error(f"加载历史反馈失败: {e}")
 
 
-# --- 主渲染函数 ---
+# --- 主渲染函数 (核心修改) ---
 def render_feedback_section():
     """
-    渲染整个反馈区的主函数，包括表单和历史记录墙。
+    渲染整个反馈区的主函数。
+    这里将手动管理asyncio事件循环，以确保在Streamlit中稳定运行。
     """
     client = connect_to_db()
     if client:
+        # 解决方案：手动获取或创建一个事件循环
         try:
-            # 在同步函数中使用 asyncio.run() 来调用异步的初始化和数据展示函数
-            asyncio.run(init_db_async(client))
-            render_feedback_form(client)
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        try:
+            # 使用 loop.run_until_complete 来运行我们的异步函数
+            loop.run_until_complete(init_db_async(client))
+            # 将 loop 传递给表单函数，用于处理提交
+            render_feedback_form(client, loop)
             st.markdown("---")
-            asyncio.run(display_feedback_wall_async(client))
+            loop.run_until_complete(display_feedback_wall_async(client))
         finally:
-            # 确保客户端连接在使用后被关闭
-            client.close()
+            # 确保客户端连接在使用后被异步关闭
+            loop.run_until_complete(client.close())
 
