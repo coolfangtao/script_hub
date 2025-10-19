@@ -81,13 +81,20 @@ def plot_keyword_traffic(df):
 def display_word_cloud(word_counts):
     st.write("单词词云")
     wordcloud = WordCloud(
-        width=800,
-        height=600,
-        background_color=None,  # 必须使用None
-        mode="RGBA"
+        width=1600,  # 增大画布尺寸
+        height=1200,
+        background_color=None,
+        mode="RGBA",
+        max_words=200,  # 限制单词数量
+        max_font_size=200,  # 设置最大字体
+        min_font_size=10,  # 设置最小字体
+        prefer_horizontal=0.9,  # 调整水平显示偏好
+        relative_scaling=0.5,  # 调整缩放比例
+        collocations=False  # 禁用词组
     ).generate_from_frequencies(word_counts)
 
-    fig, ax = plt.subplots(figsize=(10, 8))
+    # 创建图形时设置更高的DPI
+    fig, ax = plt.subplots(figsize=(12, 10), dpi=300)
     ax.imshow(wordcloud, interpolation='bilinear')
     ax.axis('off')
 
@@ -95,7 +102,8 @@ def display_word_cloud(word_counts):
     fig.patch.set_alpha(0)
     ax.patch.set_alpha(0)
 
-    st.pyplot(fig, bbox_inches='tight', pad_inches=0)
+    # 保存为高分辨率图像
+    st.pyplot(fig, bbox_inches='tight', pad_inches=0, dpi=300)
 
 
 def display_frequency_table(freq_df):
