@@ -134,7 +134,7 @@ def display_main_content():
     """显示页面的主要交互内容。"""
     st.title("🗣️ 英语句子语音现象分析器")
     st.markdown("输入一个英语句子，即可生成标准发音，并由 Gemini AI 分析其中包含的连读、略读等语音现象。\n"
-                "- 部分符号说明：\n"
+                "**部分符号说明：**\n"
                 "- 连读 (Liaison): 使用上括号 `‿` 连接单词，例如 next‿two\n"
                 "- 略读 (Elision): 在被省略的音素位置使用删除线 `~`，例如 las~t night\n"
                 "- 插读 (Intrusion): 在插入音素的位置使用 `+` 号，例如 go+w away\n"
