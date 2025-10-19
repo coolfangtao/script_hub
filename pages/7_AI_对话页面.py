@@ -3,6 +3,7 @@
 import streamlit as st
 import google.generativeai as genai
 from shared.sidebar import create_common_sidebar # 导入公共侧边栏函数
+from shared.ai_model_config import MODEL_NAME
 
 # --- 页面配置和侧边栏 ---
 st.set_page_config(
@@ -25,7 +26,7 @@ except (KeyError, FileNotFoundError):
 # 使用 session_state 来持久化聊天记录
 if "gemini_chat" not in st.session_state:
     # 初始化模型
-    model = genai.GenerativeModel('gemini-2.5-pro')
+    model = genai.GenerativeModel(MODEL_NAME)
     # 开始聊天，并将会话对象存储在 session_state 中
     st.session_state.gemini_chat = model.start_chat(history=[])
     # 初始化一个列表来单独存储和显示消息

@@ -7,6 +7,7 @@ import os
 import google.generativeai as genai
 from typing import Optional
 from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+from shared.ai_model_config import MODEL_NAME
 create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # --- 配置部分 ---
@@ -50,7 +51,7 @@ def analyze_phonetics_with_gemini(text: str) -> str:
 
     # 此时 genai 模块应该已经被配置好了
     try:
-        model = genai.GenerativeModel('gemini-2.5-pro')
+        model = genai.GenerativeModel(MODEL_NAME)
         prompt = f"""
         请作为一名专业的英语语音教师，分析以下句子的语音现象。
 

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+from shared.ai_model_config import MODEL_NAME
 create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 
@@ -96,7 +97,7 @@ def generate_listing_info(api_key, prompt):
         # 配置API密钥
         genai.configure(api_key=api_key)
         # 创建模型实例
-        model = genai.GenerativeModel('gemini-2.5-pro')
+        model = genai.GenerativeModel(MODEL_NAME)
         # 生成内容
         response = model.generate_content(prompt)
         return response.text
