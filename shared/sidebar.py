@@ -5,7 +5,7 @@ import streamlit as st
 # --- 核心数据结构: 统一管理所有脚本和分组 ---
 # 这是你项目中唯一的"数据源"，所有页面都从这里读取导航信息
 SCRIPTS_BY_GROUP = {
-    "📊 电商运维": [
+    "📊 运营维护": [
         {
             "label": "统计单个ASIN关键词结果",
             "path": r"pages/2_统计单个ASIN关键词结果.py"
