@@ -8,3 +8,4 @@ wordcloud
 plotly
 googletrans
 easyocr
+deep-translator
