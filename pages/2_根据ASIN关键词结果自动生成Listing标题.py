@@ -61,7 +61,7 @@ def create_prompts(df):
     {keywords_csv}
     ```
 
-    请直接给出你认为最佳的1个产品标题。
+    请直接给出你认为最佳的3个产品标题。
     """
 
     # --- 五点描述的提示词 ---
@@ -116,7 +116,7 @@ def main():
         st.header("⚙️ 设置")
 
         # 获取API Key
-        api_key = st.text_input("请输入你的Google Gemini API密钥:", type="password", help="在此输入您的Gemini API密钥。")
+        api_key = st.text_input("请输入你的Google Gemini API密钥\n(链接：https://aistudio.google.com/app/api-keys):", type="password", help="在此输入您的Gemini API密钥。")
 
         # 文件上传
         uploaded_file = st.file_uploader(
