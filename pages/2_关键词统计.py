@@ -313,25 +313,20 @@ def plot_asin_traffic_contribution(df: pd.DataFrame):
 
 def display_aggregated_word_frequency(df: pd.DataFrame):
     """为合并数据展示单词频率表格和词云。"""
-    st.subheader("聚合后的单词频率 (Aggregated Word Frequency)")
-    word_counts, freq_df = calculate_word_frequency(df)
+    # --- 词频分析 ---
+    st.subheader("组成关键词的单词频率 (Word Frequency)")
+    # 1. 计算词频 (公共逻辑)
+    text = ' '.join(df['流量词'].dropna())
+    words = re.findall(r'\b\w+\b', text.lower())
+    word_counts = Counter(words)
+    total_words = sum(word_counts.values())
+    freq_df = pd.DataFrame(word_counts.items(), columns=["单词", "出现次数"])
+    freq_df["频率"] = freq_df["出现次数"] / total_words
+    freq_df = freq_df.sort_values(by="出现次数", ascending=False)
 
-    if not word_counts:
-        st.warning("没有有效的流量词来生成单词频率分析。")
-        return
-
-    st.write("单词频率统计表格")
-    st.dataframe(freq_df.style.format({"频率": "{:.2%}"}), use_container_width=True)
-
-    st.write("单词词云")
-    wordcloud = WordCloud(
-        width=1600, height=800, background_color='white',
-        max_words=200, collocations=False
-    ).generate_from_frequencies(word_counts)
-    fig, ax = plt.subplots(figsize=(16, 8))
-    ax.imshow(wordcloud, interpolation='bilinear')
-    ax.axis('off')
-    st.pyplot(fig)
+    # 2. 依次展示词云和表格
+    display_word_cloud(word_counts)
+    display_frequency_table(freq_df)
 
 
 # --- Streamlit 页面主函数 ---
@@ -363,11 +358,12 @@ def main():
 
             # 单文件仪表盘
             display_key_metrics(df, asin=asin) # todo：新增专用函数
+
+            # 展示流量占比
             plot_keyword_traffic(df)
 
             # --- 词频分析 ---
             st.subheader("组成关键词的单词频率 (Word Frequency)")
-
             # 1. 计算词频 (公共逻辑)
             text = ' '.join(df['流量词'].dropna())
             words = re.findall(r'\b\w+\b', text.lower())
@@ -418,7 +414,7 @@ def main():
         choice = st.selectbox("请选择要查看的视图:", asin_options)
 
         if choice == "合并后文件统计信息":
-            display_key_metrics(consolidated_df, is_consolidated=True)
+            display_key_metrics(consolidated_df, is_consolidated=True) # todo:新建特定函数
             plot_asin_traffic_contribution(consolidated_df)
             plot_keyword_traffic(consolidated_df)
             display_aggregated_word_frequency(consolidated_df)
