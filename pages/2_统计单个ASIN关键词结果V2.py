@@ -120,7 +120,12 @@ def display_word_frequency(df):
 
     with col2:
         st.write("单词频率统计")
-        st.dataframe(freq_df.head(20), height=600, use_container_width=True)
+        # 使用st.dataframe并格式化“频率”列为百分比
+        st.dataframe(
+            freq_df.head(20).style.format({"频率": "{:.2%}"}),
+            height=600,
+            use_container_width=True
+        )
 
 
 def plot_search_volume_and_clicks(df):
@@ -158,9 +163,21 @@ def plot_search_volume_and_clicks(df):
         color_discrete_map={
             "购买量": "#00CC96",
             "未购买量": "#FECB52"
-        },
-        text=plot_df.apply(lambda row: f'购买率: {row["购买率"]:.2%}' if row["类型"] == '购买量' else '', axis=1)
+        }
     )
+
+    # 添加标注，使其位于整个柱子的中间
+    for index, row in top_20_search.iterrows():
+        fig.add_annotation(
+            x=row['月搜索量'] / 2,  # X轴位置为总长度的一半
+            y=row['流量词'],  # Y轴位置为关键词
+            text=f"购买率: {row['购买率']:.2%}",
+            showarrow=False,
+            font=dict(
+                color="black",
+                size=12
+            )
+        )
 
     fig.update_layout(
         xaxis_title="月搜索量",
@@ -181,34 +198,32 @@ def main():
 
     uploaded_file = st.file_uploader("请上传你的Excel或CSV文件", type=["xlsx", "csv"])
 
+    # 文件上传后直接分析，无需按钮
     if uploaded_file is not None:
-        if st.button("开始分析"):
-            try:
+        try:
+            with st.spinner('正在分析数据，请稍候...'):
                 # 根据文件类型读取数据
                 if uploaded_file.name.endswith('.csv'):
-                    # 假设第一个sheet是主数据
                     df = pd.read_csv(uploaded_file)
                 else:
-                    # 对于Excel，我们读取第一个sheet
                     df = pd.read_excel(uploaded_file, sheet_name=0)
 
-                with st.spinner('正在分析数据，请稍候...'):
-                    # 显示关键指标
-                    display_key_metrics(df)
+                # 显示关键指标
+                display_key_metrics(df)
 
-                    # 显示关键词流量图
-                    plot_keyword_traffic(df)
+                # 显示关键词流量图
+                plot_keyword_traffic(df)
 
-                    # 显示词频分析
-                    display_word_frequency(df)
+                # 显示词频分析
+                display_word_frequency(df)
 
-                    # 显示搜索量和购买量
-                    plot_search_volume_and_clicks(df)
+                # 显示搜索量和购买量
+                plot_search_volume_and_clicks(df)
 
-                st.success("分析完成！")
+            st.success("分析完成！")
 
-            except Exception as e:
-                st.error(f"处理文件时出错: {e}")
+        except Exception as e:
+            st.error(f"处理文件时出错: {e}")
 
 
 if __name__ == "__main__":
