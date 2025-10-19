@@ -12,7 +12,6 @@ create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边�
 
 
 # --- 核心功能函数 ---
-
 def parse_filename(filename: str) -> Optional[Dict[str, str]]:
     """
     从标准文件名中解析出ASIN等信息。
@@ -27,28 +26,47 @@ def parse_filename(filename: str) -> Optional[Dict[str, str]]:
 
 def process_uploaded_file(uploaded_file) -> Optional[Tuple[str, pd.DataFrame, pd.DataFrame]]:
     """
-    处理单个上传的Excel文件，提取ASIN并准备数据用于合并。
+    处理单个上传的Excel文件。
+    1. 读取第一个sheet。
+    2. 解析文件名获取ASIN。
+    3. 创建一个新DataFrame，并在第一列添加ASIN信息。
+
+    Args:
+        uploaded_file: Streamlit上传的文件对象。
+
+    Returns:
+        Optional[Tuple[str, pd.DataFrame, pd.DataFrame]]:
+        一个元组，包含:
+        - 原始sheet的名称。
+        - 原始sheet的完整DataFrame (用于单独存放)。
+        - 添加了ASIN列的DataFrame (用于总表合并)。
+        如果文件处理失败或文件名格式不正确，则返回None。
     """
     try:
+        # 解析文件名
         file_info = parse_filename(uploaded_file.name)
         if not file_info:
             st.warning(f"文件名 '{uploaded_file.name}' 格式不符合要求，已跳过。")
             return None
 
         asin = file_info['asin']
+
+        # 读取Excel的第一个sheet
+        # `sheet_name=0` 表示读取第一个sheet
+        # `engine='openpyxl'` 是为了更好地兼容.xlsx文件
+        original_df = pd.read_excel(uploaded_file, sheet_name=0, engine='openpyxl')
+
+        # 获取第一个sheet的名称，用于在新Excel中创建同名sheet
         xls = pd.ExcelFile(uploaded_file, engine='openpyxl')
         sheet_name = xls.sheet_names[0]
-        original_df = pd.read_excel(xls, sheet_name=sheet_name)
 
-        # 数据清洗
-        numeric_cols = ['流量占比', '自然流量占比', '广告流量占比', '月搜索量', '购买量', '购买率']
-        for col in numeric_cols:
-            if col in original_df.columns:
-                original_df[col] = pd.to_numeric(original_df[col], errors='coerce').fillna(0)
-
+        # 准备用于合并到总表的数据
         df_for_consolidation = original_df.copy()
+        # 在第一列插入ASIN信息
         df_for_consolidation.insert(0, 'ASIN', asin)
+
         return sheet_name, original_df, df_for_consolidation
+
     except Exception as e:
         st.error(f"处理文件 '{uploaded_file.name}' 时出错: {e}")
         return None
@@ -56,19 +74,30 @@ def process_uploaded_file(uploaded_file) -> Optional[Tuple[str, pd.DataFrame, pd
 
 def create_excel_file(individual_sheets: Dict[str, pd.DataFrame], consolidated_df: pd.DataFrame) -> BytesIO:
     """
-    在内存中创建一个包含所有独立sheet和总表的Excel文件。
+    将处理好的数据写入一个新的Excel文件（在内存中）。
+
+    Args:
+        individual_sheets (Dict[str, pd.DataFrame]): 一个字典，键是sheet名，值是对应的原始DataFrame。
+        consolidated_df (pd.DataFrame): 整合了所有ASIN信息的总表DataFrame。
+
+    Returns:
+        BytesIO: 包含新Excel文件内容的二进制流对象。
     """
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # 1. 写入总表，并将其放在第一个
         consolidated_df.to_excel(writer, sheet_name='总表-所有ASIN整合', index=False)
+
+        # 2. 写入每个独立的ASIN sheet
         for sheet_name, df in individual_sheets.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    # 重置指针到文件开头，以便st.download_button可以读取它
     output.seek(0)
     return output
 
 
 # --- 数据分析与可视化函数 ---
-
 def display_key_metrics(df: pd.DataFrame, is_consolidated: bool = False, asin: str = ""):
     """展示关键指标总览。"""
     st.subheader("关键指标总览 (Key Metrics)")
