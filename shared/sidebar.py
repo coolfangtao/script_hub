@@ -13,23 +13,23 @@ SCRIPTS_BY_GROUP = {
     ],
     "📊 运营维护": [
         {
-            "label": "关键词统计",
+            "label": "关键词统计（推荐）",
             "path": r"pages/2_关键词统计.py"
         },
         {
-            "label": "统计单个ASIN关键词结果",
+            "label": "统计单个ASIN关键词结果（已废弃）",
             "path": r"pages/2_统计单个ASIN关键词结果.py"
         },
         {
-            "label": "统计单个ASIN关键词结果V2",
+            "label": "统计单个ASIN关键词结果V2（已废弃）",
             "path": r"pages/2_统计单个ASIN关键词结果V2.py"
         },
         {
-            "label": "合并多个ASIN的关键词结果",
+            "label": "合并多个ASIN的关键词结果（已废弃）",
             "path": r"pages/2_合并多个ASIN关键词结果.py"
         },
         {
-            "label": "统计多个ASIN关键词结果",
+            "label": "统计多个ASIN关键词结果（已废弃）",
             "path": r"pages/2_统计多个ASIN关键词结果.py"
         },
         {
