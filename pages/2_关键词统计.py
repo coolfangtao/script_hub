@@ -314,7 +314,6 @@ def plot_asin_traffic_contribution(df: pd.DataFrame):
 def display_aggregated_word_frequency(df: pd.DataFrame):
     """为合并数据展示单词频率表格和词云。"""
     # --- 词频分析 ---
-    st.subheader("组成关键词的单词频率 (Word Frequency)")
     # 1. 计算词频 (公共逻辑)
     text = ' '.join(df['流量词'].dropna())
     words = re.findall(r'\b\w+\b', text.lower())
@@ -363,7 +362,7 @@ def main():
             plot_keyword_traffic(df)
 
             # --- 词频分析 ---
-            st.subheader("组成关键词的单词频率 (Word Frequency)")
+            st.subheader("单ASIN组成关键词的单词频率 (Word Frequency)")
             display_aggregated_word_frequency(df)
 
             plot_search_volume_and_purchases(df)
@@ -406,6 +405,7 @@ def main():
             display_key_metrics(consolidated_df, is_consolidated=True) # todo:新建特定函数
             plot_asin_traffic_contribution(consolidated_df)
             plot_keyword_traffic(consolidated_df) # todo:有问题，要修改
+            st.subheader("聚合后组成关键词的单词频率 (Word Frequency)")
             display_aggregated_word_frequency(consolidated_df)
             display_raw_data(consolidated_df, title="合并后的数据表 (Consolidated Data)")
         else:
@@ -422,7 +422,7 @@ def main():
                 plot_keyword_traffic(selected_asin_df)
 
                 # --- 词频分析 ---
-                st.subheader("组成关键词的单词频率 (Word Frequency)")
+                st.subheader("单ASIN组成关键词的单词频率 (Word Frequency)")
                 display_aggregated_word_frequency(selected_asin_df)
 
                 plot_search_volume_and_purchases(selected_asin_df)
