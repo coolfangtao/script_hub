@@ -116,7 +116,8 @@ def main():
         st.header("⚙️ 设置")
 
         # 获取API Key
-        api_key = st.text_input("请输入你的Google Gemini API密钥:\n链接：https://aistudio.google.com/app/api-keys", type="password", help="在此输入您的Gemini API密钥。")
+        # api_key = st.text_input("请输入你的Google Gemini API密钥:\n链接：https://aistudio.google.com/app/api-keys", type="password", help="在此输入您的Gemini API密钥。")
+        api_key = st.secrets["API_KEY"]
 
         # 文件上传
         uploaded_file = st.file_uploader(
