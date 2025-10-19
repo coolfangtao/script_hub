@@ -95,7 +95,7 @@ def generate_listing_info(api_key, prompt):
         # 配置API密钥
         genai.configure(api_key=api_key)
         # 创建模型实例
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.5-pro')
         # 生成内容
         response = model.generate_content(prompt)
         return response.text
