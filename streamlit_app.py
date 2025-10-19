@@ -55,7 +55,8 @@ with col3:
 with col4:
     with st.container(border=True):
         st.markdown("<h5>🤖 AI工具</h5>", unsafe_allow_html=True)
-        st.write("在没有VPN的情况下也能使用Gemini 2.5 Pro功能")
+        # 将这里的描述加长，让它和其他的差不多
+        st.write("与强大的 AI 模型进行对话，无需特殊网络环境即可体验 Gemini 2.5 Pro。")
         if st.button("立即开始", key="ai", use_container_width=True):
             st.switch_page(r"pages/7_AI_对话页面.py")
 
