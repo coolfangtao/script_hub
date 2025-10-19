@@ -52,7 +52,7 @@ MODEL_OPTIONS = [
 # 创建一个选择框，默认值为 'gemini-2.0-flash'
 # `index=0` 因为 'gemini-2.0-flash' 是列表中的第一个元素
 selected_model = st.selectbox(
-    "请选择一个 AI 模型:",
+    "请选择一个 AI 模型（https://aistudio.google.com/）:",
     options=MODEL_OPTIONS,
     index=0
 )
