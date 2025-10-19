@@ -116,7 +116,7 @@ def main():
         st.header("⚙️ 设置")
 
         # 获取API Key
-        api_key = st.text_input("请输入你的Google Gemini API密钥\n(链接：https://aistudio.google.com/app/api-keys):", type="password", help="在此输入您的Gemini API密钥。")
+        api_key = st.text_input("请输入你的Google Gemini API密钥:\n链接：https://aistudio.google.com/app/api-keys", type="password", help="在此输入您的Gemini API密钥。")
 
         # 文件上传
         uploaded_file = st.file_uploader(
@@ -167,7 +167,7 @@ def main():
     elif uploaded_file is None:
         st.info("请在左侧边栏上传您的Excel文件以开始。")
     elif not api_key:
-        st.warning("请输入您的Google Gemini API密钥以启用生成功能。")
+        st.warning("请输入您的Google Gemini API密钥以启用生成功能。\n链接：https://aistudio.google.com/app/api-keys")
 
 
 if __name__ == "__main__":
