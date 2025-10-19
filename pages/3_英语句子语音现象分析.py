@@ -145,7 +145,7 @@ def process_and_display_results(sentence: str, selected_model: str):
         with st.spinner("🔊 正在生成语音，请稍候..."):
             audio_file_path = asyncio.run(generate_tts(sentence))
             if audio_file_path and os.path.exists(audio_file_path):
-                st.success("语音生成成功！")
+                st.success("语音生成成功！点击播放或调整速度")
                 st.audio(audio_file_path, format="audio/mp3")
                 with open(audio_file_path, "rb") as file:
                     st.download_button(
