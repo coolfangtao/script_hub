@@ -48,7 +48,7 @@ def analyze_phonetics_with_gemini(text: str) -> str:
 
     # 此时 genai 模块应该已经被配置好了
     try:
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.5-pro')
         prompt = f"""
         请作为一名专业的英语语音教师，分析以下句子的语音现象。
 
@@ -107,7 +107,7 @@ def setup_page_config_and_styles():
 def setup_sidebar():
     """在侧边栏设置API密钥输入框。"""
     st.sidebar.header("🔑 API 密钥配置")
-    st.sidebar.markdown("为了使用分析功能，请输入您的 Google Gemini API 密钥。")
+    st.sidebar.markdown("为了使用分析功能，请输入你的Google Gemini API密钥:\n链接：https://aistudio.google.com/app/api-keys")
 
     # 使用 st.session_state 来持久化存储 API 密钥
     if "GEMINI_API_KEY" not in st.session_state:
