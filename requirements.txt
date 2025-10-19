@@ -10,3 +10,4 @@ googletrans
 easyocr
 deep-translator
 google-generativeai
+sqlalchemy
