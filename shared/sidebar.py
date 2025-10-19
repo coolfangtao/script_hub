@@ -60,7 +60,13 @@ SCRIPTS_BY_GROUP = {
             "label": "图像翻译",
             "path": r"pages/6_图片翻译.py"
         },
-    ]
+    ],
+    "其他": [
+        {
+            "label": "基金涨跌",
+            "path": r"pages/8_基金涨跌.py"
+        },
+    ],
 }
 
 
