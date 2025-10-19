@@ -1,9 +1,7 @@
-# 文件路径: pages/7_AI_对话页面.py
-
 import streamlit as st
 import google.generativeai as genai
 from shared.sidebar import create_common_sidebar # 导入公共侧边栏函数
-from shared.ai_model_config import MODEL_NAME
+# from shared.ai_model_config import MODEL_NAME # 不再需要从外部文件导入固定的模型名称
 
 # --- 页面配置和侧边栏 ---
 st.set_page_config(
@@ -21,20 +19,60 @@ except (KeyError, FileNotFoundError):
     st.error("Gemini API 密钥未找到。请在 Streamlit secrets 中设置名为 'API_KEY' 的密钥。")
     st.stop()
 
-
-# --- 初始化模型和会话状态 ---
-# 使用 session_state 来持久化聊天记录
-if "gemini_chat" not in st.session_state:
-    # 初始化模型
-    model = genai.GenerativeModel(MODEL_NAME)
-    # 开始聊天，并将会话对象存储在 session_state 中
-    st.session_state.gemini_chat = model.start_chat(history=[])
-    # 初始化一个列表来单独存储和显示消息
-    st.session_state.messages = []
-
 # --- 页面标题和介绍 ---
 st.title("🤖 AI 对话")
 st.caption("一个由 Google Gemini Pro 驱动的聊天机器人")
+
+
+# --- 模型选择 ---
+# 定义可选的 AI 模型列表
+MODEL_OPTIONS = [
+    "gemini-2.0-flash",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash-exp",
+    "gemini-2.0-flash-lite",
+    "gemini-2.0-flash-preview-image-generation",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash-tts",
+    "gemini-2.5-flash",
+    "gemini-robotics-er-1.5-preview",
+    "gemma-3-12b",
+    "gemma-3-1b",
+    "gemma-3-27b",
+    "gemma-3-2b",
+    "gemma-3-4b",
+    "learnim-2.0-flash-experimental",
+    "imagen-3.0-generate",
+    "veo-2.0-generate-001",
+    "gemini-2.0-flash-live",
+    "gemini-2.5-flash-live",
+    "gemini-2.5-flash-native-audio-dialog"
+]
+
+# 创建一个选择框，默认值为 'gemini-2.0-flash'
+# `index=0` 因为 'gemini-2.0-flash' 是列表中的第一个元素
+selected_model = st.selectbox(
+    "请选择一个 AI 模型:",
+    options=MODEL_OPTIONS,
+    index=0
+)
+
+
+# --- 初始化模型和会话状态 ---
+# 检查 session_state 中是否已有聊天记录，或者用户是否切换了模型
+# 如果切换了模型，则需要重置聊天
+if "gemini_chat" not in st.session_state or st.session_state.get("selected_model") != selected_model:
+    # 存储当前选择的模型
+    st.session_state.selected_model = selected_model
+    # 初始化模型
+    model = genai.GenerativeModel(selected_model)
+    # 开始新的聊天，并将会话对象存储在 session_state 中
+    st.session_state.gemini_chat = model.start_chat(history=[])
+    # 初始化一个列表来单独存储和显示消息
+    st.session_state.messages = []
+    # （可选）可以加一个提示，告诉用户模型已切换，对话已重置
+    # st.info(f"模型已切换为 {selected_model}。新的对话已开始。")
+
 
 # --- 显示历史聊天记录 ---
 # 遍历 session_state 中存储的所有消息并显示
