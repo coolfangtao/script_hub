@@ -78,53 +78,39 @@ def plot_keyword_traffic(df):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def display_word_frequency(df):
+def display_word_cloud(word_counts):
     """
-    展示组成关键词的单词频率，包括词云和表格。
+    根据词频数据生成并展示词云。
 
     Args:
-        df (pd.DataFrame): 包含关键词数据的DataFrame。
+        word_counts (Counter): 包含单词及其出现次数的Counter对象。
     """
-    st.subheader("组成关键词的单词频率 (Word Frequency)")
+    st.write("单词词云")
+    wordcloud = WordCloud(
+        width=800,
+        height=600,
+        background_color='white'
+    ).generate_from_frequencies(word_counts)
 
-    # 将所有流量词合并为一个长字符串
-    text = ' '.join(df['流量词'].dropna())
+    fig, ax = plt.subplots()
+    ax.imshow(wordcloud, interpolation='bilinear')
+    ax.axis('off')
+    st.pyplot(fig)
 
-    # 使用正则表达式找到所有单词
-    words = re.findall(r'\b\w+\b', text.lower())
 
-    # 统计词频
-    word_counts = Counter(words)
-    total_words = sum(word_counts.values())
+def display_frequency_table(freq_df):
+    """
+    展示格式化后的单词频率统计表格。
 
-    # 创建词频DataFrame
-    freq_df = pd.DataFrame(word_counts.items(), columns=["单词", "出现次数"])
-    freq_df["频率"] = freq_df["出现次数"] / total_words
-    freq_df = freq_df.sort_values(by="出现次数", ascending=False)
-
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        st.write("单词词云")
-        wordcloud = WordCloud(
-            width=800,
-            height=600,
-            background_color='white'
-        ).generate_from_frequencies(word_counts)
-
-        fig, ax = plt.subplots()
-        ax.imshow(wordcloud, interpolation='bilinear')
-        ax.axis('off')
-        st.pyplot(fig)
-
-    with col2:
-        st.write("单词频率统计")
-        # 使用st.dataframe并格式化“频率”列为百分比
-        st.dataframe(
-            freq_df.head(20).style.format({"频率": "{:.2%}"}),
-            height=600,
-            use_container_width=True
-        )
+    Args:
+        freq_df (pd.DataFrame): 包含单词、出现次数和频率的DataFrame。
+    """
+    st.write("单词频率统计")
+    st.dataframe(
+        freq_df.head(20).style.format({"频率": "{:.2%}"}),
+        height=600,
+        use_container_width=True
+    )
 
 
 def plot_search_volume_and_clicks(df):
@@ -224,8 +210,21 @@ def main():
                 # 显示关键词流量图
                 plot_keyword_traffic(df)
 
-                # 显示词频分析
-                display_word_frequency(df)
+                # --- 词频分析 ---
+                st.subheader("组成关键词的单词频率 (Word Frequency)")
+
+                # 1. 计算词频 (公共逻辑)
+                text = ' '.join(df['流量词'].dropna())
+                words = re.findall(r'\b\w+\b', text.lower())
+                word_counts = Counter(words)
+                total_words = sum(word_counts.values())
+                freq_df = pd.DataFrame(word_counts.items(), columns=["单词", "出现次数"])
+                freq_df["频率"] = freq_df["出现次数"] / total_words
+                freq_df = freq_df.sort_values(by="出现次数", ascending=False)
+
+                # 2. 依次展示词云和表格
+                display_word_cloud(word_counts)
+                display_frequency_table(freq_df)
 
                 # 显示搜索量和购买量
                 plot_search_volume_and_clicks(df)
