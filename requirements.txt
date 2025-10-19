@@ -10,6 +10,7 @@ googletrans
 easyocr
 deep-translator
 google-generativeai
+libsql
 libsql-client
 sqlalchemy
 turso-python
