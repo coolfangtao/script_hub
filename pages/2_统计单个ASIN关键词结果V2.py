@@ -8,7 +8,6 @@ import re
 from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
 create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
-
 def display_key_metrics(df):
     """
     展示关键指标总览。
@@ -189,6 +188,17 @@ def plot_search_volume_and_clicks(df):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def display_raw_data(df):
+    """
+    在页面底部展示完整的原始数据表格。
+
+    Args:
+        df (pd.DataFrame): 包含关键词数据的DataFrame。
+    """
+    st.subheader("原始数据 (Raw Data)")
+    st.dataframe(df)
+
+
 def main():
     """
     Streamlit应用的主函数。
@@ -219,6 +229,9 @@ def main():
 
                 # 显示搜索量和购买量
                 plot_search_volume_and_clicks(df)
+
+                # 新增：显示原始数据
+                display_raw_data(df)
 
             st.success("分析完成！")
 
