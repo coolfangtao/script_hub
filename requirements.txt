@@ -9,3 +9,4 @@ plotly
 googletrans
 easyocr
 deep-translator
+google-generativeai
