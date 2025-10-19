@@ -115,29 +115,34 @@ async def display_feedback_wall_async(client):
         st.error(f"加载历史反馈失败: {e}")
 
 
-# --- 主渲染函数 (核心修改) ---
 def render_feedback_section():
-    """
-    渲染整个反馈区的主函数。
-    这里将手动管理asyncio事件循环，以确保在Streamlit中稳定运行。
-    """
+    """渲染整个反馈区的主函数。"""
     client = connect_to_db()
-    if client:
-        # 解决方案：手动获取或创建一个事件循环
+    if not client:
+        return
+
+    # 手动管理事件循环
+    loop = None
+    try:
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        try:
-            # 使用 loop.run_until_complete 来运行我们的异步函数
-            loop.run_until_complete(init_db_async(client))
-            # 将 loop 传递给表单函数，用于处理提交
-            render_feedback_form(client, loop)
-            st.markdown("---")
-            loop.run_until_complete(display_feedback_wall_async(client))
-        finally:
-            # 确保客户端连接在使用后被异步关闭
+        # 初始化数据库
+        loop.run_until_complete(init_db_async(client))
+
+        # 渲染表单和反馈墙
+        render_feedback_form(client, loop)
+        st.markdown("---")
+        loop.run_until_complete(display_feedback_wall_async(client))
+
+    except Exception as e:
+        st.error(f"发生错误: {e}")
+    finally:
+        if client:
             loop.run_until_complete(client.close())
+        if loop and not loop.is_closed():
+            loop.close()
 
