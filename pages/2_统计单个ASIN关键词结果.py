@@ -78,7 +78,11 @@ def plot_top_keywords_by_traffic(df):
     st.subheader("流量占比 TOP 10 关键词")
 
     # 在绘图前，确保'流量占比'列是数字类型
-    df['流量占比'] = pd.to_numeric(df['流量占比'], errors='coerce')
+    # 同样地，处理可能存在的百分号
+    if df['流量占比'].dtype == 'object':
+        df['流量占比'] = pd.to_numeric(df['流量占比'].str.replace('%', ''), errors='coerce') / 100
+    else:
+        df['流量占比'] = pd.to_numeric(df['流量占比'], errors='coerce')
 
     # 按“流量占比”降序排序并选取前10
     top_10_keywords = df.sort_values(by='流量占比', ascending=False).head(10)
@@ -90,7 +94,7 @@ def plot_top_keywords_by_traffic(df):
         y='流量词',
         orientation='h',
         title='流量占比最高的10个关键词',
-        labels={'流量占比': '流量占比 (%)', '流量词': '关键词'},
+        labels={'流量占比': '流量占比', '流量词': '关键词'},
         text='流量占比' # 在条上显示数值
     )
     # 更新图表布局
@@ -162,15 +166,17 @@ def main():
 
     st.title("📊 ASIN反查关键词分析面板")
 
-    # 创建一个侧边栏用于文件上传
-    with st.sidebar:
-        st.header("上传数据文件")
-        uploaded_file = st.file_uploader("请在此处上传您的Excel文件", type=["xlsx"])
+    # --- 修改部分 START ---
+    # 将文件上传组件直接放在主页面上
+    st.header("上传数据文件")
+    uploaded_file = st.file_uploader("请在此处上传您的ASIN反查关键词Excel文件以开始分析", type=["xlsx"])
 
     # 如果没有上传文件，显示提示信息
     if uploaded_file is None:
-        st.info("👋 欢迎使用！请在左侧侧边栏上传您的ASIN反查关键词Excel文件以开始分析。")
+        st.info("👋 欢迎使用！请上传文件以开始分析。")
         return
+    # --- 修改部分 END ---
+
 
     # --- 文件处理与数据展示 ---
     filename = uploaded_file.name
