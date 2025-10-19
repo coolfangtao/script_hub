@@ -81,28 +81,8 @@ with col4:
 
 st.markdown("---")
 
-# --- 4. 关于我们 & 更新日志 ---
-about_col, changelog_col = st.columns(2)
-
-with about_col:
-    st.subheader("🎯 关于我们")
-    st.write(
-        """
-        **FT的脚本中心** 旨在成为一个强大而易于使用的在线工具箱。
-
-        我们的目标是:
-        - **提升效率**: 自动化处理重复性、耗时的工作。
-        - **简化操作**: 提供直观的用户界面，无需专业知识也能轻松上手。
-        - **持续迭代**: 根据用户反馈不断添加新功能和优化现有工具。
-
-        希望这些工具能对你有所帮助！
-        """
-    )
-
-with changelog_col:
-    # 将更新日志放入 "关于我们" 旁边的列中
-    show_changelog()
-
+# --- 4. 更新日志 ---
+show_changelog()
 st.markdown("---")
 
 # --- 5. 联系与反馈 ---
@@ -112,7 +92,7 @@ st.markdown("---")
 st.markdown(
     """
     <p style='text-align: center; color: grey;'>
-        © 2025 FT的脚本中心 | Made with ❤️ using Streamlit
+        © 2025 FT的脚本中心 | ✉️ 邮箱：19210860039@fudan.edu.cn
     </p>
     """,
     unsafe_allow_html=True
