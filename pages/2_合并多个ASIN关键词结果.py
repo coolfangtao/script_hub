@@ -3,6 +3,8 @@ import pandas as pd
 import re
 from io import BytesIO
 from typing import List, Dict, Tuple, Optional
+from shared.sidebar import create_sidebar # <-- 1. 导入函数
+create_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 
 # --- 核心功能函数 (Core Logic Functions) ---

@@ -2,11 +2,6 @@ import streamlit as st
 import re
 
 from shared.sidebar import create_sidebar # <-- 1. 导入函数
-
-# --- 页面基础设置 (可选，但建议保留) ---
-# st.set_page_config(layout="wide") # 子页面通常不需要这个
-
-# --- 创建侧边栏 ---
 create_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # Main title of the application
