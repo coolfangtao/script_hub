@@ -25,7 +25,7 @@ except (KeyError, FileNotFoundError):
 # 使用 session_state 来持久化聊天记录
 if "gemini_chat" not in st.session_state:
     # 初始化模型
-    model = genai.GenerativeModel('gemini-pro')
+    model = genai.GenerativeModel('gemini-2.5-pro')
     # 开始聊天，并将会话对象存储在 session_state 中
     st.session_state.gemini_chat = model.start_chat(history=[])
     # 初始化一个列表来单独存储和显示消息
