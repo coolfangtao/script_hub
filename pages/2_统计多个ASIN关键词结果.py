@@ -170,16 +170,13 @@ def main():
     st.set_page_config(page_title="多ASIN关键词分析面板", layout="wide")
     st.title("📊 多ASIN反查关键词分析面板")
 
-    # --- 侧边栏 ---
-    with st.sidebar:
-        st.header("上传与筛选")
-        uploaded_file = st.file_uploader("上传合并后的Excel文件", type=["xlsx"])
-
-        # 占位符，用于之后显示ASIN筛选器
-        filter_container = st.container()
+    # --- 修改部分 START ---
+    # 将上传和筛选功能直接放在主页面
+    st.header("上传与筛选")
+    uploaded_file = st.file_uploader("上传合并后的Excel文件", type=["xlsx"])
 
     if uploaded_file is None:
-        st.info("👋 欢迎使用！请在左侧上传包含 '总表-所有ASIN整合' Sheet的Excel文件以开始分析。")
+        st.info("👋 欢迎使用！请上传包含 '总表-所有ASIN整合' Sheet的Excel文件以开始分析。")
         return
 
     # --- 数据加载与处理 ---
@@ -190,17 +187,19 @@ def main():
     # 清洗数据
     df_cleaned = clean_data(df_original.copy())
 
-    # --- 在侧边栏中动态创建ASIN筛选器 ---
+    # 在主页面上动态创建ASIN筛选器
     all_asins = df_cleaned['ASIN'].unique()
-    selected_asins = filter_container.multiselect("选择要分析的ASIN (可多选)", options=all_asins, default=all_asins)
+    selected_asins = st.multiselect("选择要分析的ASIN (可多选)", options=all_asins, default=all_asins)
+    # --- 修改部分 END ---
+
 
     # 根据选择筛选数据
-    if selected_asins:
-        df_filtered = df_cleaned[df_cleaned['ASIN'].isin(selected_asins)]
-    else:
-        # 如果没有选择任何ASIN，则显示空状态
+    if not selected_asins:
+        # 如果没有选择任何ASIN，则显示提示信息
         st.warning("请至少选择一个ASIN进行分析。")
         return
+
+    df_filtered = df_cleaned[df_cleaned['ASIN'].isin(selected_asins)]
 
     # --- 页面主内容展示 ---
     display_metrics(df_filtered)
