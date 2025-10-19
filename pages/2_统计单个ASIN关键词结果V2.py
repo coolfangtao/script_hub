@@ -81,7 +81,7 @@ def plot_keyword_traffic(df):
 def display_word_cloud(word_counts):
     st.write("单词词云")
     wordcloud = WordCloud(
-        width=1600,  # 增大画布尺寸
+        # width=1600,  # 增大画布尺寸
         height=1200,
         background_color=None,
         mode="RGBA",
