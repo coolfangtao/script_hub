@@ -6,6 +6,8 @@ import edge_tts
 import os
 import google.generativeai as genai
 from typing import Optional
+from shared.sidebar import create_sidebar # <-- 1. 导入函数
+create_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # --- 配置部分 ---
 
