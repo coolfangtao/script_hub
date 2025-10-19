@@ -113,12 +113,13 @@ def setup_sidebar():
     if "GEMINI_API_KEY" not in st.session_state:
         st.session_state["GEMINI_API_KEY"] = ""
 
-    api_key = st.sidebar.text_input(
-        "Gemini API 密钥",
-        type="password",
-        value=st.session_state["GEMINI_API_KEY"],
-        help="您的密钥将仅在当前浏览器会话中使用，不会被存储或分享。"
-    )
+    # api_key = st.sidebar.text_input(
+    #     "Gemini API 密钥",
+    #     type="password",
+    #     value=st.session_state["GEMINI_API_KEY"],
+    #     help="您的密钥将仅在当前浏览器会话中使用，不会被存储或分享。"
+    # )
+    api_key = st.secrets["API_KEY"]
 
     # 当输入框内容改变时，更新 session_state
     if api_key:
