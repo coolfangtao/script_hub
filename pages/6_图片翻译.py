@@ -89,7 +89,7 @@ def remove_original_text(image_np, ocr_results):
     return inpainted_image
 
 
-def draw_translated_text(image_np, translated_results, font_path='arial.ttf'):
+def draw_translated_text(image_np, translated_results, font_path='Arial.ttf'):
     """
     在图片上绘制翻译后的文本。
     (这部分完全没有变化)
@@ -156,7 +156,7 @@ def main():
                     inpainted_image_cv = remove_original_text(original_image_cv, translation_results)
 
                     final_image_pil = draw_translated_text(inpainted_image_cv, translation_results,
-                                                           font_path='arial.ttf')
+                                                           font_path='Arial.ttf')
 
                     st.subheader(f"处理结果: {uploaded_file.name}")
                     col1, col2 = st.columns(2)
