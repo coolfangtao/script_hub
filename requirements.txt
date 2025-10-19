@@ -4,3 +4,5 @@ langdetect
 rembg
 onnxruntime
 openpyxl
+wordcloud
+plotly
