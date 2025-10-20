@@ -10,8 +10,8 @@ def shin_chan_animation(
         gif_url: str = "https://img.alicdn.com/imgextra/i2/2210123621994/O1CN019ne3h11QbIltvPjB8_!!2210123621994.gif",
         position: str = "top",
         speed_seconds: int = 18,
-        size_pixels: int = 100,  # 从你的截图中看，动画尺寸较小，我把默认值改成了100
-        distance_from_edge_pixels: int = 10
+        size_pixels: int = 180,  # 从你的截图中看，动画尺寸较小，我把默认值改成了100
+        distance_from_edge_pixels: int = 30
 ):
     """
     在Streamlit页面上渲染一个蜡笔小新左右移动的动画。
