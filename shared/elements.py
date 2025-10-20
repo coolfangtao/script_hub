@@ -1,4 +1,4 @@
-# shard/elements.py
+# shard/elements.py (健壮性优化版)
 
 import streamlit as st
 
@@ -13,24 +13,11 @@ def shin_chan_animation(
 ):
     """
     在Streamlit页面上渲染一个行为更随机的蜡笔小新动画。
-
-    参数:
-    - gif_url (str): GIF的URL地址。
-    - position (str): 'top' 或 'bottom'。
-    - size_pixels (int): 动画的宽度（像素）。
-    - distance_from_edge_pixels (int): 距离顶部或底部的距离（像素）。
-    - movement_speed (float): 移动速度，数字越大走得越快。
-    - pause_chance (float): 在每一帧停下来的几率 (0.0 到 1.0 之间的一个很小的数, e.g., 0.005)。
     """
-
     position_css = f"{position}: {distance_from_edge_pixels}px;"
 
-    # HTML 包含一个 img 标签用于显示小新
-    # CSS 用于初始定位和样式
-    # JavaScript (<script>) 用于控制所有动态行为
     animation_html = f"""
     <style>
-        /* CSS现在只负责基础样式，不再处理动画 */
         .shin-chan-element {{
             position: fixed;
             {position_css}
@@ -38,7 +25,6 @@ def shin_chan_animation(
             width: {size_pixels}px;
             height: auto;
             z-index: 9999;
-            /* 初始时图片是朝右的 */
             transform: scaleX(1);
         }}
     </style>
@@ -46,55 +32,55 @@ def shin_chan_animation(
     <img src="{gif_url}" id="shin-chan-element" class="shin-chan-element">
 
     <script>
-        const shinChan = document.getElementById('shin-chan-element');
+        // 【关键修改】将所有代码包裹在一个事件监听器中
+        // 这可以确保在页面的所有基本元素都加载完毕后，再执行我们的脚本
+        document.addEventListener('DOMContentLoaded', (event) => {{
+            const shinChan = document.getElementById('shin-chan-element');
 
-        let positionX = 0;
-        let direction = 1; // 1 表示向右, -1 表示向左
-        let isPaused = false;
+            // 如果找不到元素，就直接退出，防止报错
+            if (!shinChan) return;
 
-        const speed = {movement_speed};
-        const size = {size_pixels};
-        const screenWidth = window.innerWidth;
+            let positionX = 0;
+            let direction = 1;
+            let isPaused = false;
 
-        function animate() {{
-            // 如果处于暂停状态，则什么都不做
-            if (isPaused) {{
+            const speed = {movement_speed};
+            const size = {size_pixels};
+            const screenWidth = window.innerWidth;
+
+            function animate() {{
+                if (isPaused) {{
+                    requestAnimationFrame(animate);
+                    return;
+                }}
+
+                positionX += speed * direction;
+                shinChan.style.transform = `translateX(${{positionX}}px) scaleX(${{direction}})`;
+
+                if (positionX > screenWidth - size) {{
+                    direction = -1;
+                }} else if (positionX < 0) {{
+                    direction = 1;
+                }}
+
+                if (Math.random() < {pause_chance}) {{
+                    isPaused = true;
+                    const pauseDuration = Math.random() * 3000 + 1000;
+
+                    setTimeout(() => {{
+                        isPaused = false;
+                        if (Math.random() < 0.5) {{
+                            direction *= -1;
+                        }}
+                    }}, pauseDuration);
+                }}
+
                 requestAnimationFrame(animate);
-                return;
             }}
 
-            // 更新位置
-            positionX += speed * direction;
-            shinChan.style.transform = `translateX(${{positionX}}px) scaleX(${{direction}})`;
-
-            // 边界检测，撞到墙就转身
-            if (positionX > screenWidth - size) {{
-                direction = -1;
-            }} else if (positionX < 0) {{
-                direction = 1;
-            }}
-
-            // 随机暂停的逻辑
-            if (Math.random() < {pause_chance}) {{
-                isPaused = true;
-                // 随机决定暂停多久 (1到4秒)
-                const pauseDuration = Math.random() * 3000 + 1000;
-
-                setTimeout(() => {{
-                    isPaused = false;
-                    // 暂停结束后，有50%的几率会换个方向
-                    if (Math.random() < 0.5) {{
-                        direction *= -1;
-                    }}
-                }}, pauseDuration);
-            }}
-
-            // 请求下一帧动画
-            requestAnimationFrame(animate);
-        }}
-
-        // 启动动画
-        animate();
+            // 启动动画
+            animate();
+        }});
     </script>
     """
 
