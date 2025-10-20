@@ -2,6 +2,8 @@
 import streamlit as st
 import requests
 import base64
+from shared.sidebar import create_common_sidebar # 导入公共侧边栏函数
+create_common_sidebar() # 调用函数创建侧边栏
 
 # --- 从 Streamlit Secrets 中安全地获取 API Key ---
 # 前提：您需要在项目目录下创建 .streamlit/secrets.toml 文件
