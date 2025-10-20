@@ -21,7 +21,7 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/2_关键词统计.py"
         },
         {
-            "label": "根据ASIN关键词结果自动生成Listing标题",
+            "label": "Listing自动生成",
             "path": r"pages/2_根据ASIN关键词结果自动生成Listing标题.py"
         },
     ],
