@@ -100,8 +100,13 @@ FRIENDLY_LINKS = [
         "description": "PDF24 Tools: 免费且易于使用的在线PDF工具"
     },
     {
-        "title": "无需上传文件也可在线处理图片",
+        "title": "imagesTool，无需上传文件也可在线处理图片，可以图片转换、拼接、裁剪、压缩、加水印，GIF 压缩、提取、转换等，功能非常齐全。",
         "url": "https://imagestool.com/zh_CN/",
+        "description": "菜鸟工具 - 不止于工具"
+    },
+    {
+        "title": "格式转换（图片/视频/音频等）",
+        "url": "https://www.aconvert.com/cn/",
         "description": "菜鸟工具 - 不止于工具"
     },
     {
