@@ -88,6 +88,39 @@ st.markdown("---")
 # --- 5. 联系与反馈 ---
 # render_feedback_section() # <-- 2. 在这里调用函数
 
+# --- 5. 友情链接 ---
+st.subheader("🔗 友情链接")
+st.write("发现更多有用的工具和资源。")
+
+# 使用列表和字典来管理链接，未来增删链接只需修改这里
+FRIENDLY_LINKS = [
+    {
+        "title": "PDF24 Tools: 免费且易于使用的在线PDF工具",
+        "url": "https://tools.pdf24.org/zh/",
+        "description": "PDF24 Tools: 免费且易于使用的在线PDF工具"
+    },
+    {
+        "title": "菜鸟工具 - 不止于工具",
+        "url": "https://www.jyshare.com/",
+        "description": "菜鸟工具 - 不止于工具"
+    },
+    {
+        "title": "GD音乐台 - GD Studio's Online Music Platform",
+        "url": "https://music.gdstudio.org/",
+        "description": "GD音乐台 - GD Studio's Online Music Platform"
+    }
+]
+
+# 遍历列表，为每个链接创建一个独立的容器
+for link in FRIENDLY_LINKS:
+    with st.container(border=True):
+        st.markdown(f"##### {link['title']}")
+        st.write(link['description'])
+        # 使用 st.link_button 创建一个更美观的跳转按钮
+        st.link_button("前往查看 →", link['url'])
+
+st.markdown("---")
+
 # --- 6. 页脚 ---
 st.markdown(
     """

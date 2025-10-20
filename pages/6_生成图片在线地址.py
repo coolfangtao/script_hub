@@ -115,11 +115,11 @@ if st.button("生成在线链接", disabled=not uploaded_files or not api_key_co
         st.success("所有图片处理完毕！")
 
 # --- 使用说明 ---
-with st.expander("点击查看使用说明"):
+with st.expander("点击查看使用说明", expanded=True):
     st.markdown("""
     1.  **(首次使用)** 请确保您已经在项目文件夹下创建了 `.streamlit/secrets.toml` 文件，并正确配置了您的 `IMGBB_API_KEY`。
     2.  点击上方的“Browse files”按钮，或直接将图片文件拖拽到上传区域。
     3.  选择您想要转换的所有图片文件 (imgbb免费版有大小限制, 通常为32MB)。
-    4.  选择完毕后，点击蓝色的“生成在线链接”按钮。
+    4.  选择完毕后，点击蓝色的“生成在线链接”按钮（https://coolfangtao.imgbb.com/）。
     5.  应用将自动处理每张图片，并在下方显示图片的预览和生成的在线URL。
     """)
