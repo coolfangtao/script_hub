@@ -78,8 +78,8 @@ if not all_etf_df.empty:
     fund_options_list = fund_options.apply(lambda x: f"{x['名称']} ({x['代码']})", axis=1).tolist()
 
     default_selections = [
-        "纳斯达克100ETF (513300)", "恒生科技指数ETF (513180)", "中概互联网ETF (513050)",
-        "医疗ETF (512170)", "科创50ETF (588000)"
+        "沪深300ETF （510300）", "黃金ETF（518880）", "半导体设备ETF易方达（159558）",
+        "人工智能ETF （515980）", "稀土ETF易方达（159715）", "军工ETF易方达（512560）"
     ]
     valid_defaults = [item for item in default_selections if item in fund_options_list]
 
