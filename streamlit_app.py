@@ -21,7 +21,31 @@ import streamlit.components.v1 as components
 # 从我们创建的文件中，导入代码变量
 # 因为文件名是 particles_component.py，所以我们 from particles_component
 from shared.particles_component import particles_js_code
-components.html(particles_js_code, height=200, scrolling=False)
+# --- 1. 注入自定义CSS，让Streamlit的背景变透明 ---
+# 使用 st.markdown 来插入 HTML 和 CSS
+# [data-testid="stAppViewContainer"] 是 Streamlit 应用的主容器
+# [data-testid="stHeader"] 是顶部的 Header
+custom_css = """
+<style>
+    /* 让主应用容器和顶栏的背景都变成透明 */
+    [data-testid="stAppViewContainer"],
+    [data-testid="stHeader"] {
+        background: transparent;
+    }
+
+    /* 如果你需要，也可以让侧边栏透明 (可选) */
+    /*
+    [data-testid="stSidebar"] {
+        background: transparent;
+    }
+    */
+</style>
+"""
+st.markdown(custom_css, unsafe_allow_html=True)
+# --- 2. 渲染粒子动画HTML组件 ---
+# 这会将 id="particles-js" 的 div 插入到页面中
+# 由于它的 CSS 设置了 position: fixed 和 z-index: -1，它会自动铺满整个背景
+components.html(particles_js_code, height=800, scrolling=False)
 
 # =====================================================================
 # --- 新的主页内容 ---
