@@ -153,7 +153,7 @@ with header_cols[1]:  # 使用页面顶部已经创建好的列
     countdown_placeholder = col1.empty()
 
 # 2. 循环只负责更新占位符的文本和执行延时
-REFRESH_INTERVAL_SECONDS = 60
+REFRESH_INTERVAL_SECONDS = 120
 for i in range(REFRESH_INTERVAL_SECONDS, 0, -1):
     # 更新占位符中的倒计时
     countdown_placeholder.markdown(f"🕒 `自动刷新: {i}s`")
