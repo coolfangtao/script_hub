@@ -1,148 +1,164 @@
+# fund_dashboard.py
+
 import streamlit as st
-import akshare as ak
 import pandas as pd
+import akshare as ak
+import time
 
-# --- 页面基础设置 ---
-# st.set_page_config 是 Streamlit 的一个命令，用于设置页面的基本属性，比如标题、图标和布局。
-# page_title: 设置浏览器选项卡上显示的标题。
-# layout="wide": 让页面内容占满整个屏幕宽度，提供更宽敞的显示空间。
-st.set_page_config(page_title="基金涨跌看板", layout="wide")
+# ----------------- 页面配置 -----------------
+st.set_page_config(
+    page_title="基金实时看板",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-# --- 应用标题和描述 ---
-st.title("📈 基金涨跌看板")
-st.caption("在这里跟踪您关注的场内基金的最新表现。数据来源于天天基金网。")
+# ----------------- 样式注入（可选） -----------------
+st.markdown("""
+<style>
+/* 调整指标卡边框和阴影 */
+[data-testid="stMetric"] {
+    background-color: #f0f2f6;
+    border: 1px solid #e6e6e6;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+/* 调整指标卡的标签字体大小 */
+[data-testid="stMetricLabel"] {
+    font-size: 18px;
+    font-weight: 500;
+}
+/* 调整指标卡的值字体大小 */
+[data-testid="stMetricValue"] {
+    font-size: 28px;
+    font-weight: 700;
+}
+/* 调整指标卡的Delta（变化量）字体大小 */
+[data-testid="stMetricDelta"] {
+    font-size: 16px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
-# --- 数据获取与缓存 ---
-# @st.cache_data 是一个装饰器，它可以缓存函数返回的数据。
-# 当函数以相同的参数再次被调用时，Streamlit 会直接返回缓存的结果，而不是重新执行函数。
-# 这对于耗时的数据获取操作（如API请求）非常有用，可以显著提升应用性能。
-# ttl=3600 设置缓存的存活时间为3600秒（1小时），之后缓存会失效，数据将重新获取。
-@st.cache_data(ttl=3600)
-def get_fund_data():
-    """
-    使用 akshare 获取所有场内交易基金的排名数据，并进行初步处理。
-    """
+# ----------------- 数据获取与缓存 -----------------
+@st.cache_data(ttl=60)
+def get_etf_data():
+    """获取所有ETF基金的实时行情数据"""
     try:
-        # 从 akshare 获取数据
-        df = ak.fund_exchange_rank_em()
-
-        # 增加一个健壮性检查，确保返回的是一个非空的DataFrame
-        if not isinstance(df, pd.DataFrame) or df.empty:
-            st.warning("未能从数据源获取到有效的基金数据，可能网络或接口暂时有问题。")
-            return pd.DataFrame()
-
-        # --- 数据清洗和预处理 ---
-        # 使用 try-except 块来捕获可能因列名更改而引发的 KeyError
-        try:
-            # 确保'代码'列为字符串类型，以便进行准确的匹配和筛选
-            df['代码'] = df['代码'].astype(str)
-
-            # 将日期相关列转换为统一的 'YYYY-MM-DD' 格式的字符串
-            date_columns = ['日期', '成立日期']
-            for col in date_columns:
-                # pd.to_datetime 将文本转换为日期对象，errors='coerce' 会将无法转换的值设为 NaT（非时间）
-                # .dt.strftime('%Y-%m-%d') 将日期对象格式化为字符串
-                df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%Y-%m-%d')
-
-            # 将所有列中的空值 (NaN) 填充为 '--'，使表格显示更友好
-            df = df.fillna('--')
-            return df
-
-        except KeyError as e:
-            st.error(f"处理数据时发生列名错误: {e}。这很可能是因为数据源的列名发生了变化。")
-            st.info("以下是实际获取到的数据列名，请检查代码与之一致：")
-            st.code(df.columns.tolist()) # 将实际的列名展示出来，方便调试
-            return pd.DataFrame() # 返回空 DataFrame 防止应用崩溃
-
+        etf_spot_df = ak.fund_etf_spot_em()
+        numeric_cols = [
+            '最新价', 'IOPV实时估值', '基金折价率', '涨跌额', '涨跌幅', '成交量',
+            '成交额', '开盘价', '最高价', '最低价', '昨收', '振幅', '换手率', '量比',
+            '委比', '外盘', '内盘', '主力净流入-净额', '主力净流入-净占比'
+        ]
+        for col in numeric_cols:
+            etf_spot_df[col] = pd.to_numeric(etf_spot_df[col], errors='coerce')
+        etf_spot_df = etf_spot_df.fillna(0)
+        return etf_spot_df
     except Exception as e:
-        # 如果数据获取过程中发生任何其他错误，则在页面上显示错误提示，并返回一个空的DataFrame
-        st.error(f"数据加载失败，请稍后重试。错误类型: {type(e).__name__}, 错误信息: {e}")
+        st.error(f"数据加载失败，可能是网络问题或接口暂时不可用。错误信息: {e}")
         return pd.DataFrame()
 
 
-def style_change_rate(val):
-    """
-    根据单元格数值的正负，返回对应的CSS颜色样式。
-    用于高亮显示涨跌幅数据。
-    """
-    # 检查值是否为数字类型
-    if isinstance(val, (int, float)):
-        # 小于0显示红色，大于0显示绿色，等于0显示黑色
-        color = 'red' if val < 0 else 'green' if val > 0 else 'black'
-        return f'color: {color}'
-    # 如果不是数字，则不应用任何样式
-    return ''
+# ----------------- 页面主体 -----------------
 
+# --- 标题和刷新控件的容器 ---
+header_cols = st.columns([0.8, 0.2])
+with header_cols[0]:
+    st.title("📈 基金实时看板")
 
-# --- 主应用逻辑 ---
-# 加载数据
-all_funds_df = get_fund_data()
+# --- 获取数据 ---
+all_etf_df = get_etf_data()
 
-# 只有在数据成功加载后才显示主要内容
-if not all_funds_df.empty:
+if not all_etf_df.empty:
+    # --- 基金选择器 ---
+    fund_options = all_etf_df[['代码', '名称']].drop_duplicates()
+    fund_options_list = fund_options.apply(lambda x: f"{x['名称']} ({x['代码']})", axis=1).tolist()
 
-    # --- 侧边栏交互 ---
-    st.sidebar.header("筛选设置")
+    default_selections = [
+        "纳斯达克100ETF (513300)", "恒生科技指数ETF (513180)", "中概互联网ETF (513050)",
+        "医疗ETF (512170)", "科创50ETF (588000)"
+    ]
+    valid_defaults = [item for item in default_selections if item in fund_options_list]
 
-    # 创建一个包含基金代码和名称的列表，用于多选框的选项
-    fund_options = all_funds_df['代码'] + " - " + all_funds_df['名称']
-
-    # 设置一些默认关注的基金，作为应用启动时的示例
-    default_funds_codes = ['510300', '513100', '159949', '512170']  # 示例: 沪深300, 纳指ETF, 创业板50, 医疗ETF
-    # 根据默认代码列表，在 fund_options 中找到对应的完整选项
-    default_selections = [opt for opt in fund_options if any(code in opt for code in default_funds_codes)]
-
-    # 创建一个多选框，让用户可以选择自己关注的基金
-    selected_funds = st.sidebar.multiselect(
-        "选择您关注的基金 (可搜索):",
-        options=fund_options,
-        default=default_selections
+    selected_funds_str = st.multiselect(
+        label="🔍 请选择或搜索您关注的基金:",
+        options=fund_options_list,
+        default=valid_defaults,
+        placeholder="输入基金名称或代码进行搜索..."
     )
 
-    # 从用户选择的 "代码 - 名称" 字符串中提取出基金代码
-    selected_codes = [fund.split(" - ")[0] for fund in selected_funds]
+    selected_fund_names = [item.split(" (")[0] for item in selected_funds_str]
 
-    # --- 内容展示 ---
-    st.subheader("⭐ 我关注的基金")
-    if selected_codes:
-        # 根据用户选择的代码筛选出对应的基金数据
-        watched_df = all_funds_df[all_funds_df['代码'].isin(selected_codes)].copy()
+    # --- 筛选数据 ---
+    filtered_df = all_etf_df[all_etf_df['名称'].isin(selected_fund_names)]
 
-        # 定义需要应用颜色样式的涨跌幅列
-        rate_columns = ['日增长率', '今年来', '近1周', '近1月', '近3月', '近6月', '近1年', '近2年', '近3年']
+    st.divider()
 
-        # 将这些列的数值转换为数字类型，以便进行样式判断。无法转换的将变为NaN。
-        for col in rate_columns:
-            if col in watched_df.columns:
-                watched_df[col] = pd.to_numeric(watched_df[col], errors='coerce')
+    # --- 指标卡展示 ---
+    if not filtered_df.empty:
+        st.subheader("📊 核心指标速览")
+        num_funds = len(filtered_df)
+        cols = st.columns(num_funds)
 
-        # 使用 st.dataframe 展示数据，并应用样式
-        # .style.map() 应用颜色函数
-        # .format() 将数字格式化为带两位小数和百分号的字符串，并将NaN值显示为'--'
-        st.dataframe(
-            watched_df.style.map(style_change_rate, subset=rate_columns).format("{:.2f}%", subset=rate_columns,
-                                                                                na_rep='--'),
-            use_container_width=True # 让表格宽度自适应容器
-        )
+        for i, (index, row) in enumerate(filtered_df.iterrows()):
+            with cols[i]:
+                delta_value = f"{row['涨跌额']:.2f}"
+                percent_change = row['涨跌幅']
+
+                st.metric(
+                    label=f"{row['名称']} ({row['代码']})",
+                    value=f"¥ {row['最新价']:.3f}",
+                    delta=f"{delta_value} ({percent_change:.2f}%)",
+                )
     else:
-        # 如果用户没有选择任何基金，则显示提示信息
-        st.info("请在左侧边栏选择您关注的基金，以便在此处快速查看。")
+        st.warning("请至少选择一只基金进行展示。")
 
-    # --- 显示所有基金的排名 ---
-    st.divider() # 添加一条分割线
-    st.subheader("📊 所有场内基金排名")
+    st.divider()
 
-    # 为了性能，对完整的列表数据进行同样的处理和展示
-    full_df_styled = all_funds_df.copy()
-    for col in rate_columns:
-        if col in full_df_styled.columns:
-            full_df_styled[col] = pd.to_numeric(full_df_styled[col], errors='coerce')
+    # --- 详细数据表格 ---
+    with st.expander("詳細數據一覽", expanded=True):
+        if not filtered_df.empty:
+            display_cols = [
+                '代码', '名称', '最新价', '涨跌幅', '涨跌额', '成交额',
+                '换手率', '基金折价率', '主力净流入-净额', '更新时间'
+            ]
 
-    st.dataframe(
-        full_df_styled.style.map(style_change_rate, subset=rate_columns).format("{:.2f}%", subset=rate_columns,
-                                                                                na_rep='--'),
-        height=600, # 设置一个固定高度，使表格可以滚动
-        use_container_width=True
-    )
+            styled_df = filtered_df[display_cols].copy()
+            styled_df['涨跌幅'] = styled_df['涨跌幅'].map('{:.2f}%'.format)
+            styled_df['换手率'] = styled_df['换手率'].map('{:.2f}%'.format)
+            styled_df['基金折价率'] = styled_df['基金折价率'].map('{:.2f}%'.format)
+            styled_df['成交额'] = (styled_df['成交额'] / 100000000).map('{:,.2f} 亿'.format)
+            styled_df['主力净流入-净额'] = (styled_df['主力净流入-净额'] / 100000000).map('{:,.2f} 亿'.format)
 
+            st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("暂无选中基金的详细数据。")
+else:
+    st.error("无法获取数据，页面无法加载。请检查网络连接或稍后重试。")
+
+# --- 自动刷新逻辑 (已修正) ---
+# 1. 在循环外部，预先定义好布局和按钮
+with header_cols[1]:  # 使用页面顶部已经创建好的列
+    col1, col2 = st.columns([0.6, 0.4], gap="small")
+
+    # 按钮只在这里创建一次
+    if col2.button("刷新", key="manual_refresh"):
+        st.cache_data.clear()
+        st.rerun()
+
+    # 为倒计时文本创建一个专用的占位符
+    countdown_placeholder = col1.empty()
+
+# 2. 循环只负责更新占位符的文本和执行延时
+REFRESH_INTERVAL_SECONDS = 60
+for i in range(REFRESH_INTERVAL_SECONDS, 0, -1):
+    # 更新占位符中的倒计时
+    countdown_placeholder.markdown(f"🕒 `自动刷新: {i}s`")
+    time.sleep(1)
+
+# 3. 倒计时结束后，清除缓存并重新运行以实现自动刷新
+st.cache_data.clear()
+st.rerun()
