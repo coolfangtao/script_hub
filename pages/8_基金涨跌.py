@@ -27,23 +27,37 @@ def get_fund_data():
         # 从 akshare 获取数据
         df = ak.fund_exchange_rank_em()
 
+        # 增加一个健壮性检查，确保返回的是一个非空的DataFrame
+        if not isinstance(df, pd.DataFrame) or df.empty:
+            st.warning("未能从数据源获取到有效的基金数据，可能网络或接口暂时有问题。")
+            return pd.DataFrame()
+
         # --- 数据清洗和预处理 ---
-        # 确保'代码'列为字符串类型，以便进行准确的匹配和筛选
-        df['代码'] = df['代码'].astype(str)
+        # 使用 try-except 块来捕获可能因列名更改而引发的 KeyError
+        try:
+            # 确保'代码'列为字符串类型，以便进行准确的匹配和筛选
+            df['代码'] = df['代码'].astype(str)
 
-        # 将日期相关列转换为统一的 'YYYY-MM-DD' 格式的字符串
-        date_columns = ['日期', '成立日期']
-        for col in date_columns:
-            # pd.to_datetime 将文本转换为日期对象，errors='coerce' 会将无法转换的值设为 NaT（非时间）
-            # .dt.strftime('%Y-%m-%d') 将日期对象格式化为字符串
-            df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%Y-%m-%d')
+            # 将日期相关列转换为统一的 'YYYY-MM-DD' 格式的字符串
+            date_columns = ['日期', '成立日期']
+            for col in date_columns:
+                # pd.to_datetime 将文本转换为日期对象，errors='coerce' 会将无法转换的值设为 NaT（非时间）
+                # .dt.strftime('%Y-%m-%d') 将日期对象格式化为字符串
+                df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%Y-%m-%d')
 
-        # 将所有列中的空值 (NaN) 填充为 '--'，使表格显示更友好
-        df = df.fillna('--')
-        return df
+            # 将所有列中的空值 (NaN) 填充为 '--'，使表格显示更友好
+            df = df.fillna('--')
+            return df
+
+        except KeyError as e:
+            st.error(f"处理数据时发生列名错误: {e}。这很可能是因为数据源的列名发生了变化。")
+            st.info("以下是实际获取到的数据列名，请检查代码与之一致：")
+            st.code(df.columns.tolist()) # 将实际的列名展示出来，方便调试
+            return pd.DataFrame() # 返回空 DataFrame 防止应用崩溃
+
     except Exception as e:
-        # 如果数据获取过程中发生任何错误，则在页面上显示错误提示，并返回一个空的DataFrame
-        st.error(f"数据加载失败，请稍后重试。错误信息: {e}")
+        # 如果数据获取过程中发生任何其他错误，则在页面上显示错误提示，并返回一个空的DataFrame
+        st.error(f"数据加载失败，请稍后重试。错误类型: {type(e).__name__}, 错误信息: {e}")
         return pd.DataFrame()
 
 
@@ -131,3 +145,4 @@ if not all_funds_df.empty:
         height=600, # 设置一个固定高度，使表格可以滚动
         use_container_width=True
     )
+
