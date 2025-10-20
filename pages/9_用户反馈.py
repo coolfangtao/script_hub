@@ -76,7 +76,7 @@ def setup_database():
 
 
 def load_feedback():
-    """加载所有反馈 - 修复后的版本"""
+    """加载所有反馈 - 修正版本"""
     result = execute_sql("""
         SELECT name, message, created_at 
         FROM feedback 
@@ -90,13 +90,22 @@ def load_feedback():
             if rows:
                 data = []
                 for row in rows:
-                    # 正确解析行数据
-                    if isinstance(row, list) and len(row) >= 3:
-                        data.append({
-                            "name": row[0] if row[0] is not None else "",
-                            "message": row[1] if row[1] is not None else "",
-                            "created_at": row[2] if row[2] is not None else ""
-                        })
+                    # 检查row是否是字典列表，而不是简单的值列表
+                    if isinstance(row, list):
+                        # 处理每个元素可能是字典的情况
+                        processed_row = []
+                        for item in row:
+                            if isinstance(item, dict) and 'value' in item:
+                                processed_row.append(item['value'])
+                            else:
+                                processed_row.append(item)
+
+                        if len(processed_row) >= 3:
+                            data.append({
+                                "name": processed_row[0] if processed_row[0] is not None else "",
+                                "message": processed_row[1] if processed_row[1] is not None else "",
+                                "created_at": processed_row[2] if processed_row[2] is not None else ""
+                            })
                 return pd.DataFrame(data)
 
     return pd.DataFrame(columns=["name", "message", "created_at"])
