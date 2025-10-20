@@ -1,17 +1,19 @@
-# # fund_dashboard.py
-#
-# import streamlit as st
-# import pandas as pd
-# import akshare as ak
-# import time
-#
-# # ----------------- 页面配置 -----------------
-# st.set_page_config(
-#     page_title="基金实时看板",
-#     page_icon="📈",
-#     layout="wide",
-#     initial_sidebar_state="collapsed",
-# )
+# fund_dashboard.py
+
+import streamlit as st
+import pandas as pd
+import akshare as ak
+import time
+from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
+
+# ----------------- 页面配置 -----------------
+st.set_page_config(
+    page_title="基金实时看板",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 #
 # # ----------------- 样式注入（可选） -----------------
 # st.markdown("""
