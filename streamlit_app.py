@@ -117,8 +117,6 @@ st.markdown("---")
 show_changelog()
 st.markdown("---")
 
-
-
 # --- 5. 联系与反馈 ---
 # 只需调用这一个函数，即可显示整个反馈模块（包括输入表单和历史记录）
 show_feedback_module()

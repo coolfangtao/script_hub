@@ -18,8 +18,8 @@ def execute_sql(sql, params=None):
     """执行SQL语句"""
     try:
         # 从Streamlit secrets中获取数据库URL和认证令牌
-        url = fix_db_url(st.secrets["db_url"]).rstrip('/')
-        auth_token = st.secrets["auth_token"]
+        url = fix_db_url(st.secrets["feedback_db_url"]).rstrip('/')
+        auth_token = st.secrets["feedback_db_token"]
 
         api_url = f"{url}/v2/pipeline"
         headers = {
