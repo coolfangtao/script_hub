@@ -159,13 +159,13 @@ def main():
         title_prompt_text = st.text_area(
             label="标题生成提示词 (Title Prompt)",
             value=st.session_state.generated_prompts['title'],
-            height=300
+            height=600
         )
 
         bullet_points_prompt_text = st.text_area(
             label="五点描述生成提示词 (Bullet Points Prompt)",
             value=st.session_state.generated_prompts['bullet_points'],
-            height=300
+            height=600
         )
 
         st.markdown("---")
