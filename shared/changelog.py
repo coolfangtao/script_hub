@@ -7,7 +7,7 @@ def show_changelog():
     在页面上渲染“最近更新”这个UI组件。
     未来所有更新日志的修改，都只在这个函数里进行。
     """
-    st.subheader("📝 最近更新 (Changelog)")
+    st.header("📝 最近更新 (Changelog)")
     with st.expander("点击查看更新历史", expanded=True):
         # 你可以在这里用Markdown语法自由地添加新的更新记录
         st.markdown("""
