@@ -16,8 +16,8 @@ def fix_db_url(url):
 def execute_sql(sql, params=None):
     """执行SQL语句"""
     try:
-        url = fix_db_url(st.secrets["feedback_db_url"]).rstrip('/')
-        auth_token = st.secrets["feedback_db_token"]
+        url = fix_db_url(st.secrets["db_url"]).rstrip('/')
+        auth_token = st.secrets["auth_token"]
 
         api_url = f"{url}/v2/pipeline"
         headers = {
@@ -76,7 +76,7 @@ def setup_database():
 
 
 def load_feedback():
-    """加载所有反馈"""
+    """加载所有反馈 - 修复后的版本"""
     result = execute_sql("""
         SELECT name, message, created_at 
         FROM feedback 
@@ -90,11 +90,13 @@ def load_feedback():
             if rows:
                 data = []
                 for row in rows:
-                    data.append({
-                        "name": row[0],
-                        "message": row[1] if len(row) > 1 else "",
-                        "created_at": row[2] if len(row) > 2 else ""
-                    })
+                    # 正确解析行数据
+                    if isinstance(row, list) and len(row) >= 3:
+                        data.append({
+                            "name": row[0] if row[0] is not None else "",
+                            "message": row[1] if row[1] is not None else "",
+                            "created_at": row[2] if row[2] is not None else ""
+                        })
                 return pd.DataFrame(data)
 
     return pd.DataFrame(columns=["name", "message", "created_at"])
@@ -188,22 +190,23 @@ feedback_df = load_feedback()
 if not feedback_df.empty:
     st.write(f"**共 {len(feedback_df)} 条反馈**")
 
-    # 格式化显示
-    display_df = feedback_df.copy()
-    display_df.columns = ["用户姓名", "反馈内容", "提交时间"]
-
-    # 美化显示
-    for index, row in display_df.iterrows():
+    # 美化显示每条反馈
+    for index, row in feedback_df.iterrows():
         with st.container():
             st.markdown(f"""
-            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin: 10px 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h4 style="margin: 0; color: #1f77b4;">{row['用户姓名']}</h4>
-                    <span style="color: #666; font-size: 0.9em;">{row['提交时间']}</span>
+            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 10px; margin: 10px 0; border-left: 4px solid #1f77b4;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h4 style="margin: 0; color: #1f77b4;">{row['name']}</h4>
+                    <span style="color: #666; font-size: 0.8em;">{row['created_at']}</span>
                 </div>
-                <p style="margin: 10px 0 0 0; line-height: 1.5;">{row['反馈内容']}</p>
+                <p style="margin: 0; line-height: 1.5; color: #333;">{row['message']}</p>
             </div>
             """, unsafe_allow_html=True)
-            st.markdown("---")
+
 else:
     st.info("📝 暂无用户反馈，快来留下第一条反馈吧！")
+
+# 调试信息（可选，可以在侧边栏查看原始数据）
+with st.sidebar.expander("调试信息"):
+    st.write("原始数据预览:")
+    st.write(feedback_df)
