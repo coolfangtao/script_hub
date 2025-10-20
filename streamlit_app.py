@@ -16,33 +16,77 @@ st.set_page_config(
     layout="wide"
 )
 
-import streamlit.components.v1 as components
-from shared.particles_component import particles_js_code
-# --- 1. 注入自定义CSS，让Streamlit的背景变透明 ---
-# 使用 st.markdown 来插入 HTML 和 CSS
-# [data-testid="stAppViewContainer"] 是 Streamlit 应用的主容器
-# [data-testid="stHeader"] 是顶部的 Header
-custom_css = """
+# --- 将所有背景动画的代码和CSS整合到一个HTML字符串中 ---
+# 1. CSS: 让Streamlit的核心组件背景透明，并设置动画容器的样式
+# 2. HTML: 创建一个div作为粒子动画的容器
+# 3. JavaScript: 加载并初始化 particles.js
+background_html = """
 <style>
-    /* 让主应用容器和顶栏的背景都变成透明 */
-    [data-testid="stAppViewContainer"],
+    /* 动画容器的样式 */
+    #particles-js {
+        position: fixed; /* 固定在视窗中 */
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        z-index: -1; /* 确保它在所有内容的后面 */
+    }
+
+    /* Streamlit 主容器背景透明 */
+    [data-testid="stAppViewContainer"] {
+        background: transparent;
+    }
+
+    /* Streamlit 页面主要内容块背景透明 */
+    .main .block-container {
+        background: transparent;
+    }
+
+    /* Streamlit 顶栏背景透明 */
     [data-testid="stHeader"] {
         background: transparent;
     }
 
-    /* 如果你需要，也可以让侧边栏透明 (可选) */
-    /*
+    /* Streamlit 侧边栏背景透明 (可选) */
     [data-testid="stSidebar"] {
         background: transparent;
     }
-    */
 </style>
+
+<div id="particles-js"></div>
+
+<script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+
+<script>
+    particlesJS("particles-js", {
+      "particles": {
+        "number": {"value": 200, "density": {"enable": true, "value_area": 800}},
+        "color": {"value": "#ffffff"},
+        "shape": {"type": "circle"},
+        "opacity": {"value": 0.5, "random": false},
+        "size": {"value": 3, "random": true},
+        "line_linked": {"enable": true, "distance": 150, "color": "#ffffff", "opacity": 0.4, "width": 1},
+        "move": {"enable": true, "speed": 1, "direction": "none", "out_mode": "out"}
+      },
+      "interactivity": {
+        "detect_on": "canvas",
+        "events": {
+          "onhover": {"enable": true, "mode": "grab"},
+          "onclick": {"enable": true, "mode": "push"},
+          "resize": true
+        },
+        "modes": {
+          "grab": {"distance": 140, "line_linked": {"opacity": 1}},
+          "push": {"particles_nb": 4}
+        }
+      },
+      "retina_detect": true
+    });
+</script>
 """
-st.markdown(custom_css, unsafe_allow_html=True)
-# --- 2. 渲染粒子动画HTML组件 ---
-# 这会将 id="particles-js" 的 div 插入到页面中
-# 由于它的 CSS 设置了 position: fixed 和 z-index: -1，它会自动铺满整个背景
-components.html(particles_js_code, height=200, scrolling=False)
+
+# --- 使用 st.html() 将背景注入到页面中 ---
+st.html(background_html)
 
 # =====================================================================
 # --- 新的主页内容 ---
