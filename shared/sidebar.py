@@ -1,5 +1,6 @@
 # 文件路径: shared/sidebar.py
 import streamlit as st
+from elements import shin_chan_animation
 
 # --- 核心数据结构: 统一管理所有脚本和分组 ---
 # (这部分数据结构保持不变)
@@ -93,3 +94,5 @@ def create_common_sidebar():
             # 在折叠容器内部，为每个脚本创建页面链接
             for script in scripts_in_group:
                 st.page_link(script["path"], label=script["label"])
+
+    shin_chan_animation()
