@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 from shared.sidebar import create_common_sidebar # 导入公共侧边栏函数
 # from shared.ai_model_config import MODEL_NAME # 不再需要从外部文件导入固定的模型名称
+from shared.particles_component import render_particles
 
 # --- 页面配置和侧边栏 ---
 st.set_page_config(
@@ -9,6 +10,9 @@ st.set_page_config(
     page_icon="🤖"
 )
 create_common_sidebar() # 调用函数创建侧边栏
+# --- 渲染背景 ---
+# 在所有其他元素之前调用，确保背景被首先加载
+render_particles()
 
 # --- API 密钥配置 ---
 # 从 Streamlit secrets 中获取 API 密钥
