@@ -6,6 +6,13 @@ from shared.changelog import show_changelog
 from shared.feedback import setup_database, show_feedback_module
 from shared.particles_component import render_particles
 
+# --- 页面基础设置 (必须是第一个st命令) ---
+st.set_page_config(
+    page_title="FT的脚本中心",
+    page_icon="🚀",
+    layout="wide"
+)
+
 # --- 渲染背景 ---
 # 在所有其他元素之前调用，确保背景被首先加载
 render_particles()
@@ -13,14 +20,6 @@ render_particles()
 # --- 渲染侧边栏 ---
 # 这一行代码会负责搞定所有侧边栏的显示逻辑
 create_common_sidebar()
-
-
-# --- 页面基础设置 (必须是第一个st命令) ---
-st.set_page_config(
-    page_title="FT的脚本中心",
-    page_icon="🚀",
-    layout="wide"
-)
 
 # --- 初始化数据库 ---
 # 在应用启动时，确保反馈表已经创建
