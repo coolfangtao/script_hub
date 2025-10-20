@@ -1,9 +1,13 @@
+# 关键修复：在所有其他导入之前应用 nest_asyncio 补丁
+import nest_asyncio
+
+nest_asyncio.apply()
+
+# --- 原有代码开始 ---
 import streamlit as st
 import pandas as pd
 import libsql_client
 import os
-from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
-create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # --- 配置 ---
 st.set_page_config(page_title="我的云端生词本 (Turso版)", layout="wide")
@@ -13,17 +17,13 @@ st.set_page_config(page_title="我的云端生词本 (Turso版)", layout="wide")
 
 def create_db_connection():
     """使用 Streamlit Secrets 创建并返回一个 Turso 数据库连接"""
-    url = st.secrets["turso"]["TURSO_DATABASE_URL"]
-    auth_token = st.secrets["turso"]["TURSO_AUTH_TOKEN"]
-
-    # 确保 URL 以 "libsql://" 开头，并且 sync_url 可能需要被设置
-    # 对于生产环境，你可能需要更复杂的配置，但对于基础应用这足够了
+    url = st.secrets["turso"]["db_url"]
+    auth_token = st.secrets["turso"]["auth_token"]
     return libsql_client.create_client(url=url, auth_token=auth_token)
 
 
 def setup_database(client):
     """检查并创建生词表（如果不存在）"""
-    # 使用 execute() 方法执行 SQL 语句
     client.execute("""
         CREATE TABLE IF NOT EXISTS vocabulary (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,9 +37,7 @@ def setup_database(client):
 def load_data(client):
     """从 Turso 加载所有生词"""
     try:
-        # Turso/libsql 返回的结果集可以直接转换为 Pandas DataFrame
         rs = client.execute("SELECT word, definition, example FROM vocabulary ORDER BY id DESC")
-        # rs.columns 包含了列名, rs.rows 包含了数据
         df = pd.DataFrame(rs.rows, columns=[col for col in rs.columns])
         return df
     except Exception as e:
@@ -49,7 +47,6 @@ def load_data(client):
 
 def add_word(client, word, definition, example):
     """向数据库中添加一个新单词，处理重复情况"""
-    # 使用参数化查询 (?) 来防止 SQL 注入，这是最佳实践！
     sql = "INSERT INTO vocabulary (word, definition, example) VALUES (?, ?, ?)"
     params = (word, definition, example)
 
@@ -58,7 +55,6 @@ def add_word(client, word, definition, example):
         st.success(f"单词 '{word}' 已成功添加到云端数据库！")
         return True
     except Exception as e:
-        # 常见错误是 UNIQUE constraint failed，意味着单词已存在
         if "UNIQUE constraint failed" in str(e):
             st.warning(f"单词 '{word}' 已经存在于你的生词本中。")
         else:
@@ -71,13 +67,9 @@ def add_word(client, word, definition, example):
 st.title("📚 我的云端生词本 (Turso 数据库版)")
 st.markdown("---")
 
-# 创建数据库连接
 db_client = create_db_connection()
-
-# 初始化数据库（创建表）
 setup_database(db_client)
 
-# --- 1. 添加新单词的区域 ---
 st.header("添加新单词")
 with st.form("new_word_form", clear_on_submit=True):
     col1, col2, col3 = st.columns(3)
@@ -95,15 +87,12 @@ with st.form("new_word_form", clear_on_submit=True):
     elif submitted:
         st.warning("“新单词”为必填项！")
 
-# --- 2. 展示所有单词的区域 ---
 st.markdown("---")
 st.header("我的单词列表")
 
-# 从数据库加载数据
 vocab_df = load_data(db_client)
 
 if not vocab_df.empty:
-    # 为了更好的显示，我们可以重命名列
     vocab_df.columns = ["单词", "释义", "例句"]
     st.dataframe(vocab_df, use_container_width=True, hide_index=True)
 else:
