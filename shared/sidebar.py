@@ -68,6 +68,10 @@ SCRIPTS_BY_GROUP = {
             "label": "图像翻译",
             "path": r"pages/6_图片翻译.py"
         },
+        {
+            "label": "生成图片在线地址",
+            "path": r"pages/6_生成图片在线地址.py"
+        },
     ],
     "其他": [
         {
