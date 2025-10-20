@@ -125,7 +125,7 @@ st.markdown("---")
 st.markdown(
     """
     <p style='text-align: center; color: grey;'>
-        © 2025 FT的脚本中心 | ✉️ 邮箱：19210860039@fudan.edu.cn
+        © 2025 FT的脚本中心 | ✉️ 邮箱：morebetter2025@163.com
     </p>
     """,
     unsafe_allow_html=True
