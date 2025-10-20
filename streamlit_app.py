@@ -6,31 +6,13 @@ from shared.changelog import show_changelog
 from shared.feedback import setup_database, show_feedback_module
 from shared.particles_component import render_particles
 
-# --- 渲染侧边栏 ---
-# 这一行代码会负责搞定所有侧边栏的显示逻辑
-create_common_sidebar()
-
-# 注入CSS，使主内容区的背景透明
-st.markdown("""
-<style>
-/* 主要的内容容器 */
-[data-testid="stAppViewContainer"] > .main {
-    background: transparent;
-}
-/* 顶部的装饰条 */
-[data-testid="stDecoration"] {
-    background: transparent;
-}
-/* 侧边栏（如果你的应用有的话） */
-[data-testid="stSidebar"] {
-    background: transparent;
-}
-</style>
-""", unsafe_allow_html=True)
-
 # --- 渲染背景 ---
 # 在所有其他元素之前调用，确保背景被首先加载
 render_particles()
+
+# --- 渲染侧边栏 ---
+# 这一行代码会负责搞定所有侧边栏的显示逻辑
+create_common_sidebar()
 
 
 # --- 页面基础设置 (必须是第一个st命令) ---
