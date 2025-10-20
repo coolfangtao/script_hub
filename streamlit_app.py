@@ -4,6 +4,9 @@ import streamlit as st
 from shared.sidebar import create_common_sidebar  # 导入我们创建的侧边栏函数
 from shared.changelog import show_changelog
 # from shared.feedback import render_feedback_section # <-- 1. 导入新的反馈函数
+# --- 渲染侧边栏 ---
+# 这一行代码会负责搞定所有侧边栏的显示逻辑
+create_common_sidebar()
 
 
 # --- 页面基础设置 (必须是第一个st命令) ---
@@ -13,13 +16,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 渲染侧边栏 ---
-# 这一行代码会负责搞定所有侧边栏的显示逻辑
-create_common_sidebar()
-
 import streamlit.components.v1 as components
-# 从我们创建的文件中，导入代码变量
-# 因为文件名是 particles_component.py，所以我们 from particles_component
 from shared.particles_component import particles_js_code
 # --- 1. 注入自定义CSS，让Streamlit的背景变透明 ---
 # 使用 st.markdown 来插入 HTML 和 CSS
@@ -45,7 +42,7 @@ st.markdown(custom_css, unsafe_allow_html=True)
 # --- 2. 渲染粒子动画HTML组件 ---
 # 这会将 id="particles-js" 的 div 插入到页面中
 # 由于它的 CSS 设置了 position: fixed 和 z-index: -1，它会自动铺满整个背景
-components.html(particles_js_code, height=800, scrolling=False)
+components.html(particles_js_code, height=200, scrolling=False)
 
 # =====================================================================
 # --- 新的主页内容 ---
