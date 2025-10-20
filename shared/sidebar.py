@@ -66,6 +66,10 @@ SCRIPTS_BY_GROUP = {
             "label": "测试",
             "path": r"pages/测试.py"
         },
+        {
+            "label": "用户反馈",
+            "path": r"pages/9_用户反馈.py"
+        },
     ],
 }
 

@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import json
 
-st.set_page_config(page_title="我的云端生词本", layout="wide")
+st.set_page_config(page_title="用户反馈系统", layout="wide")
 
 
 def fix_db_url(url):
@@ -14,9 +14,10 @@ def fix_db_url(url):
 
 
 def execute_sql(sql, params=None):
+    """执行SQL语句"""
     try:
-        url = fix_db_url(st.secrets["db_url"]).rstrip('/')
-        auth_token = st.secrets["auth_token"]
+        url = fix_db_url(st.secrets["feedback_db_url"]).rstrip('/')
+        auth_token = st.secrets["feedback_db_token"]
 
         api_url = f"{url}/v2/pipeline"
         headers = {
@@ -64,22 +65,21 @@ def execute_sql(sql, params=None):
 def setup_database():
     """初始化数据库表"""
     result = execute_sql("""
-        CREATE TABLE IF NOT EXISTS vocabulary (
+        CREATE TABLE IF NOT EXISTS feedback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            word TEXT NOT NULL UNIQUE,
-            definition TEXT,
-            example TEXT,
+            name TEXT NOT NULL,
+            message TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     """)
     return result is not None
 
 
-def load_vocabulary():
-    """加载所有生词"""
+def load_feedback():
+    """加载所有反馈"""
     result = execute_sql("""
-        SELECT word, definition, example 
-        FROM vocabulary 
+        SELECT name, message, created_at 
+        FROM feedback 
         ORDER BY created_at DESC
     """)
 
@@ -91,29 +91,32 @@ def load_vocabulary():
                 data = []
                 for row in rows:
                     data.append({
-                        "word": row[0],
-                        "definition": row[1] if len(row) > 1 else "",
-                        "example": row[2] if len(row) > 2 else ""
+                        "name": row[0],
+                        "message": row[1] if len(row) > 1 else "",
+                        "created_at": row[2] if len(row) > 2 else ""
                     })
                 return pd.DataFrame(data)
 
-    return pd.DataFrame(columns=["word", "definition", "example"])
+    return pd.DataFrame(columns=["name", "message", "created_at"])
 
 
-def add_word(word, definition, example):
-    """添加新单词"""
-    if not word.strip():
-        st.warning("单词不能为空")
+def add_feedback(name, message):
+    """添加新反馈"""
+    if not name.strip():
+        st.warning("姓名不能为空")
+        return False
+
+    if not message.strip():
+        st.warning("反馈内容不能为空")
         return False
 
     # 处理空值
-    word_str = word.strip()
-    definition_str = definition.strip() if definition else ""
-    example_str = example.strip() if example else ""
+    name_str = name.strip()
+    message_str = message.strip()
 
     result = execute_sql(
-        "INSERT INTO vocabulary (word, definition, example) VALUES (?, ?, ?)",
-        [word_str, definition_str, example_str]
+        "INSERT INTO feedback (name, message) VALUES (?, ?)",
+        [name_str, message_str]
     )
 
     if result is None:
@@ -123,34 +126,17 @@ def add_word(word, definition, example):
         first_result = result["results"][0]
         if "error" in first_result and first_result["error"]:
             error_msg = str(first_result["error"])
-            if "UNIQUE constraint failed" in error_msg:
-                st.warning(f"单词 '{word}' 已经存在于生词本中")
-                return False
-            else:
-                st.error(f"添加失败: {error_msg}")
-                return False
+            st.error(f"提交失败: {error_msg}")
+            return False
         else:
-            st.success(f"单词 '{word}' 已成功添加到生词本！")
+            st.success("反馈已成功提交！")
             return True
 
     return False
 
 
-def delete_word(word):
-    """删除单词"""
-    result = execute_sql(
-        "DELETE FROM vocabulary WHERE word = ?",
-        [word]
-    )
-
-    if result and "results" in result and result["results"]:
-        st.success(f"单词 '{word}' 已删除")
-        return True
-    return False
-
-
 # --- 页面布局 ---
-st.title("📚 我的云端生词本")
+st.title("💬 用户反馈系统")
 st.markdown("---")
 
 # 侧边栏 - 数据库信息
@@ -168,53 +154,56 @@ if st.sidebar.button("🗃️ 初始化数据库表"):
     else:
         st.sidebar.error("❌ 数据库表初始化失败")
 
-# 添加新单词部分
-st.header("➕ 添加新单词")
+# 留言区部分
+st.header("📝 留言区")
 
-with st.form("add_word_form", clear_on_submit=True):
-    col1, col2, col3 = st.columns([2, 2, 3])
+with st.form("feedback_form", clear_on_submit=True):
+    col1, col2 = st.columns([1, 2])
 
     with col1:
-        new_word = st.text_input("新单词 *", placeholder="输入英文单词", key="word_input")
+        user_name = st.text_input("姓名 *", placeholder="请输入您的姓名", key="name_input")
     with col2:
-        new_definition = st.text_input("释义", placeholder="中文释义", key="def_input")
-    with col3:
-        new_example = st.text_input("例句", placeholder="使用例句", key="ex_input")
+        user_message = st.text_area("反馈内容 *", placeholder="请输入您的反馈意见", height=100, key="message_input")
 
-    submitted = st.form_submit_button("✅ 添加到生词本")
+    submitted = st.form_submit_button("✅ 提交反馈")
 
     if submitted:
-        if new_word:
-            if add_word(new_word, new_definition, new_example):
+        if user_name and user_message:
+            if add_feedback(user_name, user_message):
                 st.rerun()
         else:
-            st.warning("请输入新单词！")
+            st.warning("请填写姓名和反馈内容！")
 
 st.markdown("---")
 
-# 单词列表部分
-st.header("📖 我的单词列表")
+# 反馈区部分
+st.header("💭 用户反馈区")
 
-if st.button("🔄 刷新列表"):
+if st.button("🔄 刷新反馈"):
     st.rerun()
 
 # 加载并显示数据
-vocab_df = load_vocabulary()
+feedback_df = load_feedback()
 
-if not vocab_df.empty:
-    st.write(f"**共 {len(vocab_df)} 个单词**")
+if not feedback_df.empty:
+    st.write(f"**共 {len(feedback_df)} 条反馈**")
 
-    display_df = vocab_df.copy()
-    display_df.columns = ["单词", "释义", "例句"]
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    # 格式化显示
+    display_df = feedback_df.copy()
+    display_df.columns = ["用户姓名", "反馈内容", "提交时间"]
 
-    # 删除功能
-    st.subheader("🗑️ 删除单词")
-    words_list = vocab_df["word"].tolist()
-    selected_word = st.selectbox("选择要删除的单词", words_list)
-
-    if st.button("删除选中的单词", type="secondary"):
-        if delete_word(selected_word):
-            st.rerun()
+    # 美化显示
+    for index, row in display_df.iterrows():
+        with st.container():
+            st.markdown(f"""
+            <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; margin: 10px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h4 style="margin: 0; color: #1f77b4;">{row['用户姓名']}</h4>
+                    <span style="color: #666; font-size: 0.9em;">{row['提交时间']}</span>
+                </div>
+                <p style="margin: 10px 0 0 0; line-height: 1.5;">{row['反馈内容']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            st.markdown("---")
 else:
-    st.info("📝 你的生词本还是空的，快去添加第一个单词吧！")
+    st.info("📝 暂无用户反馈，快来留下第一条反馈吧！")
