@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+from shared.sidebar import create_common_sidebar  # <-- 1. 导入函数
 from shared.ai_model_config import MODEL_NAME
-create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
+
+create_common_sidebar()  # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 
 def load_data(uploaded_file):
@@ -47,9 +48,10 @@ def create_prompts(df):
     keywords_csv = top_keywords_df[existing_columns].to_csv(index=False)
 
     # --- 标题的提示词 ---
+    # 根据您的要求，默认提示词会要求生成3个标题，您可以在页面上修改这个数字
     title_prompt = f"""
     你是一名专业的亚马逊美国站的电商运营专家，尤其擅长撰写吸引人的产品标题。
-    请根据以下TOP 20的关键词数据，为一款宠物脱毛手套（pet hair removal glove）撰写一个符合亚马逊平台规则且具有高吸引力的产品标题。
+    请根据以下TOP 20的关键词数据，为一款宠物脱毛手套（pet hair removal glove）撰写3个符合亚马逊平台规则且具有高吸引力的产品标题。
 
     **标题要求:**
     1.  **核心关键词优先**: 必须包含最核心的关键词，如 'pet hair remover glove', 'dog grooming glove', 'cat hair glove' 等。
@@ -63,7 +65,7 @@ def create_prompts(df):
     {keywords_csv}
     ```
 
-    请直接给出你认为最佳的3个产品标题。
+    请直接给出你认为最佳的3个产品标题，并用数字编号。
     """
 
     # --- 五点描述的提示词 ---
@@ -93,6 +95,10 @@ def generate_listing_info(api_key, prompt):
     """
     使用Gemini API根据提示词生成内容.
     """
+    # 增加一个API Key是否存在的检查
+    if not api_key:
+        st.error("Google Gemini API 密钥未配置，请在 secrets.toml 中设置。")
+        return None
     try:
         # 配置API密钥
         genai.configure(api_key=api_key)
@@ -113,66 +119,75 @@ def main():
     st.title("🚀 Listing智能生成器")
     st.markdown("---")
 
-    # --- 修改部分 START ---
-    # 将控件直接放在主页面上
-    st.header("⚙️ 设置与上传")
+    st.header("⚙️ 第1步: 上传文件")
 
-    # 获取API Key (从secrets中读取)
+    # 从secrets中获取API Key
     api_key = st.secrets.get("API_KEY")
 
-    # 文件上传
+    # 文件上传控件
     uploaded_file = st.file_uploader(
         "上传关键词反查Excel文件",
         type=['xlsx'],
         help="请上传包含关键词数据的Excel文件。"
     )
     st.markdown("---")
-    # --- 修改部分 END ---
 
+    # 初始化session_state以存储生成的提示词
+    if 'generated_prompts' not in st.session_state:
+        st.session_state.generated_prompts = None
 
-    # 主区域用于展示结果
-    if uploaded_file is not None and api_key:
-        st.header("1. 数据预览")
-        data = load_data(uploaded_file)
+    if uploaded_file:
+        df = load_data(uploaded_file)
+        if df is not None:
+            st.dataframe(df.head(), use_container_width=True)
 
-        if data is not None:
-            st.success("文件上传成功！已读取第一个Sheet的内容。")
-            st.dataframe(data.head())
+            # --- 新增逻辑: 点击按钮来生成提示词 ---
+            if st.button("📝 分析数据并生成提示词"):
+                with st.spinner("正在分析关键词并创建提示词..."):
+                    # 将生成的提示词存入session_state
+                    st.session_state.generated_prompts = create_prompts(df)
+                st.success("提示词已生成！您现在可以在下方文本框中进行修改。")
+    else:
+        st.info("请先上传您的Excel文件。")
 
-            # 创建提示词
-            prompts = create_prompts(data)
+    # --- 新增逻辑: 如果提示词已生成，则显示可编辑的文本框 ---
+    if st.session_state.generated_prompts:
+        st.header("✏️ 第2步: 编辑提示词")
+        st.info("您可以在这里微调AI的指令。例如，您可以要求AI生成5个而不是3个标题，或者改变文案的语气。")
 
-            st.markdown("---")
-            st.header("2. AI生成提示词（Prompt）预览")
+        # 从session_state中读取提示词作为文本框的默认值
+        title_prompt_text = st.text_area(
+            label="标题生成提示词 (Title Prompt)",
+            value=st.session_state.generated_prompts['title'],
+            height=300
+        )
 
-            with st.expander("点击查看【标题】生成提示词"):
-                st.text(prompts['title'])
+        bullet_points_prompt_text = st.text_area(
+            label="五点描述生成提示词 (Bullet Points Prompt)",
+            value=st.session_state.generated_prompts['bullet_points'],
+            height=300
+        )
 
-            with st.expander("点击查看【五点描述】生成提示词"):
-                st.text(prompts['bullet_points'])
+        st.markdown("---")
+        st.header("✨ 第3步: 生成Listing")
 
-            st.markdown("---")
-            if st.button("✨ 生成Listing信息", type="primary"):
+        # 点击此按钮时，会使用上面两个文本框中最新的内容
+        if st.button("🚀 点击生成Listing", type="primary"):
+            if not api_key:
+                st.error("未在st.secrets中配置Google Gemini API密钥，无法生成内容。")
+            else:
                 with st.spinner("AI正在努力创作中，请稍候..."):
-                    # 生成标题
-                    generated_title = generate_listing_info(api_key, prompts['title'])
-                    # 生成五点
-                    generated_bullets = generate_listing_info(api_key, prompts['bullet_points'])
+                    # 使用文本框中（可能已被修改的）提示词来生成内容
+                    generated_title = generate_listing_info(api_key, title_prompt_text)
+                    generated_bullets = generate_listing_info(api_key, bullet_points_prompt_text)
 
-                    st.header("3. AI生成结果")
+                    # 显示最终结果
+                    st.subheader("✅ 生成结果")
+                    if generated_title:
+                        st.text_area("建议标题:", generated_title, height=150)
 
-                    # 展示标题
-                    st.subheader("建议标题:")
-                    st.text_area("标题", generated_title, height=150)
-
-                    # 展示五点
-                    st.subheader("建议五点描述:")
-                    st.text_area("五点描述", generated_bullets, height=350)
-
-    elif uploaded_file is None:
-        st.info("请上传您的Excel文件以开始。")
-    elif not api_key:
-        st.warning("未配置Google Gemini API密钥，无法启用生成功能。")
+                    if generated_bullets:
+                        st.text_area("建议五点描述:", generated_bullets, height=350)
 
 
 if __name__ == "__main__":
