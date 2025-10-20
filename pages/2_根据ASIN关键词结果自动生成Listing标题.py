@@ -109,8 +109,8 @@ def main():
     """
     Streamlit应用的主函数.
     """
-    st.set_page_config(page_title="亚马逊Listing智能生成器", layout="wide")
-    st.title("🚀 亚马逊Listing智能生成器")
+    st.set_page_config(page_title="Listing智能生成器", layout="wide")
+    st.title("🚀 Listing智能生成器")
     st.markdown("---")
 
     # --- 修改部分 START ---
