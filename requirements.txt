@@ -11,4 +11,4 @@ easyocr
 deep-translator
 google-generativeai
 akshare
-pip install libsql-client
+libsql-client
