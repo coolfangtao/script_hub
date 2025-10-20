@@ -168,7 +168,7 @@ def show_feedback_module():
                 col1, col2 = st.columns([0.8, 0.2])
                 with col1:
                     # 显示称呼，并加粗
-                    st.markdown(f"**👤 {row['称呼']}**")
+                    st.markdown(f"**{row['称呼']}**")
                 with col2:
                     # 显示提交时间，设为灰色、小字体并右对齐
                     st.markdown(f"<p style='text-align: right; color: grey; font-size: 0.9em;'>{row['提交时间']}</p>",
@@ -190,5 +190,3 @@ def show_feedback_module():
         submitted = st.form_submit_button("提交反馈")
         if submitted:
             add_feedback(name, message)
-
-    st.divider()
