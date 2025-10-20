@@ -81,8 +81,8 @@ def create_common_sidebar():
     """, unsafe_allow_html=True)
 
     # 2. 创建自定义的侧边栏头部 (保持不变)
-    st.sidebar.title("🛠️ 功能导航")
     st.sidebar.page_link("streamlit_app.py", label="🏠 返回主页")
+    st.sidebar.title("🛠️ 功能导航")
     st.sidebar.divider()
 
     # --- 主要修改部分 ---
