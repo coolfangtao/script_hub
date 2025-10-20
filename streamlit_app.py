@@ -115,7 +115,7 @@ FRIENDLY_LINKS = [
 for link in FRIENDLY_LINKS:
     with st.container(border=True):
         st.markdown(f"##### {link['title']}")
-        st.write(link['description'])
+        # st.write(link['description'])
         # 使用 st.link_button 创建一个更美观的跳转按钮
         st.link_button("前往查看 →", link['url'])
 
