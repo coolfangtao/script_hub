@@ -157,22 +157,37 @@ def show_feedback_module():
     st.header("✍️ 用户反馈")
     st.write("我们非常重视您的意见，请在这里留下您的反馈和建议。")
 
-    # 使用表单来收集用户输入
+    # 使用表单来收集用户输入 (保持不变)
     with st.form(key='feedback_form', clear_on_submit=True):
         name = st.text_input("您的称呼")
-        message = st.text_area("您的反馈内容")
+        message = st.text_area("您的反馈内容", height=150)
         submitted = st.form_submit_button("提交反馈")
-
         if submitted:
             add_feedback(name, message)
 
     st.divider()
 
-    # 显示历史反馈
+    # --- 显示历史反馈 (美化版本) ---
     st.subheader("历史反馈")
     feedback_df = load_feedback()
 
     if feedback_df.empty:
-        st.info("暂无反馈记录。")
+        st.info("暂无反馈记录，期待您的第一条建议！")
     else:
-        st.dataframe(feedback_df, use_container_width=True, hide_index=True)
+        # 遍历DataFrame中的每一行，为每一条反馈创建一个卡片
+        for index, row in feedback_df.iterrows():
+            with st.container(border=True):
+                col1, col2 = st.columns([0.8, 0.2])
+                with col1:
+                    # 显示称呼，并加粗
+                    st.markdown(f"**👤 {row['称呼']}**")
+                with col2:
+                    # 显示提交时间，设为灰色、小字体并右对齐
+                    st.markdown(f"<p style='text-align: right; color: grey; font-size: 0.9em;'>{row['提交时间']}</p>",
+                                unsafe_allow_html=True)
+
+                # 显示反馈内容
+                st.write(row['反馈内容'])
+
+            # 在卡片之间增加一点小间距
+            st.empty()
