@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 def shin_chan_animation(
         gif_url: str = "https://img.alicdn.com/imgextra/i2/2210123621994/O1CN019ne3h11QbIltvPjB8_!!2210123621994.gif",
         position: str = "top",
-        speed_seconds: int = 18,
+        speed_seconds: int = 10,
         size_pixels: int = 120,
         distance_from_edge_pixels: int = 10
 ):
