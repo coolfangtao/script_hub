@@ -184,10 +184,14 @@ def main():
                     # 显示最终结果
                     st.subheader("✅ 生成结果")
                     if generated_title:
-                        st.text_area("建议标题:", generated_title, height=150)
+                        st.markdown("**建议标题:**")
+                        # 使用markdown代码块来显示，它会自动适应内容高度并自带复制按钮
+                        st.markdown(f"```\n{generated_title}\n```")
 
                     if generated_bullets:
-                        st.text_area("建议五点描述:", generated_bullets, height=350)
+                        st.markdown("**建议五点描述:**")
+                        # 使用markdown代码块来显示，它会自动适应内容高度并自带复制按钮
+                        st.markdown(f"```\n{generated_bullets}\n```")
 
 
 if __name__ == "__main__":
