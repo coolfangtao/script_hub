@@ -1,6 +1,6 @@
 # 文件路径: shared/sidebar.py
 import streamlit as st
-from elements import shin_chan_animation
+from shared.elements import shin_chan_animation
 
 # --- 核心数据结构: 统一管理所有脚本和分组 ---
 # (这部分数据结构保持不变)
