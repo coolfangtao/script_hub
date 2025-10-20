@@ -1,19 +1,18 @@
-# import streamlit as st
+import streamlit as st
 # import pandas as pd
 # import akshare as ak
 # import time
-# from shared.sidebar import create_common_sidebar
+from shared.sidebar import create_common_sidebar
+
+# ----------------- 初始化侧边栏 -----------------
+create_common_sidebar()
 #
-# # ----------------- 初始化侧边栏 -----------------
-# create_common_sidebar()
-#
-# # ----------------- 页面配置 -----------------
-# st.set_page_config(
-#     page_title="基金实时看板",
-#     page_icon="📈",
-#     layout="wide",
-#     initial_sidebar_state="collapsed",
-# )
+# ----------------- 页面配置 -----------------
+st.set_page_config(
+    page_title="基金实时看板",
+    page_icon="📈",
+    layout="wide",
+)
 #
 # # ----------------- 样式注入 -----------------
 # st.markdown("""
