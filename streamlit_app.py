@@ -100,6 +100,11 @@ FRIENDLY_LINKS = [
         "description": "PDF24 Tools: 免费且易于使用的在线PDF工具"
     },
     {
+        "title": "无需上传文件也可在线处理图片",
+        "url": "https://imagestool.com/zh_CN/",
+        "description": "菜鸟工具 - 不止于工具"
+    },
+    {
         "title": "菜鸟工具 - 不止于工具",
         "url": "https://www.jyshare.com/",
         "description": "菜鸟工具 - 不止于工具"
