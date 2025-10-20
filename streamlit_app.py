@@ -1,6 +1,23 @@
 # 文件路径: streamlit_app.py
 
 import streamlit as st
+# 注入CSS，使主内容区的背景透明
+st.markdown("""
+<style>
+/* 主要的内容容器 */
+[data-testid="stAppViewContainer"] > .main {
+    background: transparent;
+}
+/* 顶部的装饰条 */
+[data-testid="stDecoration"] {
+    background: transparent;
+}
+/* 侧边栏（如果你的应用有的话） */
+[data-testid="stSidebar"] {
+    background: transparent;
+}
+</style>
+""", unsafe_allow_html=True)
 from shared.sidebar import create_common_sidebar  # 导入我们创建的侧边栏函数
 from shared.changelog import show_changelog
 from shared.feedback import setup_database, show_feedback_module
