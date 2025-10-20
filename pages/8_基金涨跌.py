@@ -1,181 +1,160 @@
 import streamlit as st
-# import pandas as pd
-# import akshare as ak
-# import time
-from shared.sidebar import create_common_sidebar
+import requests
+import pandas as pd
+import re
+from datetime import datetime
+from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
-# ----------------- 初始化侧边栏 -----------------
-create_common_sidebar()
-#
-# ----------------- 页面配置 -----------------
-st.set_page_config(
-    page_title="基金实时看板",
-    page_icon="📈",
-    layout="wide",
-)
-st.title("由于IP原因，已停止使用")
-#
-# # ----------------- 样式注入 -----------------
-# st.markdown("""
-# <style>
-# [data-testid="stMetric"] {
-#     background-color: #f0f2f6;
-#     border: 1px solid #e6e6e6;
-#     border-radius: 10px;
-#     padding: 15px;
-#     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-# }
-# [data-testid="stMetricLabel"] {
-#     font-size: 18px;
-#     font-weight: 500;
-# }
-# [data-testid="stMetricValue"] {
-#     font-size: 28px;
-#     font-weight: 700;
-# }
-# [data-testid="stMetricDelta"] {
-#     font-size: 16px;
-# }
-# </style>
-# """, unsafe_allow_html=True)
-#
-#
-# # ----------------- 数据获取与缓存 -----------------
-# @st.cache_data(ttl=60)
-# def get_fund_data(fund_codes):
-#     """获取指定基金代码的实时行情数据（带重试机制）"""
-#     max_retries = 3
-#     retry_delay = 5
-#
-#     for attempt in range(max_retries):
-#         try:
-#             with st.spinner('正在获取基金数据...'):
-#                 etf_spot_df = ak.fund_etf_spot_em()
-#                 filtered_df = etf_spot_df[etf_spot_df['代码'].isin(fund_codes)]
-#
-#                 numeric_cols = [
-#                     '最新价', 'IOPV实时估值', '基金折价率', '涨跌额', '涨跌幅', '成交量',
-#                     '成交额', '开盘价', '最高价', '最低价', '昨收', '振幅', '换手率', '量比',
-#                     '委比', '外盘', '内盘', '主力净流入-净额', '主力净流入-净占比'
-#                 ]
-#                 for col in numeric_cols:
-#                     filtered_df[col] = pd.to_numeric(filtered_df[col], errors='coerce')
-#                 return filtered_df.fillna(0)
-#
-#         except Exception as e:
-#             if attempt < max_retries - 1:
-#                 time.sleep(retry_delay)
-#                 continue
-#             st.error(f"数据加载失败，可能是网络问题或接口暂时不可用。错误信息: {e}")
-#             return pd.DataFrame()
-#
-#
-# # ----------------- 页面主体 -----------------
-#
-# # --- 标题和刷新控件的容器 ---
-# header_cols = st.columns([0.8, 0.2])
-# with header_cols[0]:
-#     st.title("📈 基金实时看板")
-#
-# # 我们关注的几只关键基金
-# key_funds = {
-#     "510300": "沪深300ETF",
-#     "518880": "黃金ETF",
-#     "159558": "半导体设备ETF易方达",
-#     "515980": "人工智能ETF",
-#     "159715": "稀土ETF易方达",
-#     "512560": "军工ETF易方达"
-# }
-#
-# # --- 获取数据 ---
-# fund_codes = list(key_funds.keys())
-# all_etf_df = get_fund_data(fund_codes)
-#
-# if not all_etf_df.empty:
-#     # --- 基金选择器 ---
-#     fund_options_list = [f"{key_funds[code]} ({code})" for code in fund_codes]
-#
-#     selected_funds_str = st.multiselect(
-#         label="🔍 请选择您关注的基金:",
-#         options=fund_options_list,
-#         default=fund_options_list,
-#         placeholder="选择要显示的基金..."
-#     )
-#
-#     selected_fund_codes = [item.split(" (")[1].replace(")", "") for item in selected_funds_str]
-#     selected_fund_names = [key_funds[code] for code in selected_fund_codes]
-#
-#     # --- 筛选数据 ---
-#     filtered_df = all_etf_df[all_etf_df['代码'].isin(selected_fund_codes)]
-#     st.divider()
-#
-#     # --- 指标卡展示 ---
-#     if not filtered_df.empty:
-#         st.subheader("📊 核心指标速览")
-#         num_funds = len(filtered_df)
-#         cols = st.columns(num_funds)
-#
-#         for i, (index, row) in enumerate(filtered_df.iterrows()):
-#             with cols[i]:
-#                 delta_value = f"{row['涨跌额']:.2f}"
-#                 percent_change = row['涨跌幅']
-#
-#                 st.metric(
-#                     label=f"{key_funds[row['代码']]} ({row['代码']})",
-#                     value=f"¥ {row['最新价']:.3f}",
-#                     delta=f"{delta_value} ({percent_change:.2f}%)",
-#                 )
-#     else:
-#         st.warning("请至少选择一只基金进行展示。")
-#
-#     st.divider()
-#
-#     # --- 详细数据表格 ---
-#     with st.expander("詳細數據一覽", expanded=True):
-#         if not filtered_df.empty:
-#             display_cols = [
-#                 '代码', '名称', '最新价', '涨跌幅', '涨跌额', '成交额',
-#                 '换手率', '基金折价率', '主力净流入-净额', '更新时间'
-#             ]
-#
-#             styled_df = filtered_df[display_cols].copy()
-#             styled_df['涨跌幅'] = styled_df['涨跌幅'].map('{:.2f}%'.format)
-#             styled_df['换手率'] = styled_df['换手率'].map('{:.2f}%'.format)
-#             styled_df['基金折价率'] = styled_df['基金折价率'].map('{:.2f}%'.format)
-#             styled_df['成交额'] = (styled_df['成交额'] / 100000000).map('{:,.2f} 亿'.format)
-#             styled_df['主力净流入-净额'] = (styled_df['主力净流入-净额'] / 100000000).map('{:,.2f} 亿'.format)
-#
-#             st.dataframe(styled_df, use_container_width=True, hide_index=True)
-#         else:
-#             st.info("暂无选中基金的详细数据。")
-# else:
-#     st.error("无法获取数据，页面无法加载。请检查网络连接或稍后重试。")
-#
-# # ----------------- 自动刷新逻辑 -----------------
-# with header_cols[1]:
-#     col1, col2 = st.columns([0.6, 0.4], gap="small")
-#
-#     # 手动刷新按钮
-#     if col2.button("刷新", key="manual_refresh"):
-#         st.cache_data.clear()
-#         st.rerun()
-#
-#     # 倒计时显示
-#     countdown_placeholder = col1.empty()
-#
-# # 初始化或更新倒计时状态
-# if 'countdown' not in st.session_state:
-#     st.session_state.countdown = 120  # 2分钟刷新间隔
-#
-# # 显示当前倒计时
-# countdown_placeholder.markdown(f"🕒 `自动刷新: {st.session_state.countdown}s`")
-#
-# # 倒计时逻辑
-# if st.session_state.countdown > 0:
-#     st.session_state.countdown -= 1
-#     time.sleep(1)
-#     st.rerun()
-# else:
-#     # 倒计时结束，清除缓存并刷新
-#     st.cache_data.clear()
-#     st.rerun()
+# 1. 定义您关注的基金列表
+# 键是基金代码，值是基金名称
+FUNDS = {
+    "510300": "沪深300ETF",
+    "518880": "黄金ETF",
+    "159558": "半导体设备ETF易方达",
+    "515980": "人工智能ETF",
+    "159715": "稀土ETF易方达",
+    "512560": "军工ETF易方达"
+}
+
+
+# 2. 根据基金代码获取完整的市场代码 (例如 510300 -> sh510300)
+def get_full_code(code):
+    """根据基金代码判断是上海(sh)还是深圳(sz)市场"""
+    if code.startswith('51'):
+        return f"sh{code}"
+    elif code.startswith('15'):
+        return f"sz{code}"
+    else:
+        return ""
+
+
+# 3. 核心功能：通过HTTP请求从新浪财经获取数据并解析
+def fetch_fund_data(fund_codes):
+    """
+    通过HTTP请求从新浪财经获取多个基金的实时数据。
+
+    Args:
+        fund_codes (list): 包含基金代码的列表, e.g., ["510300", "159558"]
+
+    Returns:
+        list: 一个包含每个基金数据的字典列表
+    """
+    if not fund_codes:
+        return []
+
+    full_codes = [get_full_code(code) for code in fund_codes if get_full_code(code)]
+    url = f"http://hq.sinajs.cn/list={','.join(full_codes)}"
+    headers = {
+        'Referer': 'http://finance.sina.com.cn'  # 添加Referer头，模拟浏览器请求
+    }
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # 如果请求失败则抛出异常
+        response.encoding = 'gbk'  # 新浪财经接口使用GBK编码
+
+        data_list = []
+        raw_text = response.text
+        # 使用正则表达式匹配每个基金的数据
+        # var hq_str_sh510300="...";
+        pattern = re.compile(r'var hq_str_(\w+)="([^"]+)";')
+        matches = pattern.findall(raw_text)
+
+        for match in matches:
+            code_full, data_str = match
+            code = code_full[2:]  # 去掉 sh/sz 前缀
+
+            if not data_str:
+                continue
+
+            parts = data_str.split(',')
+
+            # 解析数据 (根据新浪财经的ETF数据格式)
+            # 0: 基金名称
+            # 1: 今日开盘价
+            # 2: 昨日收盘价
+            # 3: 当前价格
+            # 4: 今日最高价
+            # 5: 今日最低价
+            # ... 更多数据我们暂时不需要
+
+            name = FUNDS.get(code, parts[0])  # 优先使用我们定义的名称
+            yesterday_close = float(parts[2])
+            current_price = float(parts[3])
+
+            if yesterday_close == 0:
+                change_percent = 0
+            else:
+                change = current_price - yesterday_close
+                change_percent = (change / yesterday_close) * 100
+
+            data_list.append({
+                "基金代码": code,
+                "基金名称": name,
+                "最新价": f"{current_price:.3f}",
+                "昨收": f"{yesterday_close:.3f}",
+                "涨跌幅(%)": f"{change_percent:+.2f}%"
+            })
+
+        return data_list
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"网络请求失败: {e}")
+        return None
+    except Exception as e:
+        st.error(f"数据解析失败: {e}")
+        return None
+
+
+# 4. Streamlit 页面布局
+st.set_page_config(page_title="基金涨跌观察面板", layout="wide")
+
+st.title("📈 基金涨跌观察面板")
+st.markdown(f"数据更新时间: **{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}** (数据源：新浪财经)")
+
+# 创建一个占位符，用于后续更新数据
+data_placeholder = st.empty()
+
+
+# 5. 定义数据展示和样式
+def display_data():
+    fund_data = fetch_fund_data(list(FUNDS.keys()))
+
+    if fund_data:
+        df = pd.DataFrame(fund_data)
+
+        # 定义涨跌颜色函数 (A股市场习惯：红涨绿跌)
+        def color_change(val):
+            if isinstance(val, str) and val.endswith('%'):
+                num_val = float(val.strip('%'))
+                if num_val > 0:
+                    return 'color: red;'
+                elif num_val < 0:
+                    return 'color: green;'
+            return 'color: black;'
+
+        # 应用样式
+        styled_df = df.style.apply(
+            lambda col: col.map(color_change), subset=['涨跌幅(%)']
+        ).format({
+            "最新价": "{:}",
+            "昨收": "{:}",
+            "涨跌幅(%)": "{:}"
+        })
+
+        # 在占位符中显示数据表格
+        data_placeholder.dataframe(styled_df, use_container_width=True, hide_index=True)
+    else:
+        data_placeholder.warning("暂时无法获取基金数据，请稍后刷新。")
+
+
+# 添加一个手动刷新按钮
+if st.button('手动刷新'):
+    st.toast("正在刷新数据...")
+    display_data()
+
+# 页面首次加载时自动执行一次
+display_data()
+
+st.info("ℹ️ 本页面数据仅供参考，不构成任何投资建议。")
