@@ -4,6 +4,12 @@ import streamlit as st
 from shared.sidebar import create_common_sidebar  # 导入我们创建的侧边栏函数
 from shared.changelog import show_changelog
 from shared.feedback import setup_database, show_feedback_module
+from shared.elements import shin_chan_animation  # 导入我们的动画函数
+
+# --- 1. 显示顶部动画 (默认效果) ---
+# 只需调用这一行函数，所有复杂的HTML/CSS代码都已封装好
+shin_chan_animation()
+
 # --- 渲染侧边栏 ---
 # 这一行代码会负责搞定所有侧边栏的显示逻辑
 create_common_sidebar()
