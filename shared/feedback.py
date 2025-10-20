@@ -154,8 +154,7 @@ def show_feedback_module():
     在Streamlit页面上显示完整的用户反馈模块。
     这个函数将被主应用导入和调用。
     """
-
-    # --- 显示历史反馈 (美化版本) ---
+    # --- 首先显示历史反馈 ---
     st.header("✍️ 用户反馈")
     feedback_df = load_feedback()
 
@@ -168,7 +167,7 @@ def show_feedback_module():
                 col1, col2 = st.columns([0.8, 0.2])
                 with col1:
                     # 显示称呼，并加粗
-                    st.markdown(f"**{row['称呼']}**")
+                    st.markdown(f"**👤 {row['称呼']}**")
                 with col2:
                     # 显示提交时间，设为灰色、小字体并右对齐
                     st.markdown(f"<p style='text-align: right; color: grey; font-size: 0.9em;'>{row['提交时间']}</p>",
@@ -180,13 +179,16 @@ def show_feedback_module():
             # 在卡片之间增加一点小间距
             st.empty()
 
+    # --- 然后显示提交表单 ---
     st.subheader("提交你的反馈")
     st.write("我们非常重视您的意见，请在这里留下您的反馈和建议。")
 
-    # 使用表单来收集用户输入 (保持不变)
     with st.form(key='feedback_form', clear_on_submit=True):
         name = st.text_input("您的称呼")
         message = st.text_area("您的反馈内容", height=150)
         submitted = st.form_submit_button("提交反馈")
         if submitted:
-            add_feedback(name, message)
+            # add_feedback 函数在成功时会返回 True
+            if add_feedback(name, message):
+                # 成功后，强制页面重新运行，以刷新上面的历史记录
+                st.rerun()
