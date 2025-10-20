@@ -3,12 +3,12 @@
 import streamlit as st
 
 # --- 核心数据结构: 统一管理所有脚本和分组 ---
-# 这是你项目中唯一的"数据源"，所有页面都从这里读取导航信息
+# (这部分数据结构保持不变)
 SCRIPTS_BY_GROUP = {
     "🤖 AI工具": [
         {
             "label": "AI对话",
-            "path": r"pages/7_AI_对话页面.py"  # 假设新文件放在pages目录下
+            "path": r"pages/7_AI_对话页面.py"
         },
         {
             "label": "AI分析语音现象",
@@ -20,22 +20,6 @@ SCRIPTS_BY_GROUP = {
             "label": "关键词统计（推荐）",
             "path": r"pages/2_关键词统计.py"
         },
-        # {
-        #     "label": "统计单个ASIN关键词结果（已废弃）",
-        #     "path": r"pages/2_统计单个ASIN关键词结果.py"
-        # },
-        # {
-        #     "label": "统计单个ASIN关键词结果V2（已废弃）",
-        #     "path": r"pages/2_统计单个ASIN关键词结果V2.py"
-        # },
-        # {
-        #     "label": "合并多个ASIN的关键词结果（已废弃）",
-        #     "path": r"pages/2_合并多个ASIN关键词结果.py"
-        # },
-        # {
-        #     "label": "统计多个ASIN关键词结果（已废弃）",
-        #     "path": r"pages/2_统计多个ASIN关键词结果.py"
-        # },
         {
             "label": "根据ASIN关键词结果自动生成Listing标题",
             "path": r"pages/2_根据ASIN关键词结果自动生成Listing标题.py"
@@ -84,10 +68,10 @@ SCRIPTS_BY_GROUP = {
 
 def create_common_sidebar():
     """
-    在Streamlit应用的侧边栏中创建一个公共分组导航。
+    在Streamlit应用的侧边栏中创建一个可折叠的公共分组导航。
     """
 
-    # 1. 注入CSS以隐藏默认的Streamlit导航
+    # 1. 注入CSS以隐藏默认的Streamlit导航 (保持不变)
     st.markdown("""
         <style>
             [data-testid="stSidebarNav"] {
@@ -96,18 +80,17 @@ def create_common_sidebar():
         </style>
     """, unsafe_allow_html=True)
 
-    # --- 新增代码: 添加返回主页的按钮 ---
-    # 假设你的主页文件名为 streamlit_app.py
+    # 2. 创建自定义的侧边栏头部 (保持不变)
+    st.sidebar.title("🛠️ 功能导航")
     st.sidebar.page_link("streamlit_app.py", label="🏠 返回主页")
     st.sidebar.divider()
 
-    # 2. 创建自定义的侧边栏内容
-    st.sidebar.title("🛠️ 功能导航")
-    st.sidebar.divider()
-
-
+    # --- 主要修改部分 ---
+    # 3. 使用 st.expander 创建可折叠的导航菜单
     for group_name, scripts_in_group in SCRIPTS_BY_GROUP.items():
-        st.sidebar.subheader(group_name)
-        for script in scripts_in_group:
-            st.sidebar.page_link(script["path"], label=script["label"])
-        st.sidebar.divider()
+        # 为每个分组创建一个可折叠的容器
+        # expanded=False 表示默认是折叠的, 你可以根据需要设置为 True 让某个分组默认展开
+        with st.sidebar.expander(group_name, expanded=False):
+            # 在折叠容器内部，为每个脚本创建页面链接
+            for script in scripts_in_group:
+                st.page_link(script["path"], label=script["label"])
