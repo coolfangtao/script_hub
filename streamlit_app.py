@@ -21,7 +21,7 @@ import streamlit.components.v1 as components
 # 从我们创建的文件中，导入代码变量
 # 因为文件名是 particles_component.py，所以我们 from particles_component
 from shared.particles_component import particles_js_code
-components.html(particles_js_code, height=800, scrolling=False)
+components.html(particles_js_code, height=200, scrolling=False)
 
 # =====================================================================
 # --- 新的主页内容 ---
