@@ -161,13 +161,21 @@ def show_feedback_module():
     if feedback_df.empty:
         st.info("暂无反馈记录，期待您的第一条建议！")
     else:
+        # 创建一个多彩的图标列表
+        icons = ["👨‍🌾", "👩‍🌾", "👨‍🍳", "👩‍🍳", "👨‍🎓", "👩‍🎓", "👨‍🎤", "👩‍🎤", "👨‍🏫", "👩‍🏫", "👨‍⚖️", "👩‍⚖️", "👨‍⚕️", "👩‍⚕️", "👨‍🔬",
+                 "👩‍🔬", "👨‍💻", "👩‍💻", "👨‍🎨", "👩‍🎨", "👨‍✈️", "👩‍✈️", "👨‍🚀", "👩‍🚀", "👨‍🚒", "👩‍🚒", "👮‍♂️", "👮‍♀️", "🕵️‍♂️", "🕵️‍♀️",
+                 "💂‍♂️", "💂‍♀️", "👷‍♂️", "👷‍♀️", "🤴", "👸", "👳‍♂️", "👳‍♀️", "👲", "🧕", "🤵", "👰"]
+
         # 遍历DataFrame中的每一行，为每一条反馈创建一个卡片
         for index, row in feedback_df.iterrows():
+            # 根据留言的索引来循环选择一个图标
+            icon = icons[index % len(icons)]
+
             with st.container(border=True):
                 col1, col2 = st.columns([0.8, 0.2])
                 with col1:
-                    # 显示称呼，并加粗
-                    st.markdown(f"**👤 {row['称呼']}**")
+                    # 使用动态选择的图标来代替固定的头像
+                    st.markdown(f"**{icon} {row['称呼']}**")
                 with col2:
                     # 显示提交时间，设为灰色、小字体并右对齐
                     st.markdown(f"<p style='text-align: right; color: grey; font-size: 0.9em;'>{row['提交时间']}</p>",
