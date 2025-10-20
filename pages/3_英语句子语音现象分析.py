@@ -6,7 +6,7 @@ import edge_tts
 import os
 import google.generativeai as genai
 from typing import Optional
-from shared.sidebar import create_common_sidebar # 导入公共侧边栏函数
+from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
 
 # --- 页面和侧边栏配置 ---
 # 配置页面信息
@@ -96,7 +96,7 @@ def analyze_phonetics_with_gemini(text: str, model_name: str) -> str:
         return ""
 
     try:
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerModel(model_name)
         prompt = f"""
         请作为一名专业的英语语音教师，分析以下句子的语音现象。
 
@@ -136,7 +136,15 @@ def process_and_display_results(sentence: str, selected_model: str):
     # --- 1. 文本转语音 (TTS) ---
     st.subheader("标准发音")
     with st.spinner("🔊 正在生成语音，请稍候..."):
-        audio_file_path = asyncio.run(generate_tts(sentence))
+        # 使用更稳健的方式在 Streamlit 中运行异步代码
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        audio_file_path = loop.run_until_complete(generate_tts(sentence))
+
         if audio_file_path and os.path.exists(audio_file_path):
             st.success("语音生成成功！")
             st.audio(audio_file_path, format="audio/mp3")
@@ -148,9 +156,10 @@ def process_and_display_results(sentence: str, selected_model: str):
                     mime="audio/mp3"
                 )
         else:
-            st.error("无法生成或找到语音文件。")
+            # generate_tts 函数内部已经显示了具体的错误信息，所以这里不需要再显示
+            pass
 
-    st.divider() # 添加一条分割线
+    st.divider()  # 添加一条分割线
 
     # --- 2. 语音现象分析 ---
     st.subheader("语音现象分析")
@@ -175,7 +184,7 @@ def main():
     selected_model = st.selectbox(
         "**请选择一个分析模型：**",
         options=MODEL_OPTIONS,
-        index=MODEL_OPTIONS.index("gemini-2.0-flash") # 默认选中 'gemini-2.0-flash'
+        index=MODEL_OPTIONS.index("gemini-2.0-flash")  # 默认选中 'gemini-2.0-flash'
     )
 
     with st.form("input_form"):
@@ -204,3 +213,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
