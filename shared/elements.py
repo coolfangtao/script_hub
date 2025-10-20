@@ -8,7 +8,7 @@ def shin_chan_animation(
         speed_seconds: int = 30,  # 可以适当减少时间，因为路径更复杂
         size_pixels: int = 180,
         distance_from_edge_pixels: int = 25,
-        random_walk: bool = False  # 新增参数，控制是否启用“随机”行走模式
+        random_walk: bool = True  # 新增参数，控制是否启用“随机”行走模式
 ):
     """
     在Streamlit页面上渲染一个蜡笔小新移动的动画。
