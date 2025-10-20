@@ -58,23 +58,6 @@ st.markdown("一个集成了运营维护、文本处理和图像处理等多种�
 st.markdown("⬅️左侧打开即可使用。")
 st.markdown("---")
 
-# # --- 2. 如何使用 ---
-# st.header("💡 如何使用")
-# st.write("只需三步，轻松上手：")
-#
-# how_col1, how_col2, how_col3 = st.columns(3)
-# with how_col1:
-#     with st.container(border=True, height=150):
-#         st.markdown("<div style='text-align: center;'><h3>① 选择工具</h3><p>⬅️从左侧的侧边栏选择您需要的功能。</p></div>", unsafe_allow_html=True)
-# with how_col2:
-#     with st.container(border=True, height=150):
-#         st.markdown("<div style='text-align: center;'><h3>② 上传文件</h3><p>根据页面提示上传您的文件或输入信息。</p></div>", unsafe_allow_html=True)
-# with how_col3:
-#     with st.container(border=True, height=150):
-#         st.markdown("<div style='text-align: center;'><h3>③ 获取结果</h3><p>点击执行按钮，立即获得处理好的结果。</p></div>", unsafe_allow_html=True)
-#
-# st.markdown("<br>", unsafe_allow_html=True)
-
 # --- 3. 核心功能 & 快速入口 ---
 st.header("🌟 核心功能一览")
 
@@ -82,13 +65,21 @@ col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     with st.container(border=True):
+        st.markdown("<h3 style='text-align: center;'>🤖</h3>", unsafe_allow_html=True)
+        st.markdown("<h5 style='text-align: center;'>AI工具</h5>", unsafe_allow_html=True)
+        st.write("与强大的 AI 模型进行对话，无需特殊网络环境即可体验 Gemini 2.5 Pro。")
+        if st.button("立即开始", key="ai", use_container_width=True):
+            st.switch_page(r"pages/7_AI_对话页面.py")
+
+with col2:
+    with st.container(border=True):
         st.markdown("<h3 style='text-align: center;'>📊</h3>", unsafe_allow_html=True)
         st.markdown("<h5 style='text-align: center;'>关键词分析</h5>", unsafe_allow_html=True)
         st.write("一键对多个ASIN的关键词分析Excel文件进行合并和分析，方便后续分析。")
         if st.button("立即开始", key="merge_asin", use_container_width=True):
             st.switch_page(r"pages/2_关键词统计.py")
 
-with col2:
+with col3:
     with st.container(border=True):
         st.markdown("<h3 style='text-align: center;'>🖼️</h3>", unsafe_allow_html=True)
         st.markdown("<h5 style='text-align: center;'>智能替换背景</h5>", unsafe_allow_html=True)
@@ -96,21 +87,13 @@ with col2:
         if st.button("立即开始", key="remove_bg", use_container_width=True):
             st.switch_page(r"pages/5_替换图片背景.py")
 
-with col3:
+with col4:
     with st.container(border=True):
         st.markdown("<h3 style='text-align: center;'>🔊</h3>", unsafe_allow_html=True)
         st.markdown("<h5 style='text-align: center;'>文字转语音</h5>", unsafe_allow_html=True)
         st.write("输入任意文本，选择多种音色，快速生成高质量的语音文件，支持多语言。")
         if st.button("立即开始", key="tts", use_container_width=True):
             st.switch_page(r"pages/3_文字转语音.py")
-
-with col4:
-    with st.container(border=True):
-        st.markdown("<h3 style='text-align: center;'>🤖</h3>", unsafe_allow_html=True)
-        st.markdown("<h5 style='text-align: center;'>AI工具</h5>", unsafe_allow_html=True)
-        st.write("与强大的 AI 模型进行对话，无需特殊网络环境即可体验 Gemini 2.5 Pro。")
-        if st.button("立即开始", key="ai", use_container_width=True):
-            st.switch_page(r"pages/7_AI_对话页面.py")
 
 st.markdown("---")
 
