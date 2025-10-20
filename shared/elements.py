@@ -6,7 +6,7 @@ def shin_chan_animation(
         gif_url: str = "https://img.alicdn.com/imgextra/i2/2210123621994/O1CN019ne3h11QbIltvPjB8_!!2210123621994.gif",
         position: str = "top",
         speed_seconds: int = 100,  # 可以适当减少时间，因为路径更复杂
-        size_pixels: int = 180,
+        size_pixels: int = 100,
         distance_from_edge_pixels: int = 25,
         random_walk: bool = True  # 新增参数，控制是否启用“随机”行走模式
 ):
