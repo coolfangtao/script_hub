@@ -4,10 +4,15 @@ import streamlit as st
 from shared.sidebar import create_common_sidebar  # 导入我们创建的侧边栏函数
 from shared.changelog import show_changelog
 from shared.feedback import setup_database, show_feedback_module
+from shared.particles_component import render_particles
 
 # --- 渲染侧边栏 ---
 # 这一行代码会负责搞定所有侧边栏的显示逻辑
 create_common_sidebar()
+
+# --- 渲染背景 ---
+# 在所有其他元素之前调用，确保背景被首先加载
+render_particles()
 
 
 # --- 页面基础设置 (必须是第一个st命令) ---
