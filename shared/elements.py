@@ -1,10 +1,6 @@
 # shard/elements.py
-
 import streamlit as st
 
-
-# 我们不再需要 st.components.v1 了
-# import streamlit.components.v1 as components
 
 def shin_chan_animation(
         gif_url: str = "https://img.alicdn.com/imgextra/i2/2210123621994/O1CN019ne3h11QbIltvPjB8_!!2210123621994.gif",
@@ -18,7 +14,6 @@ def shin_chan_animation(
     """
     position_css = f"{position}: {distance_from_edge_pixels}px;"
 
-    # CSS动画代码保持不变
     animation_html = f"""
     <style>
         @keyframes walk-across {{
@@ -35,7 +30,8 @@ def shin_chan_animation(
             left: 0;
             width: {size_pixels}px;
             height: auto;
-            z-index: 9999;
+            /* 【关键修改】提高 z-index 的值，确保它在最顶层 */
+            z-index: 999999;
             animation: walk-across {speed_seconds}s linear infinite;
         }}
     </style>
@@ -43,5 +39,4 @@ def shin_chan_animation(
     <img src="{gif_url}" class="shin-chan-animation">
     """
 
-    # 【关键修改】使用 st.markdown 来渲染，而不是 st.components.v1.html
     st.markdown(animation_html, unsafe_allow_html=True)
