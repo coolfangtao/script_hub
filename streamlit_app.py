@@ -5,6 +5,7 @@ from shared.sidebar import create_common_sidebar  # 导入我们创建的侧边�
 from shared.changelog import show_changelog
 # from shared.feedback import render_feedback_section # <-- 1. 导入新的反馈函数
 
+
 # --- 页面基础设置 (必须是第一个st命令) ---
 st.set_page_config(
     page_title="FT的脚本中心",
@@ -15,6 +16,12 @@ st.set_page_config(
 # --- 渲染侧边栏 ---
 # 这一行代码会负责搞定所有侧边栏的显示逻辑
 create_common_sidebar()
+
+import streamlit.components.v1 as components
+# 从我们创建的文件中，导入代码变量
+# 因为文件名是 particles_component.py，所以我们 from particles_component
+from shared.particles_component import particles_js_code
+components.html(particles_js_code, height=800, scrolling=False)
 
 # =====================================================================
 # --- 新的主页内容 ---
