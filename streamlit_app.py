@@ -57,22 +57,22 @@ st.title("🚀 欢迎来到 FT 的脚本中心")
 st.markdown("一个集成了运营维护、文本处理和图像处理等多种高效工具的在线平台。")
 st.markdown("---")
 
-# --- 2. 如何使用 ---
-st.header("💡 如何使用")
-st.write("只需三步，轻松上手：")
-
-how_col1, how_col2, how_col3 = st.columns(3)
-with how_col1:
-    with st.container(border=True, height=150):
-        st.markdown("<div style='text-align: center;'><h3>① 选择工具</h3><p>⬅️从左侧的侧边栏选择您需要的功能。</p></div>", unsafe_allow_html=True)
-with how_col2:
-    with st.container(border=True, height=150):
-        st.markdown("<div style='text-align: center;'><h3>② 上传文件</h3><p>根据页面提示上传您的文件或输入信息。</p></div>", unsafe_allow_html=True)
-with how_col3:
-    with st.container(border=True, height=150):
-        st.markdown("<div style='text-align: center;'><h3>③ 获取结果</h3><p>点击执行按钮，立即获得处理好的结果。</p></div>", unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
+# # --- 2. 如何使用 ---
+# st.header("💡 如何使用")
+# st.write("只需三步，轻松上手：")
+#
+# how_col1, how_col2, how_col3 = st.columns(3)
+# with how_col1:
+#     with st.container(border=True, height=150):
+#         st.markdown("<div style='text-align: center;'><h3>① 选择工具</h3><p>⬅️从左侧的侧边栏选择您需要的功能。</p></div>", unsafe_allow_html=True)
+# with how_col2:
+#     with st.container(border=True, height=150):
+#         st.markdown("<div style='text-align: center;'><h3>② 上传文件</h3><p>根据页面提示上传您的文件或输入信息。</p></div>", unsafe_allow_html=True)
+# with how_col3:
+#     with st.container(border=True, height=150):
+#         st.markdown("<div style='text-align: center;'><h3>③ 获取结果</h3><p>点击执行按钮，立即获得处理好的结果。</p></div>", unsafe_allow_html=True)
+#
+# st.markdown("<br>", unsafe_allow_html=True)
 
 # --- 3. 核心功能 & 快速入口 ---
 st.header("🌟 核心功能一览")
