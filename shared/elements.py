@@ -9,7 +9,7 @@ import streamlit as st
 def shin_chan_animation(
         gif_url: str = "https://img.alicdn.com/imgextra/i2/2210123621994/O1CN019ne3h11QbIltvPjB8_!!2210123621994.gif",
         position: str = "top",
-        speed_seconds: int = 68,  # 走完整个页面需要多少秒
+        speed_seconds: int = 100,  # 走完整个页面需要多少秒
         size_pixels: int = 180,  # 蜡笔小新身高
         distance_from_edge_pixels: int = 25  # 距离顶部距离
 ):
