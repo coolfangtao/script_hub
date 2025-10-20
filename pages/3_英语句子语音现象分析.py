@@ -125,6 +125,7 @@ def analyze_phonetics_with_gemini(text: str, model_name: str) -> str:
 def process_and_display_results(sentence: str, selected_model: str):
     """
     协调分析和TTS过程，并在页面上展示结果。
+    此版本先生成语音，再在下方生成分析。
     :param sentence: 用户输入的句子.
     :param selected_model: 用户选择的AI模型.
     """
@@ -132,30 +133,30 @@ def process_and_display_results(sentence: str, selected_model: str):
         st.warning("请输入一个句子进行分析。", icon="✍️")
         return
 
-    col1, col2 = st.columns([0.6, 0.4])
+    # --- 1. 文本转语音 (TTS) ---
+    st.subheader("标准发音")
+    with st.spinner("🔊 正在生成语音，请稍候..."):
+        audio_file_path = asyncio.run(generate_tts(sentence))
+        if audio_file_path and os.path.exists(audio_file_path):
+            st.success("语音生成成功！")
+            st.audio(audio_file_path, format="audio/mp3")
+            with open(audio_file_path, "rb") as file:
+                st.download_button(
+                    label="📥 下载语音 (MP3)",
+                    data=file,
+                    file_name=os.path.basename(audio_file_path),
+                    mime="audio/mp3"
+                )
+        else:
+            st.error("无法生成或找到语音文件。")
 
-    with col1:
-        st.subheader("语音现象分析")
-        with st.spinner("🤖 正在分析中，请稍候..."):
-            analysis_result = analyze_phonetics_with_gemini(sentence, selected_model)
-            st.markdown(f'<div class="phonetic-analysis">{analysis_result}</div>', unsafe_allow_html=True)
+    st.divider() # 添加一条分割线
 
-    with col2:
-        st.subheader("文本转语音 (TTS)")
-        with st.spinner("🔊 正在生成语音，请稍候..."):
-            audio_file_path = asyncio.run(generate_tts(sentence))
-            if audio_file_path and os.path.exists(audio_file_path):
-                st.success("语音生成成功！点击播放或调整速度")
-                st.audio(audio_file_path, format="audio/mp3")
-                with open(audio_file_path, "rb") as file:
-                    st.download_button(
-                        label="📥 下载语音 (MP3)",
-                        data=file,
-                        file_name=os.path.basename(audio_file_path),
-                        mime="audio/mp3"
-                    )
-            else:
-                st.error("无法生成或找到语音文件。")
+    # --- 2. 语音现象分析 ---
+    st.subheader("语音现象分析")
+    with st.spinner("🤖 正在分析中，请稍候..."):
+        analysis_result = analyze_phonetics_with_gemini(sentence, selected_model)
+        st.markdown(f'<div class="phonetic-analysis">{analysis_result}</div>', unsafe_allow_html=True)
 
 
 # --- 主程序入口 ---
@@ -165,10 +166,10 @@ def main():
     st.title("🗣️ 英语句子语音现象分析器")
     st.markdown("输入一个英语句子，即可生成标准发音，并由AI分析其中包含的连读、略读等语音现象。\n"
                 "**部分符号说明：**\n"
-                "- 连读 (Liaison): 使用上括号 `‿` 连接单词，例如 an‿apple\n"
+                "- 连读 (Liaison): 使用 `‿` 连接单词，例如 an‿apple\n"
                 "- 略读 (Elision): 在被省略的音素位置使用删除线 `~`，例如 las~t night\n"
                 "- 插读 (Intrusion): 在插入音素的位置使用 `+` 号，例如 go+w away\n"
-                "- 停顿: | 符号表示自然的语调停顿。")
+                "- 停顿: `|` 符号表示自然的语调停顿。")
 
     # 模型选择框
     selected_model = st.selectbox(
