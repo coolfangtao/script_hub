@@ -105,6 +105,16 @@ FRIENDLY_LINKS = [
         "description": "菜鸟工具 - 不止于工具"
     },
     {
+        "title": "MikuTools - 一个轻量的工具集合",
+        "url": "https://tools.miku.ac/",
+        "description": "菜鸟工具 - 不止于工具"
+    },
+    {
+        "title": "图像无损放大",
+        "url": "https://www.waifu2x.net/",
+        "description": "菜鸟工具 - 不止于工具"
+    },
+    {
         "title": "GD音乐台 - GD Studio's Online Music Platform",
         "url": "https://music.gdstudio.org/",
         "description": "GD音乐台 - GD Studio's Online Music Platform"
