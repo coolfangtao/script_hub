@@ -96,7 +96,7 @@ def analyze_phonetics_with_gemini(text: str, model_name: str) -> str:
         return ""
 
     try:
-        model = genai.GenerModel(model_name)
+        model = genai.GenerativeModel(model_name)
         prompt = f"""
         请作为一名专业的英语语音教师，分析以下句子的语音现象。
 
