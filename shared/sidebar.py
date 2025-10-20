@@ -90,7 +90,7 @@ def create_common_sidebar():
     for group_name, scripts_in_group in SCRIPTS_BY_GROUP.items():
         # 为每个分组创建一个可折叠的容器
         # expanded=False 表示默认是折叠的, 你可以根据需要设置为 True 让某个分组默认展开
-        with st.sidebar.expander(group_name, expanded=False):
+        with st.sidebar.expander(group_name, expanded=True):
             # 在折叠容器内部，为每个脚本创建页面链接
             for script in scripts_in_group:
                 st.page_link(script["path"], label=script["label"])
