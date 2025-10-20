@@ -32,7 +32,7 @@ st.write("只需三步，轻松上手：")
 how_col1, how_col2, how_col3 = st.columns(3)
 with how_col1:
     with st.container(border=True, height=150):
-        st.markdown("<div style='text-align: center;'><h3>① 选择工具</h3><p>从左侧的侧边栏选择您需要的功能。</p></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center;'><h3>① 选择工具</h3><p>⬅️从左侧的侧边栏选择您需要的功能。</p></div>", unsafe_allow_html=True)
 with how_col2:
     with st.container(border=True, height=150):
         st.markdown("<div style='text-align: center;'><h3>② 上传文件</h3><p>根据页面提示上传您的文件或输入信息。</p></div>", unsafe_allow_html=True)
