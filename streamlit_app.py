@@ -3,7 +3,7 @@
 import streamlit as st
 from shared.sidebar import create_common_sidebar  # 导入我们创建的侧边栏函数
 from shared.changelog import show_changelog
-# from shared.feedback import render_feedback_section # <-- 1. 导入新的反馈函数
+from shared.feedback import setup_database, show_feedback_module
 # --- 渲染侧边栏 ---
 # 这一行代码会负责搞定所有侧边栏的显示逻辑
 create_common_sidebar()
@@ -15,6 +15,10 @@ st.set_page_config(
     page_icon="🚀",
     layout="wide"
 )
+
+# --- 初始化数据库 ---
+# 在应用启动时，确保反馈表已经创建
+setup_database()
 
 # import streamlit.components.v1 as components
 # from shared.particles_component import particles_js_code
@@ -113,8 +117,11 @@ st.markdown("---")
 show_changelog()
 st.markdown("---")
 
+
+
 # --- 5. 联系与反馈 ---
-# render_feedback_section() # <-- 2. 在这里调用函数
+# 只需调用这一个函数，即可显示整个反馈模块（包括输入表单和历史记录）
+show_feedback_module()
 
 # --- 5. 友情链接 ---
 st.subheader("🔗 友情链接")
