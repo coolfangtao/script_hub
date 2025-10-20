@@ -36,7 +36,7 @@ def shin_chan_animation(
     # 新的、更复杂的“随机”行走动画（带停顿）
     random_walk_keyframes = f"""
         @keyframes random-walk {{
-            0%      {{ transform: translateX(-{size_pixels + 50}px) scaleX(1); }} /* 从左边屏幕外开始 */
+            0%      {{ transform: translateX(-{size_pixels}px) scaleX(1); }} /* 从左边屏幕外开始 */
             15%     {{ transform: translateX(30vw) scaleX(1); }} /* 走到屏幕30%处 */
             20%     {{ transform: translateX(30vw) scaleX(1); }} /* 在30%处停顿 */
             35%     {{ transform: translateX(85vw) scaleX(1); }} /* 快速走到屏幕85%处 */
@@ -44,7 +44,7 @@ def shin_chan_animation(
             45%     {{ transform: translateX(85vw) scaleX(-1); }} /* 转身 */
             60%     {{ transform: translateX(20vw) scaleX(-1); }} /* 走回屏幕20%处 */
             65%     {{ transform: translateX(20vw) scaleX(-1); }} /* 在20%处停顿 */
-            85%     {{ transform: translateX(-{size_pixels + 50}px) scaleX(-1); }} /* 走回左边屏幕外 */
+            85%     {{ transform: translateX(-{size_pixels}px) scaleX(-1); }} /* 走回左边屏幕外 */
             100%    {{ transform: translateX(-{size_pixels + 50}px) scaleX(1); }} /* 转身，为下一次循环做准备 */
         }}
     """
