@@ -1,10 +1,7 @@
 import streamlit as st
 import difflib
-from streamlit.components.v1 import html
-
-# 从你的共享库中导入侧边栏函数 (这部分保持不变)
-# from shared.sidebar import create_common_sidebar
-# create_common_sidebar()
+from shared.sidebar import create_common_sidebar
+create_common_sidebar()
 
 # --- 1. 页面基础配置 ---
 st.set_page_config(
@@ -138,8 +135,3 @@ if st.button("🚀 开始对比", type="primary", use_container_width=True):
         # 使用 st.markdown 来渲染HTML表格，这样它就可以应用我们之前注入的CSS
         # 相比 st.components.v1.html, markdown 在这种场景下与页面主题的融合度更好
         st.markdown(diff_table_html, unsafe_allow_html=True)
-
-st.divider()
-
-# --- 6. 页脚 ---
-st.markdown("Made with ❤️ TF`")
