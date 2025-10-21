@@ -183,22 +183,21 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
     with col_img:
         st.subheader(f"图片: {image_file.name}", divider='rainbow')
         img = Image.open(image_file)
-        st.image(img, caption="上传的EDS截图", use_container_width=True)
+        st.image(img, caption="上传的EDS截图", use_column_width=True)
 
-    with col_results:
-        st.subheader("分析结果", divider='rainbow')
+    # 首先调用API获取结果
+    response_text, duration = get_gemini_response(img, prompt, model_name)
 
-        # 调用API获取结果
-        response_text, duration = get_gemini_response(img, prompt, model_name)
+    if response_text:
+        # 在右侧列中显示主要的分析结果
+        with col_results:
+            st.subheader("分析结果", divider='rainbow')
 
-        if response_text:
             # 提取数据为DataFrame
             eds_df = extract_eds_data_to_dataframe(response_text)
 
             # 使用Metric展示关键信息
             st.metric(label="AI模型调用耗时", value=f"{duration:.2f} 秒")
-
-            st.info("下方表格中的数据是可编辑的。修改后，下方的分类结果将自动更新。")
 
             # 如果AI未能提取任何数据，则提供一个空模板
             if eds_df.empty:
@@ -225,10 +224,16 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
             # 使用st.success突出显示最终分类结果
             st.success(f"**最终杂质分类:** {final_classification}")
 
-            # 提供一个可展开的区域来显示原始的AI响应文本，方便调试
-            with st.expander("查看AI模型原始返回文本"):
-                st.markdown(response_text)
-        else:
+        # --- 修改之处 ---
+        # 将expander移到列布局的外部，使其占据整个宽度
+        # 这段代码现在位于 col_img 和 col_results 之下
+        with st.expander("查看AI模型原始返回文本"):
+            st.markdown(response_text)
+
+    else:
+        # 如果API调用失败，仍然在右侧列显示错误信息
+        with col_results:
+            st.subheader("分析结果", divider='rainbow')
             st.error("无法获取AI模型的响应，请检查您的API密钥、网络连接或图片是否有效。")
 
 
