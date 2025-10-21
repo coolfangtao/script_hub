@@ -35,6 +35,10 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/4_提取B站标题.py"
         },
         {
+            "label": "读书笔记整理",
+            "path": r"pages/4_读书笔记转markdown文档.py"
+        },
+        {
             "label": "文字转语音",
             "path": r"pages/3_文本转语音.py"
         },
