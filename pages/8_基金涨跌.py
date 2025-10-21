@@ -154,8 +154,8 @@ with placeholder.container():
             with col:
                 st.metric(
                     label=f"{data['基金名称']} ({data['基金代码']})",
-                    delta=f"{data['涨跌幅(%)']:.2f}% ( {data['涨跌额']} )",
-                    value = f"{data['最新价']:.3f}"
+                    value=f"{data['最新价']:.3f}",
+                    delta=f"{data['涨跌幅(%)']:.2f}% ( {data['涨跌额']} )"
                 )
 
         st.divider()
@@ -209,7 +209,7 @@ with placeholder.container():
             return 'color: black;'
 
 
-        styled_df = display_df[['基金代码', '基金名称', '最新价', '昨收', '涨跌幅(%)', '数据日期', '数据时间']].style.apply(
+        styled_df = display_df[['基金代码', '基金名称', '涨跌幅(%)', '最新价', '昨收', '数据日期', '数据时间']].style.apply(
             lambda col: col.map(color_change), subset=['涨跌幅(%)']
         ).format({"最新价": "{:.3f}", "昨收": "{:.3f}"})
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
