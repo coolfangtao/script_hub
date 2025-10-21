@@ -174,75 +174,40 @@ def setup_ui():
     return api_key, model_name, uploaded_files, analyze_button
 
 
-def display_elemental_composition_chart(df: pd.DataFrame):
+def display_elemental_composition_chart(df: pd.DataFrame, image_index: int):
     """
     在Streamlit中创建一个可折叠区域，并使用Plotly Express绘制左右两列、
     具有水平轴标签的条形图，分别展示元素的质量和原子百分比。
 
     Args:
-        df (pd.DataFrame): 包含元素分析数据的DataFrame，
-                           需要有 '元素', '质量百分比(%)', 和 '原子百分比(%)' 这几列。
+        df (pd.DataFrame): 包含元素分析数据的DataFrame。
+        image_index (int): 当前图片的索引，用于生成唯一的组件key。
     """
-    # 确保DataFrame不为空且包含所需列
     if df is not None and not df.empty and all(col in df.columns for col in ['元素', '质量百分比(%)', '原子百分比(%)']):
         with st.expander("📊 图表分析：元素组成", expanded=True):
             col_mass, col_atomic = st.columns(2)
 
-            # --- 左侧列: 质量百分比图表 ---
             with col_mass:
                 st.subheader("质量百分比 (%)", anchor=False, divider='blue')
+                fig_mass = px.bar(df, x='元素', y='质量百分比(%)', title="质量百分比构成", labels={'元素': '元素', '质量百分比(%)': '百分比'},
+                                  text='质量百分比(%)')
+                fig_mass.update_layout(title_font_size=18, xaxis_title_font_size=16, yaxis_title_font_size=16,
+                                       xaxis_tickangle=0)
+                fig_mass.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
 
-                # 使用 Plotly Express 创建条形图
-                fig_mass = px.bar(
-                    df,
-                    x='元素',
-                    y='质量百分比(%)',
-                    title="质量百分比构成",
-                    labels={'元素': '元素', '质量百分比(%)': '百分比'},  # 自定义轴标签
-                    text='质量百分比(%)'  # 在条形图上显示数值
-                )
+                # 添加唯一的 key
+                st.plotly_chart(fig_mass, use_container_width=True, key=f"mass_chart_{image_index}")
 
-                # 更新图表布局和样式
-                fig_mass.update_layout(
-                    title_font_size=18,
-                    xaxis_title_font_size=16,
-                    yaxis_title_font_size=16,
-                    xaxis_tickangle=0  # 强制X轴标签水平显示
-                )
-                # 更新条形图上的文本样式
-                fig_mass.update_traces(
-                    texttemplate='%{text:.2f}%',  # 格式化文本，显示两位小数并加百分号
-                    textposition='outside'  # 将文本放在条形图的外部
-                )
-
-                # 在Streamlit中显示Plotly图表
-                st.plotly_chart(fig_mass, use_container_width=True)
-
-            # --- 右侧列: 原子百分比图表 ---
             with col_atomic:
                 st.subheader("原子百分比 (%)", anchor=False, divider='green')
+                fig_atomic = px.bar(df, x='元素', y='原子百分比(%)', title="原子百分比构成", labels={'元素': '元素', '原子百分比(%)': '百分比'},
+                                    text='原子百分比(%)')
+                fig_atomic.update_layout(title_font_size=18, xaxis_title_font_size=16, yaxis_title_font_size=16,
+                                         xaxis_tickangle=0)
+                fig_atomic.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
 
-                fig_atomic = px.bar(
-                    df,
-                    x='元素',
-                    y='原子百分比(%)',
-                    title="原子百分比构成",
-                    labels={'元素': '元素', '原子百分比(%)': '百分比'},
-                    text='原子百分比(%)'
-                )
-
-                fig_atomic.update_layout(
-                    title_font_size=18,
-                    xaxis_title_font_size=16,
-                    yaxis_title_font_size=16,
-                    xaxis_tickangle=0
-                )
-                fig_atomic.update_traces(
-                    texttemplate='%{text:.2f}%',
-                    textposition='outside'
-                )
-
-                st.plotly_chart(fig_atomic, use_container_width=True)
+                # 添加唯一的 key
+                st.plotly_chart(fig_atomic, use_container_width=True, key=f"atomic_chart_{image_index}")
 
             st.caption("上方图表分别展示了识别出的各种元素的质量百分比与原子百分比。可将鼠标悬停在条形图上查看详细数据。")
 
@@ -325,7 +290,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
         # 这个代码块现在位于 col_results 的外面，因此它将占据全部可用宽度
         if response_text and not df_template.empty:
             # 调用图表函数，它会创建一个全宽的折叠区域
-            display_elemental_composition_chart(df_template)
+            display_elemental_composition_chart(df_template, image_index=image_index)
 
             # 将原始文本的折叠区域也放在这里，保持布局一致性
             with st.expander("查看AI模型原始返回文本"):
