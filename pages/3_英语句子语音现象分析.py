@@ -7,6 +7,8 @@ import os
 import google.generativeai as genai
 from typing import Optional
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
+from shared.config import Config
+cfg = Config()
 
 # --- 页面和侧边栏配置 ---
 # 配置页面信息
@@ -143,7 +145,7 @@ def process_and_display_results(sentence: str, selected_model: str):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        audio_file_path = loop.run_until_complete(generate_tts(sentence))
+        audio_file_path = loop.run_until_complete(generate_tts(sentence, voice=cfg.DEFAULT_VOICE_NAME))
 
         if audio_file_path and os.path.exists(audio_file_path):
             st.success("语音生成成功！")
@@ -184,7 +186,7 @@ def main():
     selected_model = st.selectbox(
         "**请选择一个分析模型：**",
         options=MODEL_OPTIONS,
-        index=MODEL_OPTIONS.index("gemini-2.0-flash")  # 默认选中 'gemini-2.0-flash'
+        index=MODEL_OPTIONS.index(cfg.ANALYSIS_DEFAULT_MODEL)  # 默认选中 'gemini-2.0-flash'
     )
 
     with st.form("input_form"):
@@ -198,7 +200,7 @@ def main():
     if submitted:
         # 从secrets读取API密钥
         try:
-            api_key = st.secrets["API_KEY"]
+            api_key = st.secrets[cfg.GEMINI_API_KEY]
             genai.configure(api_key=api_key)
         except (KeyError, FileNotFoundError):
             st.error("操作失败：未在 Streamlit secrets 中找到名为 'API_KEY' 的 Gemini API 密钥。", icon="🚫")

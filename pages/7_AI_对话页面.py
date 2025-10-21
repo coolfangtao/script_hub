@@ -1,6 +1,8 @@
 import streamlit as st
 import google.generativeai as genai
 from shared.sidebar import create_common_sidebar # 导入公共侧边栏函数
+from shared.config import Config
+cfg = Config()
 
 # --- 页面配置和侧边栏 ---
 st.set_page_config(
@@ -12,7 +14,7 @@ create_common_sidebar() # 调用函数创建侧边栏
 # --- API 密钥配置 ---
 # 从 Streamlit secrets 中获取 API 密钥
 try:
-    api_key = st.secrets["API_KEY"]
+    api_key = st.secrets[cfg.GEMINI_API_KEY]
     genai.configure(api_key=api_key)
 except (KeyError, FileNotFoundError):
     st.error("Gemini API 密钥未找到。请在 Streamlit secrets 中设置名为 'API_KEY' 的密钥。")

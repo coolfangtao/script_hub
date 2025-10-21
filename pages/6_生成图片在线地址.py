@@ -2,14 +2,14 @@
 import streamlit as st
 import requests
 import base64
+from shared.config import Config
 from shared.sidebar import create_common_sidebar # 导入公共侧边栏函数
-create_common_sidebar() # 调用函数创建侧边栏
+cfg = Config()
+create_common_sidebar()  # 调用函数创建侧边栏
 
 # --- 从 Streamlit Secrets 中安全地获取 API Key ---
-# 前提：您需要在项目目录下创建 .streamlit/secrets.toml 文件
-# 并在其中定义 IMGBB_API_KEY = "您的密钥"
 try:
-    IMGBB_API_KEY = st.secrets["IMGBB_API_KEY"]
+    IMGBB_API_KEY = st.secrets[cfg.IMGBB_API_KEY]
 except KeyError:
     # 如果在secrets中找不到key，则设置为None，以便后续处理
     IMGBB_API_KEY = None

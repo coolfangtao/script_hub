@@ -26,10 +26,6 @@ def load_ocr_reader(languages=['ch_sim', 'en']):
 
 
 # --- 2. 核心功能函数 (解耦) ---
-
-# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-# vvvvvvvv 我们只修改下面这个函数 vvvvvvvvv
-# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 def ocr_and_translate_text(image_np, ocr_reader, target_language='en'):
     """
     对图像进行OCR识别，并仅翻译识别出的中文文本。
@@ -68,11 +64,6 @@ def ocr_and_translate_text(image_np, ocr_reader, target_language='en'):
         })
 
     return translated_results
-
-
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# ^^^^^^^^^^^ 以上是唯一的修改部分 ^^^^^^^^^^^^^
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 def remove_original_text(image_np, ocr_results):
