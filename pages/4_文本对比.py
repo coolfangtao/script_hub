@@ -1,5 +1,6 @@
 import streamlit as st
 import difflib
+import re
 from streamlit.components.v1 import html
 
 # --- 1. 页面基础配置 ---
@@ -9,7 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 2. 自定义CSS样式 (核心优化) ---
+# --- 2. 自定义CSS样式 ---
 # 这段CSS是解决你截图中显示问题的关键。
 # 它覆盖了difflib的默认样式，并使用 [data-theme="dark"] 选择器来专门为Streamlit的深色主题优化颜色。
 CUSTOM_CSS = """
@@ -21,7 +22,7 @@ CUSTOM_CSS = """
         font-size: 0.9rem;
         border: 1px solid #444; /* 为表格增加一个细边框 */
     }
-    /* 表格头部 (原始文本, 修改后文本) */
+    /* 表格头部 (图例) */
     table.diff th {
         background-color: #f0f2f6; /* 浅色模式下的背景 */
         color: #333;
@@ -71,11 +72,14 @@ st.title("🔎 文本对比工具 (Diff Checker)")
 st.markdown("一个简单的小工具，用于比较两段文本之间的差异。请在下方左右两个文本框中输入或粘贴内容，然后点击“开始对比”按钮。")
 
 with st.expander("💡 使用说明"):
-    st.info("""
-        - **<span style="background-color: rgba(40, 167, 69, 0.2); padding: 2px 5px; border-radius: 3px;">绿色背景</span>**: 表示新增的内容。
-        - **<span style="background-color: rgba(255, 193, 7, 0.2); padding: 2px 5px; border-radius: 3px;">黄色背景</span>**: 表示被修改的内容行。
-        - **<span style="background-color: rgba(220, 53, 69, 0.2); padding: 2px 5px; border-radius: 3px;">红色背景</span>**: 表示被删除的内容。
-    """, icon="🎨")
+    # FIX 1: 使用st.markdown并设置unsafe_allow_html=True来正确渲染HTML标签
+    st.markdown("""
+        <ul>
+            <li><span style="background-color: rgba(40, 167, 69, 0.2); padding: 2px 5px; border-radius: 3px;">绿色背景</span>: 表示新增的内容。</li>
+            <li><span style="background-color: rgba(255, 193, 7, 0.2); padding: 2px 5px; border-radius: 3px;">黄色背景</span>: 表示被修改的内容行。</li>
+            <li><span style="background-color: rgba(220, 53, 69, 0.2); padding: 2px 5px; border-radius: 3px;">红色背景</span>: 表示被删除的内容。</li>
+        </ul>
+    """, unsafe_allow_html=True)
 st.divider()
 
 # --- 4. 核心功能区 ---
@@ -123,18 +127,25 @@ if st.button("🚀 开始对比", type="primary", use_container_width=True):
         # 使用 difflib.HtmlDiff
         d = difflib.HtmlDiff(wrapcolumn=80)
 
-        # 关键改动：使用 make_table() 而不是 make_file()
-        # make_table() 只生成 <table>...</table> 部分，不包含样式，这样我们自己的CSS才能生效
-        diff_html = d.make_table(
+        # FIX 2: 使用 make_file() 生成包含高亮信息的完整HTML，然后提取其<body>部分
+        # 这样既能获得带CSS类的表格，又能避免与Streamlit的样式冲突。
+        full_diff_html = d.make_file(
             fromlines=text1_lines,
             tolines=text2_lines,
             fromdesc='原始文本',
             todesc='修改后文本'
         )
 
+        # 使用正则表达式提取<body>标签内的所有内容
+        body_content_match = re.search(r'<body>(.*)</body>', full_diff_html, re.DOTALL)
+        if body_content_match:
+            diff_body = body_content_match.group(1).strip()
+        else:
+            diff_body = "<p>错误：无法提取对比结果。</p>"
+
         st.divider()
         st.subheader("📊 对比结果")
 
-        # 使用 st.components.v1.html 来渲染HTML，并允许滚动
-        # 相比 st.markdown，html组件在处理复杂表格时更稳定
-        html(diff_html, height=400, scrolling=True)
+        # 使用 st.components.v1.html 来渲染提取出的HTML，并允许滚动
+        # 你的自定义CSS现在可以正确应用到这个带有高亮类的表格上了
+        html(diff_body, height=400, scrolling=True)
