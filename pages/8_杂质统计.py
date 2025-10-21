@@ -214,8 +214,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
 
             # 提供一个可展开的区域来显示原始的AI响应文本，方便调试
             with st.expander("查看AI模型原始返回文本"):
-                st.markdown("**AI原始响应（Markdown格式）:**")
-                st.code(response_text, language="markdown")
+                st.markdown(response_text)
         else:
             st.error("无法获取AI模型的响应，请检查您的API密钥、网络连接或图片是否有效。")
 
