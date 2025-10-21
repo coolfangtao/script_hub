@@ -2,6 +2,8 @@ import streamlit as st
 import difflib
 import re
 from streamlit.components.v1 import html
+from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # --- 1. 页面基础配置 ---
 st.set_page_config(
