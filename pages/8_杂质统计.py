@@ -193,12 +193,18 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
         with col_results:
             st.subheader("分析结果", divider='rainbow')
 
+            # 1. 创建两列用于并排显示指标
+            metric_col1, metric_col2 = st.columns(2)
+
+            # 2. 在第一列显示API耗时
+            with metric_col1:
+                st.metric(label="AI模型调用耗时", value=f"{duration:.2f} 秒")
+
+            # 3. 在第二列创建一个空的占位符，稍后用来填充分类结果
+            classification_placeholder = metric_col2.empty()
+
             # 提取数据为DataFrame
             eds_df = extract_eds_data_to_dataframe(response_text)
-
-            # 使用Metric展示关键信息
-            st.metric(label="AI模型调用耗时", value=f"{duration:.2f} 秒")
-            classification_placeholder = st.empty()
 
             # 如果AI未能提取任何数据，则提供一个空模板
             if eds_df.empty:
@@ -212,17 +218,24 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
             else:
                 df_template = eds_df
 
-            # 创建可编辑的数据表格，使用唯一的key
+            # 创建可编辑的数据表格
             edited_df = st.data_editor(
                 df_template,
                 num_rows="dynamic",
-                key=f"editor_{image_index}"  # 为每个编辑器设置唯一key
+                key=f"editor_{image_index}"
             )
 
             # 使用编辑后的数据进行分类
             final_classification = classify_inclusion(edited_df)
-            classification_placeholder.success(f"**最终杂质分类:** {final_classification}")
 
+            # --- 主要改动开始 ---
+            # 4. 将最终的分类结果填充到之前创建的占位符中
+            #    使用 Streamlit 的 Markdown 语法 `:green[]` 来使文本变绿
+            #    并用 `** **` 加粗字体
+            classification_placeholder.metric(
+                label="最终杂质分类",
+                value=f":green[**{final_classification}**]"
+            )
 
         with st.expander("查看AI模型原始返回文本"):
             st.markdown(response_text)
