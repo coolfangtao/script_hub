@@ -87,7 +87,7 @@ class Config:
             "gemini-2.0-flash-lite",  # 可用，9.62秒
             "gemini-2.5-flash-lite",  # 可用，2.15秒
             "gemini-2.5-flash",  # 可用，6.74秒
-            "gemini-robotics-er-1.5-preview",
+            "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
             "gemma-3-12b",
             "gemma-3-1b",
             "gemma-3-27b",

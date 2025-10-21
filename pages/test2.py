@@ -39,7 +39,7 @@ def get_gemini_response(image, prompt):
     """
     start_time = time.time()  # 记录开始时间
     try:
-        model = genai.GenerativeModel('gemini-robotics-er-1.5-preview')
+        model = genai.GenerativeModel('gemma-3-12b')
         response = model.generate_content([prompt, image], stream=True)
         response.resolve()
         end_time = time.time()  # 记录结束时间
