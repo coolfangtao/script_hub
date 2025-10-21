@@ -154,8 +154,8 @@ with placeholder.container():
             with col:
                 st.metric(
                     label=f"{data['基金名称']} ({data['基金代码']})",
-                    value=f"{data['最新价']:.3f}",
-                    delta=f"{data['涨跌幅(%)']:.2f}% ( {data['涨跌额']} )"
+                    delta=f"{data['涨跌幅(%)']:.2f}% ( {data['涨跌额']} )",
+                    value = f"{data['最新价']:.3f}"
                 )
 
         st.divider()
