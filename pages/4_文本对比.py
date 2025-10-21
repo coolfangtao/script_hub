@@ -130,7 +130,7 @@ def main():
             "输入原始文本",
             height=300,
             key="original",
-            value="Streamlit is an open-source Python library that makes it easy to create and share beautiful, custom web apps for machine learning and data science."
+            value="这是第一行。\n这是第二行，内容相同。\n这是将被修改的第三行。"
         )
 
     with col2:
@@ -139,7 +139,7 @@ def main():
             "输入修改后的文本",
             height=300,
             key="modified",
-            value="Streamlit is a great open-source library that makes it simple to build and share powerful web apps for data science."
+            value="这是第1行。\n这是第二行，内容不相同。\n这是被修改过的第三行。"
         )
 
     if st.button("🔍 对比文本", use_container_width=True):
