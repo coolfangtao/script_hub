@@ -36,7 +36,7 @@ def initialize_session_state():
         st.session_state.selected_model = None
 
 
-# --- BUG 1 FIX: 创建一个专门的清除历史记录的函数 ---
+# --- 专门的清除历史记录的函数 ---
 def clear_chat_history():
     """清除所有聊天记录和相关的会话状态"""
     st.session_state.messages = []
@@ -79,7 +79,7 @@ def main():
                 st.toast(f"模型已切换，新的对话开始啦！", icon="🔄")
 
         selected_model = st.selectbox(
-            "请选择一个 AI 模型:",
+            "AI 模型:",  # 简化标签
             options=MODEL_OPTIONS,
             key="model_selector",
             on_change=on_model_change,
@@ -110,7 +110,7 @@ def main():
                 with st.spinner("AI 正在思考中..."):
                     model = genai.GenerativeModel(selected_model)
 
-                    # --- BUG 2 FIX: 使用 st.session_state.messages 作为唯一可信的历史来源 ---
+                    # --- 使用 st.session_state.messages 作为唯一可信的历史来源 ---
                     # 转换我们的消息格式为 Gemini API 需要的格式
                     # Gemini API 使用 'model' 代表 'assistant'
                     gemini_history = [
