@@ -147,11 +147,11 @@ def setup_ui():
                 "🤖 请选择AI模型",
                 options=cfg.ZAZHI_JIANCE_GEMINI_MODEL_OPTIONS,
                 index=0,  # 默认选择第一个
-                help="推荐使用 'gemini-1.5-flash-latest' 以获得更快的速度和更优的性能。"
+                help="推荐使用 'gemini-2.5-flash-lite' 以获得更快的速度和更优的性能。"
             )
 
         uploaded_files = st.file_uploader(
-            "📂 请上传EDS分析截图",
+            "📂 请上传EDS分析截图，至少要包含完整的元素质量数据",
             type=['png', 'jpg', 'jpeg', 'bmp', 'webp'],
             accept_multiple_files=True
         )
@@ -186,7 +186,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
             # 使用Metric展示关键信息
             st.metric(label="AI模型调用耗时", value=f"{duration:.2f} 秒")
 
-            st.info("下方表格中的数据是可编辑的。修改后，下方的分类结果将自动更新。")
+            # st.info("下方表格中的数据是可编辑的。修改后，下方的分类结果将自动更新。")
 
             # 将字典转换为DataFrame以便于使用st.data_editor
             if eds_data_dict:
