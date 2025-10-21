@@ -88,9 +88,6 @@ class Config:
             "gemini-2.5-flash-lite",  # 可用，2.15秒
             "gemini-2.5-flash",  # 可用，6.74秒
             "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
-            "gemini-2.0-flash-live",
-            "gemini-2.5-flash-live",
-            "gemini-2.5-flash-native-audio-dialog"
         ]
 
     def get(self, key, default=None):
