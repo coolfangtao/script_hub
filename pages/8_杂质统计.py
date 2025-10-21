@@ -61,10 +61,10 @@ def extract_eds_data_to_dataframe(markdown_text: str) -> pd.DataFrame:
         markdown_text: 包含Markdown表格的字符串。
 
     Returns:
-        一个Pandas DataFrame，包含'元素', '原子百分比(%)', 和 '质量百分比(%)' 列。
+        一个Pandas DataFrame，包含'元素', '质量百分比(%)', 和 '原子百分比(%)' 列。
     """
     if not isinstance(markdown_text, str):
-        return pd.DataFrame(columns=['元素', '原子百分比(%)', '质量百分比(%)'])
+        return pd.DataFrame(columns=['元素', '质量百分比(%)', '原子百分比(%)'])
 
     elements, atomic_percents, mass_percents = [], [], []
     lines = markdown_text.strip().split('\n')
@@ -73,31 +73,31 @@ def extract_eds_data_to_dataframe(markdown_text: str) -> pd.DataFrame:
     for line in lines[2:]:
         parts = [p.strip() for p in line.split('|') if p.strip()]
 
-        # 确保行中有足够的数据列 (元素, 原子%, 质量%)
+        # 确保行中有足够的数据列 (元素, 质量%, 原子%)
         if len(parts) < 3:
             continue
 
         element = parts[0]
-        atomic_percent_str = parts[1]
-        mass_percent_str = parts[2]
+        mass_percent_str = parts[1]
+        atomic_percent_str = parts[2]
 
         # 如果是总计行，则停止解析
         if '总计' in element or 'Total' in element:
             break
 
         # 使用正则表达式提取数值
-        atomic_match = re.search(r'(\d+\.\d+|\d+)', atomic_percent_str)
         mass_match = re.search(r'(\d+\.\d+|\d+)', mass_percent_str)
+        atomic_match = re.search(r'(\d+\.\d+|\d+)', atomic_percent_str)
 
-        if element and atomic_match and mass_match:
+        if element and mass_match and atomic_match:
             elements.append(element)
-            atomic_percents.append(float(atomic_match.group(1)))
             mass_percents.append(float(mass_match.group(1)))
+            atomic_percents.append(float(atomic_match.group(1)))
 
     df = pd.DataFrame({
         '元素': elements,
-        '原子百分比(%)': atomic_percents,
-        '质量百分比(%)': mass_percents
+        '质量百分比(%)': mass_percents,
+        '原子百分比(%)': atomic_percents
     })
     return df
 
@@ -159,7 +159,7 @@ def setup_ui():
                 "🤖 请选择AI模型",
                 options=cfg.ZAZHI_JIANCE_GEMINI_MODEL_OPTIONS,
                 index=0,  # 默认选择第一个
-                help="推荐使用 'gemini-1.5-flash' 以获得更快的速度和更优的性能。"
+                help="推荐使用 'gemini-2.5-flash-lite' 以获得更快的速度和更优的性能。"
             )
 
         uploaded_files = st.file_uploader(
@@ -206,8 +206,8 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
                 # 创建一个包含所有必需列的空模板
                 df_template = pd.DataFrame({
                     '元素': ['C', 'O', 'Al', 'Ti'],
-                    '原子百分比(%)': [0.0, 0.0, 0.0, 0.0],
-                    '质量百分比(%)': [0.0, 0.0, 0.0, 0.0]
+                    '质量百分比(%)': [0.0, 0.0, 0.0, 0.0],
+                    '原子百分比(%)': [0.0, 0.0, 0.0, 0.0]
                 })
             else:
                 df_template = eds_df
