@@ -18,6 +18,7 @@ import time
 import re
 from PIL import Image
 import pandas as pd
+import plotly.express as px
 from shared.config import Config
 from shared.sidebar import create_common_sidebar
 
@@ -175,37 +176,75 @@ def setup_ui():
 
 def display_elemental_composition_chart(df: pd.DataFrame):
     """
-    在Streamlit中创建一个可折叠区域，并使用左右两列分别展示元素的质量和原子百分比的条形图。
+    在Streamlit中创建一个可折叠区域，并使用Plotly Express绘制左右两列、
+    具有水平轴标签的条形图，分别展示元素的质量和原子百分比。
 
     Args:
         df (pd.DataFrame): 包含元素分析数据的DataFrame，
                            需要有 '元素', '质量百分比(%)', 和 '原子百分比(%)' 这几列。
     """
-    # 确保DataFrame不为空且包含所需列，避免在空数据时显示图表
+    # 确保DataFrame不为空且包含所需列
     if df is not None and not df.empty and all(col in df.columns for col in ['元素', '质量百分比(%)', '原子百分比(%)']):
-        # 使用 expanded=True 让折叠区域默认展开，方便用户直接查看
         with st.expander("📊 图表分析：元素组成", expanded=True):
-            # 1. 创建两列来实现并排布局
             col_mass, col_atomic = st.columns(2)
 
             # --- 左侧列: 质量百分比图表 ---
             with col_mass:
                 st.subheader("质量百分比 (%)", anchor=False, divider='blue')
-                # 准备仅包含质量百分比的数据
-                # 将“元素”设为索引，这样它会成为图表的x轴标签
-                mass_chart_data = df.set_index('元素')[['质量百分比(%)']]
-                # 绘制图表，use_container_width=True使其填满列宽
-                st.bar_chart(mass_chart_data, use_container_width=True)
+
+                # 使用 Plotly Express 创建条形图
+                fig_mass = px.bar(
+                    df,
+                    x='元素',
+                    y='质量百分比(%)',
+                    title="质量百分比构成",
+                    labels={'元素': '元素', '质量百分比(%)': '百分比'},  # 自定义轴标签
+                    text='质量百分比(%)'  # 在条形图上显示数值
+                )
+
+                # 更新图表布局和样式
+                fig_mass.update_layout(
+                    title_font_size=18,
+                    xaxis_title_font_size=16,
+                    yaxis_title_font_size=16,
+                    xaxis_tickangle=0  # 强制X轴标签水平显示
+                )
+                # 更新条形图上的文本样式
+                fig_mass.update_traces(
+                    texttemplate='%{text:.2f}%',  # 格式化文本，显示两位小数并加百分号
+                    textposition='outside'  # 将文本放在条形图的外部
+                )
+
+                # 在Streamlit中显示Plotly图表
+                st.plotly_chart(fig_mass, use_container_width=True)
 
             # --- 右侧列: 原子百分比图表 ---
             with col_atomic:
                 st.subheader("原子百分比 (%)", anchor=False, divider='green')
-                # 准备仅包含原子百分比的数据
-                atomic_chart_data = df.set_index('元素')[['原子百分比(%)']]
-                # 绘制图表
-                st.bar_chart(atomic_chart_data, use_container_width=True)
 
-            st.caption("上方图表分别展示了识别出的各种元素的质量百分比与原子百分比。")
+                fig_atomic = px.bar(
+                    df,
+                    x='元素',
+                    y='原子百分比(%)',
+                    title="原子百分比构成",
+                    labels={'元素': '元素', '原子百分比(%)': '百分比'},
+                    text='原子百分比(%)'
+                )
+
+                fig_atomic.update_layout(
+                    title_font_size=18,
+                    xaxis_title_font_size=16,
+                    yaxis_title_font_size=16,
+                    xaxis_tickangle=0
+                )
+                fig_atomic.update_traces(
+                    texttemplate='%{text:.2f}%',
+                    textposition='outside'
+                )
+
+                st.plotly_chart(fig_atomic, use_container_width=True)
+
+            st.caption("上方图表分别展示了识别出的各种元素的质量百分比与原子百分比。可将鼠标悬停在条形图上查看详细数据。")
 
 
 def process_and_display_image(image_file, prompt, model_name, image_index):
