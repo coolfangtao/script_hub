@@ -27,8 +27,6 @@ cfg = Config()
 
 
 # --- 核心功能函数 ---
-# 以下是您已经提供，并在此基础上进行整合和优化的函数。
-
 def get_gemini_response(image: Image.Image, prompt: str, model_name: str):
     """
     向 Gemini Pro Vision 模型发送图片和提示，并获取响应。
@@ -55,63 +53,77 @@ def get_gemini_response(image: Image.Image, prompt: str, model_name: str):
         return None, 0
 
 
-def extract_eds_data_to_dict(markdown_text: str) -> dict:
+def extract_eds_data_to_dataframe(markdown_text: str) -> pd.DataFrame:
     """
-    从包含EDS分析结果的Markdown表格字符串中提取元素和质量百分比。
+    从包含EDS分析结果的Markdown表格字符串中提取元素、质量百分比和原子百分比。
 
     Args:
         markdown_text: 包含Markdown表格的字符串。
 
     Returns:
-        一个字典，其中键是元素符号（字符串），值是质量百分比（浮点数）。
-        例如：{'C': 13.35, 'O': 19.33, ...}
+        一个Pandas DataFrame，包含'元素', '原子百分比(%)', 和 '质量百分比(%)' 列。
     """
     if not isinstance(markdown_text, str):
-        return {}
+        return pd.DataFrame(columns=['元素', '原子百分比(%)', '质量百分比(%)'])
 
-    element_data = {}
+    elements, atomic_percents, mass_percents = [], [], []
     lines = markdown_text.strip().split('\n')
 
     # 从第三行开始遍历，跳过表头和分隔线
     for line in lines[2:]:
-        # 使用'|'分割行内容
         parts = [p.strip() for p in line.split('|') if p.strip()]
 
-        # 确保行中有足够的数据列
+        # 确保行中有足够的数据列 (元素, 原子%, 质量%)
         if len(parts) < 3:
             continue
 
         element = parts[0]
+        atomic_percent_str = parts[1]
         mass_percent_str = parts[2]
 
         # 如果是总计行，则停止解析
         if '总计' in element or 'Total' in element:
             break
 
-        # 使用正则表达式提取'±'符号前的浮点数
-        # 这个正则表达式会匹配一个或多个数字，可能包含一个小数点
-        match = re.search(r'(\d+\.\d+|\d+)', mass_percent_str)
+        # 使用正则表达式提取数值
+        atomic_match = re.search(r'(\d+\.\d+|\d+)', atomic_percent_str)
+        mass_match = re.search(r'(\d+\.\d+|\d+)', mass_percent_str)
 
-        if match:
-            mass_percent_val = float(match.group(1))
-            element_data[element] = mass_percent_val
+        if element and atomic_match and mass_match:
+            elements.append(element)
+            atomic_percents.append(float(atomic_match.group(1)))
+            mass_percents.append(float(mass_match.group(1)))
 
-    return element_data
+    df = pd.DataFrame({
+        '元素': elements,
+        '原子百分比(%)': atomic_percents,
+        '质量百分比(%)': mass_percents
+    })
+    return df
 
 
-def classify_inclusion(eds_data: dict, threshold: float = 0.5) -> str:
+def classify_inclusion(eds_df: pd.DataFrame, threshold: float = 0.5) -> str:
     """
-    根据EDS定量分析结果和设定的优先级规则，对夹杂物进行分类。
+    根据EDS定量分析结果（DataFrame）和设定的优先级规则，对夹杂物进行分类。
     优先级规则: Ti/Nb > Al/Mg > La/Ce（稀土类） > Mn/S
     """
-    if not eds_data:
+    if eds_df.empty:
         return "无有效数据"
 
+    # 将元素列设为索引，以便快速查询
+    # 使用 .get(col, default_value) 来安全地访问列数据
+    def get_mass_percent(element):
+        if '元素' in eds_df.columns and '质量百分比(%)' in eds_df.columns:
+            element_row = eds_df[eds_df['元素'] == element]
+            if not element_row.empty:
+                return element_row['质量百分比(%)'].iloc[0]
+        return 0.0
+
     # 检查各种元素是否存在且超过阈值
-    has_ti_nb = eds_data.get('Ti', 0) > threshold or eds_data.get('Nb', 0) > threshold
-    has_al_mg = eds_data.get('Al', 0) > threshold or eds_data.get('Mg', 0) > threshold
-    has_la_ce = eds_data.get('La', 0) > threshold or eds_data.get('Ce', 0) > threshold
-    has_mn_s = eds_data.get('Mn', 0) > threshold or eds_data.get('S', 0) > threshold
+    has_ti_nb = get_mass_percent('Ti') > threshold or get_mass_percent('Nb') > threshold
+    has_al_mg = get_mass_percent('Al') > threshold or get_mass_percent('Mg') > threshold
+    has_la_ce = get_mass_percent('La') > threshold or get_mass_percent('Ce') > threshold
+    has_mn_s = get_mass_percent('Mn') > threshold or get_mass_percent('S') > threshold
 
     # 根据优先级返回分类结果
     if has_ti_nb:
@@ -147,7 +159,7 @@ def setup_ui():
                 "🤖 请选择AI模型",
                 options=cfg.ZAZHI_JIANCE_GEMINI_MODEL_OPTIONS,
                 index=0,  # 默认选择第一个
-                help="推荐使用 'gemini-2.5-flash-lite' 以获得更快的速度和更优的性能。"
+                help="推荐使用 'gemini-1.5-flash' 以获得更快的速度和更优的性能。"
             )
 
         uploaded_files = st.file_uploader(
@@ -180,34 +192,35 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
         response_text, duration = get_gemini_response(img, prompt, model_name)
 
         if response_text:
-            # 提取数据
-            eds_data_dict = extract_eds_data_to_dict(response_text)
+            # 提取数据为DataFrame
+            eds_df = extract_eds_data_to_dataframe(response_text)
 
             # 使用Metric展示关键信息
             st.metric(label="AI模型调用耗时", value=f"{duration:.2f} 秒")
 
-            # st.info("下方表格中的数据是可编辑的。修改后，下方的分类结果将自动更新。")
+            st.info("下方表格中的数据是可编辑的。修改后，下方的分类结果将自动更新。")
 
-            # 将字典转换为DataFrame以便于使用st.data_editor
-            if eds_data_dict:
-                df = pd.DataFrame(list(eds_data_dict.items()), columns=['元素', '质量百分比(%)'])
-            else:
-                # 如果AI未能提取任何数据，则提供一个空模板
+            # 如果AI未能提取任何数据，则提供一个空模板
+            if eds_df.empty:
                 st.warning("AI未能从图片中提取有效数据，请检查图片清晰度或在下方表格中手动输入。")
-                df = pd.DataFrame({'元素': ['C', 'O', 'Al', 'Ti'], '质量百分比(%)': [0.0, 0.0, 0.0, 0.0]})
+                # 创建一个包含所有必需列的空模板
+                df_template = pd.DataFrame({
+                    '元素': ['C', 'O', 'Al', 'Ti'],
+                    '原子百分比(%)': [0.0, 0.0, 0.0, 0.0],
+                    '质量百分比(%)': [0.0, 0.0, 0.0, 0.0]
+                })
+            else:
+                df_template = eds_df
 
             # 创建可编辑的数据表格，使用唯一的key
             edited_df = st.data_editor(
-                df,
+                df_template,
                 num_rows="dynamic",
                 key=f"editor_{image_index}"  # 为每个编辑器设置唯一key
             )
 
-            # 将编辑后的DataFrame转换回字典
-            edited_eds_data = dict(zip(edited_df['元素'], edited_df['质量百分比(%)']))
-
             # 使用编辑后的数据进行分类
-            final_classification = classify_inclusion(edited_eds_data)
+            final_classification = classify_inclusion(edited_df)
 
             # 使用st.success突出显示最终分类结果
             st.success(f"**最终杂质分类:** {final_classification}")
