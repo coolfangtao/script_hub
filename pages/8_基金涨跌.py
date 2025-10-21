@@ -203,9 +203,9 @@ with placeholder.container():
 
         def color_change(val):
             if val.startswith('+'):
-                return 'color: red;'
-            elif val.startswith('-'):
                 return 'color: green;'
+            elif val.startswith('-'):
+                return 'color: red;'
             return 'color: black;'
 
 
