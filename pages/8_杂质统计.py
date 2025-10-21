@@ -127,15 +127,15 @@ def classify_inclusion(eds_df: pd.DataFrame, threshold: float = 0.5) -> str:
 
     # 根据优先级返回分类结果
     if has_ti_nb:
-        return 'Ti、Nb 类夹杂物'
+        return 'Ti、Nb'
     elif has_al_mg:
-        return 'Al、Mg 类夹杂物'
+        return 'Al、Mg'
     elif has_la_ce:
-        return '稀土类夹杂物'
+        return '稀土'
     elif has_mn_s:
-        return 'MnS 类夹杂物'
+        return 'MnS'
     else:
-        return '其他类型'
+        return '其他'
 
 
 # --- Streamlit 界面渲染函数 ---
@@ -236,7 +236,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
             # 4. 使用 st.markdown 和 HTML 来创建自定义样式的指标，并填充到占位符中
             #    我们用HTML的<div>和<span>标签来精确控制标签和数值的字体大小、颜色和粗细
             styled_classification_html = f"""
-                        <div style="padding-top: 0.5rem;"> <div style="font-size: 0.875rem; color: rgba(49, 51, 63, 0.6); margin-bottom: 4px;">最终杂质分类</div>
+                        <div style="padding-top: 0.5rem;"> <div style="font-size: 0.875rem; color: #28a745; margin-bottom: 4px;">最终杂质分类</div>
                             <div style="font-size: 1.75rem; font-weight: 600; color: #28a745;">{final_classification}</div>
                         </div>
                         """
