@@ -189,22 +189,33 @@ def display_elemental_composition_chart(df: pd.DataFrame, image_index: int):
 
             with col_mass:
                 st.subheader("质量百分比 (%)", anchor=False, divider='blue')
-                fig_mass = px.bar(df, x='元素', y='质量百分比(%)', title="质量百分比构成", labels={'元素': '元素', '质量百分比(%)': '百分比'},
-                                  text='质量百分比(%)')
+                # 使用Viridis颜色方案，这是一个连续的彩色方案
+                fig_mass = px.bar(df, x='元素', y='质量百分比(%)', title="质量百分比构成",
+                                  labels={'元素': '元素', '质量百分比(%)': '百分比'},
+                                  text='质量百分比(%)',
+                                  color='质量百分比(%)',
+                                  color_continuous_scale='viridis')
                 fig_mass.update_layout(title_font_size=18, xaxis_title_font_size=16, yaxis_title_font_size=16,
                                        xaxis_tickangle=0)
                 fig_mass.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
+                # 隐藏颜色条，因为对于离散的分类数据可能不太合适
+                fig_mass.update_coloraxes(showscale=False)
 
                 # 添加唯一的 key
                 st.plotly_chart(fig_mass, use_container_width=True, key=f"mass_chart_{image_index}")
 
             with col_atomic:
                 st.subheader("原子百分比 (%)", anchor=False, divider='green')
-                fig_atomic = px.bar(df, x='元素', y='原子百分比(%)', title="原子百分比构成", labels={'元素': '元素', '原子百分比(%)': '百分比'},
-                                    text='原子百分比(%)')
+                # 使用Plasma颜色方案，与Viridis形成对比
+                fig_atomic = px.bar(df, x='元素', y='原子百分比(%)', title="原子百分比构成",
+                                    labels={'元素': '元素', '原子百分比(%)': '百分比'},
+                                    text='原子百分比(%)',
+                                    color='原子百分比(%)',
+                                    color_continuous_scale='plasma')
                 fig_atomic.update_layout(title_font_size=18, xaxis_title_font_size=16, yaxis_title_font_size=16,
                                          xaxis_tickangle=0)
                 fig_atomic.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
+                fig_atomic.update_coloraxes(showscale=False)
 
                 # 添加唯一的 key
                 st.plotly_chart(fig_atomic, use_container_width=True, key=f"atomic_chart_{image_index}")
