@@ -232,10 +232,16 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
             # 4. 将最终的分类结果填充到之前创建的占位符中
             #    使用 Streamlit 的 Markdown 语法 `:green[]` 来使文本变绿
             #    并用 `** **` 加粗字体
-            classification_placeholder.metric(
-                label="最终杂质分类",
-                value=f":green[**{final_classification}**]"
-            )
+            # --- 主要改动开始 ---
+            # 4. 使用 st.markdown 和 HTML 来创建自定义样式的指标，并填充到占位符中
+            #    我们用HTML的<div>和<span>标签来精确控制标签和数值的字体大小、颜色和粗细
+            styled_classification_html = f"""
+                        <div style="padding-top: 0.5rem;"> <div style="font-size: 0.875rem; color: rgba(49, 51, 63, 0.6); margin-bottom: 4px;">最终杂质分类</div>
+                            <div style="font-size: 1.75rem; font-weight: 600; color: #28a745;">{final_classification}</div>
+                        </div>
+                        """
+            classification_placeholder.markdown(styled_classification_html, unsafe_allow_html=True)
+            # --- 主要改动结束 ---
 
         with st.expander("查看AI模型原始返回文本"):
             st.markdown(response_text)
