@@ -12,3 +12,4 @@ deep-translator
 google-generativeai
 akshare
 libsql-client
+opencv-python
