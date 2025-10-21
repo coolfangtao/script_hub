@@ -183,7 +183,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
     with col_img:
         st.subheader(f"图片: {image_file.name}", divider='rainbow')
         img = Image.open(image_file)
-        st.image(img, caption="上传的EDS截图", use_column_width=True)
+        st.image(img, caption="上传的EDS截图", use_container_width=True)
 
     with col_results:
         st.subheader("分析结果", divider='rainbow')
