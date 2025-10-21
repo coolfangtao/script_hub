@@ -76,7 +76,7 @@ st.divider()
 if 'text1' not in st.session_state:
     st.session_state.text1 = "这是第一行。\n这是第二行，内容相同。\n这是将被修改的第三行。"
 if 'text2' not in st.session_state:
-    st.session_state.text2 = "这是第一行。\n这是第二行，内容相同。\n这是已经被修改过的第三行！"
+    st.session_state.text2 = "这是第一行！\n这是第二行，内容不相同。\n这是已被修改过的第三行。"
 
 # 创建左右两个并排的列
 col1, col2 = st.columns(2, gap="medium")
