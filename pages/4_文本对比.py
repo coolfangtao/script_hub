@@ -2,6 +2,8 @@ import streamlit as st
 import difflib
 import re
 from typing import List, Tuple
+from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
+create_common_sidebar()
 
 
 # --- CSS样式 (无需改动) ---
@@ -147,7 +149,7 @@ def main():
 
     # 使用一个更能体现字符级差异的示例文本
     sample_original = "这是第一行。\n这是第二行，内容相同。\n这是将被修改的第三行。"
-    sample_modified = "这是第一行。\n这是第二行，内容不同。\n这是被修改过的第三行。"
+    sample_modified = "这是第1行。\n这是第二行，内容不相同。\n这是被修改过的第三行。"
 
     col1, col2 = st.columns(2)
     with col1:
