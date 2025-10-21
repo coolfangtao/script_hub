@@ -81,14 +81,21 @@ class Config:
 
         # 杂质检测可用的AI模型
         self.ZAZHI_JIANCE_GEMINI_MODEL_OPTIONS = [
+            "gemini-2.5-flash-lite",  # 默认模型，可用，2.15秒
             "gemini-2.0-flash",  # 可用，5.11秒
             "gemini-2.5-pro",   # 可用，14.93秒
             "gemini-2.0-flash-exp",  # 可用，4.28秒
             "gemini-2.0-flash-lite",  # 可用，9.62秒
-            "gemini-2.5-flash-lite",  # 可用，2.15秒
             "gemini-2.5-flash",  # 可用，6.74秒
             "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
         ]
+        self.ZAZHI_JIANCE_GET_ELEMENTS_DATA_PROMPT = """
+                        请仔细分析提供的图片，该图片展示了X射线能谱（EDS）分析的结果界面。你的任务是从右上角的‘定量结果’表格中，提取所有检测到的元素的定量分析数据。
+                        对于表格中列出的每一个元素，请提取并清晰地列出以下两个数值：
+                        - 质量百分比（Mass %）： 提取该元素在‘质量%’列中的数值及其不确定度。
+                        - 原子百分比（Atomic %）： 提取该元素在‘原子%’列中的数值及其不确定度。
+                        请以 Markdown 表格的格式呈现这些数据，确保所有数值及其对应的不确定度都完整且准确地体现在输出中。同时，请注意表格底部的‘总计’行，提取其质量百分比和原子百分比的总和数值（应为100.00）作为完整性检查。
+                        """
 
     def get(self, key, default=None):
         """

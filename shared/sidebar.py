@@ -66,6 +66,10 @@ SCRIPTS_BY_GROUP = {
             "label": "杂质统计（测试中）",
             "path": r"pages/test2.py"
         },
+        {
+            "label": "杂质统计（正式版）",
+            "path": r"pages/8_杂质统计.py"
+        },
     ],
 }
 
