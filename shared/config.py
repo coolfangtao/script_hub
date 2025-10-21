@@ -85,7 +85,7 @@ class Config:
             "gemini-2.5-pro",   # 可用，14.93秒
             "gemini-2.0-flash-exp",  # 可用，4.28秒
             "gemini-2.0-flash-lite",  # 可用，9.62秒
-            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash-lite",  # 可用，2.15秒
             "gemini-2.5-flash-tts",
             "gemini-2.5-flash",
             "gemini-robotics-er-1.5-preview",
