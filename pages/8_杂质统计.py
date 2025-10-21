@@ -181,7 +181,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
     col_img, col_results = st.columns([1, 1.2])
 
     with col_img:
-        st.subheader(f"图片: {image_file.name}", divider='rainbow')
+        st.subheader(f"EDS图片: {image_file.name}", divider='rainbow')
         img = Image.open(image_file)
         st.image(img, caption="上传的EDS截图", use_container_width=True)
 
@@ -204,37 +204,41 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
             classification_placeholder = metric_col2.empty()
 
             # 提取数据为DataFrame
-            eds_df = extract_eds_data_to_dataframe(response_text)
+            df_template = extract_eds_data_to_dataframe(response_text)
 
             # 如果AI未能提取任何数据，则提供一个空模板
-            if eds_df.empty:
-                st.warning("AI未能从图片中提取有效数据，请检查图片清晰度或在下方表格中手动输入。")
-                # 创建一个包含所有必需列的空模板
-                df_template = pd.DataFrame({
-                    '元素': ['C', 'O', 'Al', 'Ti'],
-                    '质量百分比(%)': [0.0, 0.0, 0.0, 0.0],
-                    '原子百分比(%)': [0.0, 0.0, 0.0, 0.0]
+            if df_template.empty:
+                st.warning("AI未能从图片中提取有效数据，请检查图片清晰度。")
+                # 创建一个空的DataFrame，但包含正确的列名，以便后续代码正常运行
+                df_template = pd.DataFrame(columns=['元素', '质量百分比(%)', '原子百分比(%)'])
+
+            # 1. 因为表格变为不可编辑，所以我们直接用原始的 df_template 来进行分类
+            final_classification = classify_inclusion(df_template)
+
+            # 2. 计算总和
+            #    首先检查DataFrame是否为空，避免计算出错
+            if not df_template.empty:
+                mass_sum = df_template['质量百分比(%)'].sum()
+                atomic_sum = df_template['原子百分比(%)'].sum()
+
+                # 3. 创建一个包含总计信息的新DataFrame
+                #    为了让“总计”更突出，我们使用Markdown的加粗语法
+                total_row = pd.DataFrame({
+                    '元素': ['**总计**'],
+                    '质量百分比(%)': [mass_sum],
+                    '原子百分比(%)': [atomic_sum]
                 })
+
+                # 4. 将总计_df和原始_df合并成一个新的df用于显示
+                display_df = pd.concat([df_template, total_row], ignore_index=True)
             else:
-                df_template = eds_df
+                # 如果原始数据为空，则直接显示空的df_template
+                display_df = df_template
 
-            # 创建可编辑的数据表格
-            edited_df = st.data_editor(
-                df_template,
-                num_rows="dynamic",
-                key=f"editor_{image_index}"
-            )
+            # 5. 使用 st.dataframe() 来显示一个静态的、不可编辑的表格
+            st.dataframe(display_df, use_container_width=True)
 
-            # 使用编辑后的数据进行分类
-            final_classification = classify_inclusion(edited_df)
-
-            # --- 主要改动开始 ---
-            # 4. 将最终的分类结果填充到之前创建的占位符中
-            #    使用 Streamlit 的 Markdown 语法 `:green[]` 来使文本变绿
-            #    并用 `** **` 加粗字体
-            # --- 主要改动开始 ---
-            # 4. 使用 st.markdown 和 HTML 来创建自定义样式的指标，并填充到占位符中
-            #    我们用HTML的<div>和<span>标签来精确控制标签和数值的字体大小、颜色和粗细
+            # 将最终分类结果填充到顶部的占位符中
             styled_classification_html = f"""
                         <div style="padding-top: 0.5rem;"> <div style="font-size: 0.875rem; color: #28a745; margin-bottom: 4px;">最终杂质分类</div>
                             <div style="font-size: 1.75rem; font-weight: 600; color: #28a745;">{final_classification}</div>
