@@ -22,7 +22,7 @@ SCRIPTS_BY_GROUP = {
         },
         {
             "label": "Listing自动生成",
-            "path": r"pages/2_根据ASIN关键词结果自动生成Listing标题.py"
+            "path": r"pages/2_Listing生成.py"
         },
     ],
     "📝 文本处理": [
@@ -32,7 +32,7 @@ SCRIPTS_BY_GROUP = {
         },
         {
             "label": "文字转语音",
-            "path": r"pages/3_文字转语音.py"
+            "path": r"pages/3_文本转语音.py"
         },
         {
             "label": "文本对比",

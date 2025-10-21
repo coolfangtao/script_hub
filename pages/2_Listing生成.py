@@ -160,7 +160,7 @@ def main():
         if uploaded_file:
             df = load_data(uploaded_file)
             if df is not None:
-                with st.expander("点击查看已上传数据的前 5 行"):
+                with st.expander("点击查看已上传数据的前 5 行", expanded=True):
                     st.dataframe(df.head(), use_container_width=True)
 
                 if st.button("📝 分析数据并生成提示词", type="primary"):
