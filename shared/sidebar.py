@@ -15,7 +15,7 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/3_英语句子语音现象分析.py"
         },
         {
-            "label": "杂质统计（正式版）",
+            "label": "AI杂质统计",
             "path": r"pages/8_杂质统计.py"
         },
     ],
@@ -65,10 +65,6 @@ SCRIPTS_BY_GROUP = {
         {
             "label": "基金盯盘",
             "path": r"pages/8_基金涨跌.py"
-        },
-        {
-            "label": "杂质统计（测试中）",
-            "path": r"pages/test2.py"
         },
     ],
 }

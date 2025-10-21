@@ -183,7 +183,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
     with col_img:
         st.subheader(f"图片: {image_file.name}", divider='rainbow')
         img = Image.open(image_file)
-        st.image(img, caption="上传的EDS截图", use_column_width=True)
+        st.image(img, caption="上传的EDS截图", use_container_width=True)
 
     # 首先调用API获取结果
     response_text, duration = get_gemini_response(img, prompt, model_name)
@@ -224,9 +224,6 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
             # 使用st.success突出显示最终分类结果
             st.success(f"**最终杂质分类:** {final_classification}")
 
-        # --- 修改之处 ---
-        # 将expander移到列布局的外部，使其占据整个宽度
-        # 这段代码现在位于 col_img 和 col_results 之下
         with st.expander("查看AI模型原始返回文本"):
             st.markdown(response_text)
 
