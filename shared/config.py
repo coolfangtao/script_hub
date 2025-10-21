@@ -79,6 +79,30 @@ class Config:
             "gemini-2.5-flash-native-audio-dialog"
         ]
 
+        # 杂质检测可用的AI模型
+        self.ZAZHI_JIANCE_GEMINI_MODEL_OPTIONS = [
+            "gemini-2.0-flash",
+            "gemini-2.5-pro",
+            "gemini-2.0-flash-exp",
+            "gemini-2.0-flash-lite",
+            "gemini-2.0-flash-preview-image-generation",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash-tts",
+            "gemini-2.5-flash",
+            "gemini-robotics-er-1.5-preview",
+            "gemma-3-12b",
+            "gemma-3-1b",
+            "gemma-3-27b",
+            "gemma-3-2b",
+            "gemma-3-4b",
+            "learnim-2.0-flash-experimental",
+            "imagen-3.0-generate",
+            "veo-2.0-generate-001",
+            "gemini-2.0-flash-live",
+            "gemini-2.5-flash-live",
+            "gemini-2.5-flash-native-audio-dialog"
+        ]
+
     def get(self, key, default=None):
         """
         安全地获取一个配置项的值。
