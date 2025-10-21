@@ -11,7 +11,7 @@ def setup_page_and_sidebar():
     st.set_page_config(
         page_title="🤖 AI 对话",
         page_icon="🤖",
-        layout="centered"  # 居中布局更美观
+        layout="wide"  # 居中布局更美观
     )
     create_common_sidebar()  # 调用函数创建侧边栏
 
