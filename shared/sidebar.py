@@ -28,7 +28,7 @@ SCRIPTS_BY_GROUP = {
     "📝 文本处理": [
         {
             "label": "B站标题提取",
-            "path": r"pages/1_提取B站标题.py"
+            "path": r"pages/4_提取B站标题.py"
         },
         {
             "label": "文字转语音",
