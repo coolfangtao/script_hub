@@ -13,6 +13,7 @@ def setup_page_and_sidebar():
         page_icon="🤖",
         layout="wide"
     )
+    # 这个公共侧边栏函数保持不变
     create_common_sidebar()
 
 
@@ -33,7 +34,6 @@ def initialize_chat_session(selected_model):
     根据选择的模型初始化或重置聊天会话。
     如果模型被切换，则清空历史记录并开始新的会话。
     """
-    # 检查模型是否已切换
     model_switched = "selected_model" in st.session_state and st.session_state.get("selected_model") != selected_model
 
     if "gemini_chat" not in st.session_state or model_switched:
@@ -55,7 +55,6 @@ def stream_handler(stream):
     这样，st.write_stream 接收到的就是一个纯文本流。
     """
     for chunk in stream:
-        # 检查 chunk 是否有 text 属性，防止出错
         if hasattr(chunk, 'text'):
             yield chunk.text
 
@@ -75,27 +74,28 @@ def main():
     cfg = Config()
     MODEL_OPTIONS = cfg.GEMINI_MODEL_OPTIONS
 
-    # --- MODIFICATION 1 START: 将模型选择和清除按钮放到指定位置 ---
-    # 将模型选择放到左上角
-    top_left_col, _ = st.columns([1, 3])
-    with top_left_col:
+    # --- MODIFICATION START: 将模型选择和清除按钮分别放置在页面左上角和右上角 ---
+    # 使用列布局来放置左侧的选择框和右侧的按钮
+    col1, col_spacer, col2 = st.columns([2, 5, 2])  # 调整比例以获得最佳视觉效果
+
+    with col1:
         selected_model = st.selectbox(
             "请选择一个 AI 模型:",
             options=MODEL_OPTIONS,
             index=0,
-            key="model_selector",  # 添加一个key以稳定组件
+            key="model_selector",
+            label_visibility="collapsed",  # 隐藏标签以节省空间
             help="不同模型的能力和响应速度各异。"
         )
 
-    # 在侧边栏添加清除按钮
-    with st.sidebar:
-        st.header("对话控制")
-        if st.button("清除当前对话", use_container_width=True, type="primary"):
-            # 调用初始化函数重置会话
+    with col2:
+        # 添加一点垂直空间，让按钮和选择框大致对齐
+        st.write("")
+        if st.button("清除当前对话", use_container_width=True):
             initialize_chat_session(selected_model)
             st.toast("对话已清除！", icon="🧹")
             st.rerun()
-    # --- MODIFICATION 1 END ---
+    # --- MODIFICATION END ---
 
     initialize_chat_session(selected_model)
 
@@ -104,20 +104,16 @@ def main():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # --- MODIFICATION 2 START: 根据是否有对话历史，决定输入框位置 ---
+    # --- 根据是否有对话历史，决定输入框位置 ---
     prompt = None
-    # 如果没有消息，说明是新会话，将输入框居中
     if not st.session_state.messages:
-        # 使用一个容器和空行将输入框在垂直方向上居中一些
         with st.container():
-            st.markdown("<br><br><br><br>", unsafe_allow_html=True)  # 增加一些垂直空间
+            st.markdown("<br><br><br><br>", unsafe_allow_html=True)
             _, center_col, _ = st.columns([1, 2, 1])
             with center_col:
                 prompt = st.chat_input("您好，有什么可以帮助您的吗？", key="centered_chat_input")
-    # 如果有消息，输入框自动置于底部
     else:
         prompt = st.chat_input("继续提问...", key="bottom_chat_input")
-    # --- MODIFICATION 2 END ---
 
     # --- 统一的聊天输入和响应处理逻辑 ---
     if prompt:
@@ -129,12 +125,10 @@ def main():
             with st.chat_message("assistant"):
                 with st.spinner("AI 正在思考中..."):
                     response_stream = st.session_state.gemini_chat.send_message(prompt, stream=True)
-                    # 使用 st.write_stream 来处理流式响应
                     full_response = st.write_stream(stream_handler(response_stream))
             st.session_state.messages.append({"role": "assistant", "content": full_response})
 
-            # 如果是从居中输入框开始的对话，需要刷新页面以将输入框移到底部
-            if len(st.session_state.messages) == 2:  # 第一次提问后，总共有2条消息(user+assistant)
+            if len(st.session_state.messages) == 2:
                 st.rerun()
 
         except Exception as e:
