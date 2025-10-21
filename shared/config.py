@@ -43,7 +43,7 @@ class Config:
 
         # 分析英语句子参数
         self.DEFAULT_VOICE_NAME= "en-US-JennyNeural"
-        self.ANALYSIS_DEFAULT_MODEL = "gemini-2.0-flash"
+        self.ANALYSIS_DEFAULT_MODEL = "gemini-2.5-flash-lite"
 
         # 业务逻辑参数
         self.DEFAULT_ITEMS_TO_SHOW = 10
@@ -57,26 +57,13 @@ class Config:
 
         # 可用的AI模型
         self.GEMINI_MODEL_OPTIONS = [
-            "gemini-2.0-flash",
-            "gemini-2.5-pro",
-            "gemini-2.0-flash-exp",
-            "gemini-2.0-flash-lite",
-            "gemini-2.0-flash-preview-image-generation",
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash-tts",
-            "gemini-2.5-flash",
-            "gemini-robotics-er-1.5-preview",
-            "gemma-3-12b",
-            "gemma-3-1b",
-            "gemma-3-27b",
-            "gemma-3-2b",
-            "gemma-3-4b",
-            "learnim-2.0-flash-experimental",
-            "imagen-3.0-generate",
-            "veo-2.0-generate-001",
-            "gemini-2.0-flash-live",
-            "gemini-2.5-flash-live",
-            "gemini-2.5-flash-native-audio-dialog"
+            "gemini-2.5-flash-lite",  # 默认模型，可用，2.15秒
+            "gemini-2.0-flash",  # 可用，5.11秒
+            "gemini-2.5-pro",   # 可用，14.93秒
+            "gemini-2.0-flash-exp",  # 可用，4.28秒
+            "gemini-2.0-flash-lite",  # 可用，9.62秒
+            "gemini-2.5-flash",  # 可用，6.74秒
+            "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
         ]
 
         # 杂质检测可用的AI模型
