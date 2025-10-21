@@ -9,11 +9,11 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 2. 自定义CSS样式 ---
-# 适配新的左右分栏对比视图
+# --- 2. 自定义CSS样式 (已更新) ---
+# 增加了针对“修改”的高亮样式
 CUSTOM_CSS = """
 <style>
-    /* 对比结果容器的样式，模仿st.text_area */
+    /* 对比结果容器的样式 */
     .diff-container {
         border-radius: 0.5rem;
         padding: 10px;
@@ -21,7 +21,7 @@ CUSTOM_CSS = """
         overflow-y: scroll;
         font-family: Menlo, Monaco, 'Courier New', monospace;
         font-size: 0.9rem;
-        line-height: 1.4;
+        line-height: 1.5;
         background-color: #ffffff;
         border: 1px solid #d1d5db; 
     }
@@ -40,20 +40,35 @@ CUSTOM_CSS = """
         word-wrap: break-word;
     }
 
-    /* 新增行的背景高亮 */
+    /* 新增行的背景高亮 (绿色) */
     .diff-add {
         background-color: rgba(40, 167, 69, 0.2);
     }
-    /* 删除行的背景高亮 */
+    /* 删除行的背景高亮 (红色) */
     .diff-sub {
         background-color: rgba(220, 53, 69, 0.2);
         text-decoration: line-through;
     }
+    /* (新) 包含修改的行的背景 (淡蓝色，用于区分) */
+    .diff-mod {
+        background-color: rgba(13, 110, 253, 0.1);
+    }
+    /* (新) 行内具体修改字符的高亮 (亮黄色) */
+    .diff-change {
+        background-color: rgba(255, 235, 59, 0.6);
+        border-radius: 3px;
+        font-weight: bold;
+    }
 
     /* 确保深色主题下，高亮区域的文字依然清晰 */
     [data-theme="dark"] .diff-add,
-    [data-theme="dark"] .diff-sub {
+    [data-theme="dark"] .diff-sub,
+    [data-theme="dark"] .diff-mod,
+    [data-theme="dark"] .diff-change {
         color: #EAEAEA;
+    }
+    [data-theme="dark"] .diff-change {
+        background-color: rgba(255, 235, 59, 0.5);
     }
 </style>
 """
@@ -63,11 +78,15 @@ st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 st.title("🔎 文本对比工具 (Diff Checker)")
 st.markdown("一个简单的小工具，用于比较两段文本之间的差异。请在下方左右两个文本框中输入或粘贴内容，然后点击“开始对比”按钮。")
 
+# 更新使用说明
 with st.expander("💡 使用说明"):
     st.markdown("""
         <ul>
-            <li><span style="background-color: rgba(40, 167, 69, 0.2); padding: 2px 5px; border-radius: 3px;">绿色背景</span>: 表示新增的内容。</li>
-            <li><span style="background-color: rgba(220, 53, 69, 0.2); padding: 2px 5px; border-radius: 3px;">红色背景 (带删除线)</span>: 表示被删除的内容。</li>
+            <li><span style="background-color: rgba(40, 167, 69, 0.2); padding: 2px 5px; border-radius: 3px;">绿色背景</span>: 表示整行是新增的内容。</li>
+            <li><span style="background-color: rgba(220, 53, 69, 0.2); padding: 2px 5px; border-radius: 3px;">红色背景 (带删除线)</span>: 表示整行是被删除的内容。</li>
+            <li><span style="background-color: rgba(13, 110, 253, 0.1); padding: 2px 5px; border-radius: 3px;">淡蓝色背景</span>: 表示该行有修改。
+                <ul><li>行内<span style="background-color: rgba(255, 235, 59, 0.6); font-weight: bold; padding: 1px 4px; border-radius: 3px;">亮黄色高亮</span>的部分是具体的修改之处。</li></ul>
+            </li>
         </ul>
     """, unsafe_allow_html=True)
 st.divider()
@@ -95,16 +114,43 @@ with st.container(border=True):
 st.write("")
 
 
-# --- 5. 对比逻辑和结果展示 ---
+# --- 5. 对比逻辑和结果展示 (已重构) ---
+
+def highlight_character_diffs(old_line, new_line):
+    """
+    辅助函数：对两个字符串进行字符级对比，并用HTML标记差异。
+    返回两个HTML字符串，分别用于左右两侧的显示。
+    """
+    matcher = difflib.SequenceMatcher(None, old_line, new_line)
+    left_html = []
+    right_html = []
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        old_fragment = html_converter.escape(old_line[i1:i2])
+        new_fragment = html_converter.escape(new_line[j1:j2])
+
+        if tag == 'equal':
+            left_html.append(old_fragment)
+            right_html.append(new_fragment)
+        elif tag == 'replace':
+            left_html.append(f'<span class="diff-change">{old_fragment}</span>')
+            right_html.append(f'<span class="diff-change">{new_fragment}</span>')
+        elif tag == 'delete':
+            left_html.append(f'<span class="diff-change">{old_fragment}</span>')
+        elif tag == 'insert':
+            right_html.append(f'<span class="diff-change">{new_fragment}</span>')
+
+    return "".join(left_html), "".join(right_html)
+
 
 def generate_side_by_side_diff(text1_lines, text2_lines):
     """
     生成左右分栏对比视图的HTML。
+    此版本会处理“替换”操作，进行字符级高亮。
     """
     left_html = []
     right_html = []
-
-    matcher = difflib.SequenceMatcher(None, text1_lines, text2_lines)
+    matcher = difflib.SequenceMatcher(None, text1_lines, text2_lines, autojunk=False)
 
     for tag, i1, i2, j1, j2 in matcher.get_opcodes():
         if tag == 'equal':
@@ -114,21 +160,29 @@ def generate_side_by_side_diff(text1_lines, text2_lines):
                 right_html.append(f"<span>{escaped_line}</span>")
 
         elif tag == 'replace':
-            # 将“替换”操作分解为“删除”和“添加”
-            for line in text1_lines[i1:i2]:
-                escaped_line = html_converter.escape(line)
-                left_html.append(f'<span class="diff-sub">{escaped_line}</span>')
-            for line in text2_lines[j1:j2]:
-                escaped_line = html_converter.escape(line)
-                right_html.append(f'<span class="diff-add">{escaped_line}</span>')
+            old_chunk_lines = text1_lines[i1:i2]
+            new_chunk_lines = text2_lines[j1:j2]
 
-            # 通过添加空行来保持两侧对齐
-            len_left = i2 - i1
-            len_right = j2 - j1
-            if len_left < len_right:
-                left_html.extend(['<span>&nbsp;</span>'] * (len_right - len_left))
-            elif len_right < len_left:
-                right_html.extend(['<span>&nbsp;</span>'] * (len_left - len_right))
+            # 对“替换”块中的每一行进行处理，尽量一一对应
+            for i in range(max(len(old_chunk_lines), len(new_chunk_lines))):
+                old_line = old_chunk_lines[i] if i < len(old_chunk_lines) else None
+                new_line = new_chunk_lines[i] if i < len(new_chunk_lines) else None
+
+                if old_line is not None and new_line is not None:
+                    # 如果两侧都有行，进行字符级对比
+                    left_diff, right_diff = highlight_character_diffs(old_line, new_line)
+                    left_html.append(f'<span class="diff-mod">{left_diff}</span>')
+                    right_html.append(f'<span class="diff-mod">{right_diff}</span>')
+                elif old_line is not None:
+                    # 如果只有旧行，视为删除
+                    escaped_line = html_converter.escape(old_line)
+                    left_html.append(f'<span class="diff-sub">{escaped_line}</span>')
+                    right_html.append('<span>&nbsp;</span>')
+                elif new_line is not None:
+                    # 如果只有新行，视为新增
+                    escaped_line = html_converter.escape(new_line)
+                    left_html.append('<span>&nbsp;</span>')
+                    right_html.append(f'<span class="diff-add">{escaped_line}</span>')
 
         elif tag == 'delete':
             for line in text1_lines[i1:i2]:
@@ -138,12 +192,11 @@ def generate_side_by_side_diff(text1_lines, text2_lines):
 
         elif tag == 'insert':
             for line in text2_lines[j1:j2]:
-                left_html.append('<span>&nbsp;</span>')
                 escaped_line = html_converter.escape(line)
+                left_html.append('<span>&nbsp;</span>')
                 right_html.append(f'<span class="diff-add">{escaped_line}</span>')
 
-    # 使用<br>连接每一行，以便在HTML中正确换行
-    return "<br>".join(left_html), "<br>".join(right_html)
+    return "".join(left_html), "".join(right_html)
 
 
 if st.button("🚀 开始对比", type="primary", use_container_width=True):
@@ -158,10 +211,8 @@ if st.button("🚀 开始对比", type="primary", use_container_width=True):
         st.divider()
         st.subheader("📊 对比结果")
 
-        # 使用新的左右分栏布局来展示结果
         col1, col2 = st.columns(2, gap="medium")
         with col1:
             st.markdown(f'<div class="diff-container">{left_diff_html}</div>', unsafe_allow_html=True)
         with col2:
             st.markdown(f'<div class="diff-container">{right_diff_html}</div>', unsafe_allow_html=True)
-
