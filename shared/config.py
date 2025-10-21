@@ -6,7 +6,7 @@ from pathlib import Path
 
 class Config:
     """
-    这个类用于集中存放所有Streamlit应用的配置参数。
+    这个类用于集中存放所有Streamlit应用的配置参数。理论上所有的硬编码都应该放在这里
     它支持从YAML文件加载配置、动态设置/获取值以及清晰地打印所有配置项。
     """
 

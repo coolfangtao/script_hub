@@ -1,49 +1,81 @@
 import streamlit as st
 import re
+from shared.sidebar import create_common_sidebar
 
-from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
-create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
-
-# Main title of the application
-st.title("📌 B站标题提取工具")
-
-# --- Page Navigation (as in original code) ---
-# This button is for navigating in a multi-page app.
-# In a single-file app, it won't switch pages but we keep it as requested.
-if st.button("← 返回主页"):
-    # In a real multi-page app, this would be: st.switch_page("streamlit_app.py")
-    # For this single file app, we can just show a message.
-    st.info("这是一个单页面应用。在多页面应用中，此按钮将带您返回主页。")
-    st.switch_page("streamlit_app.py")
-
-# --- HTML Input Area ---
-st.header("1. 在下方文本框中粘贴 HTML 内容")
-html_input = st.text_area(
-    "在此处粘贴内容...",
-    height=250,
-    label_visibility="collapsed" # Hides the label "在此处粘贴内容..." for a cleaner look
+# --- 1. 页面配置 (建议放在脚本顶部) ---
+st.set_page_config(
+    page_title="B站标题提取工具",
+    page_icon="📌"
 )
 
-# --- Extraction and Display Logic ---
-if st.button("提取标题", type="primary"):
-    if html_input:
-        # Use regex to find all occurrences of title="..."
-        titles = re.findall(r'title="([^"]+)"', html_input)
+# --- 2. 核心功能函数 ---
+def extract_titles(html_content: str) -> list[str]:
+    """
+    使用正则表达式从给定的HTML文本中提取所有 title="..." 的内容。
+
+    Args:
+        html_content: 包含HTML的字符串。
+
+    Returns:
+        一个包含所有提取到的标题的列表。
+    """
+    if not html_content:
+        return []
+    # 正则表达式查找所有 title="..." 的双引号内的内容
+    return re.findall(r'title="([^"]+)"', html_content)
+
+# --- 3. 侧边栏 ---
+try:
+    create_common_sidebar()
+except Exception as e:
+    st.sidebar.error(f"加载侧边栏失败: {e}")
+
+
+# --- 4. 主界面UI ---
+
+# 页面主标题
+st.title("📌 B站标题提取工具")
+st.caption("一个简单的小工具，用于从 Bilibili 播放列表等页面的 HTML 源码中批量提取视频标题。")
+
+# 返回主页按钮
+if st.button("← 返回主页"):
+    # 在多页面应用中，此行代码会切换回主应用页面
+    st.switch_page("streamlit_app.py")
+
+# 使用可折叠容器来组织输入区域，使界面更整洁
+with st.expander("第一步：粘贴HTML内容", expanded=True):
+    st.markdown("""
+    1. 在B站的播放列表页面（或其他需要提取标题的页面），右键点击页面空白处。
+    2. 选择 **“显示网页源代码”** (View Page Source) 或 **“检查”** (Inspect)。
+    3. **全选 (Ctrl+A)** 并 **复制 (Ctrl+C)** 源代码。
+    4. 将复制的内容粘贴到下方的文本框中。
+    """)
+    html_input = st.text_area(
+        "在此处粘贴HTML源代码...",
+        height=300,
+        label_visibility="collapsed"
+    )
+
+# 提取按钮和结果展示
+if st.button("🚀 开始提取", type="primary", use_container_width=True):
+    if not html_input.strip():
+        # 检查输入是否为空或仅包含空白字符
+        st.warning("⚠️ 请先粘贴HTML内容再进行提取。")
+    else:
+        # 调用函数执行提取逻辑
+        titles = extract_titles(html_input)
+
+        st.header("第二步：复制提取结果")
 
         if titles:
-            st.header("2. 提取结果")
-            # Join all found titles with a newline character
+            # 将结果列表转换为以换行符分隔的字符串
             result_text = "\n".join(titles)
 
-            # Display the results in a code block. Streamlit's code block
-            # has a built-in copy icon in the top-right corner.
+            # st.code 自带复制按钮，非常适合展示结果
             st.code(result_text, language='text')
 
-            st.success(f"成功提取了 {len(titles)} 个标题！点击上方结果框右上角的图标即可复制。")
-
+            # 显示成功信息
+            st.success(f"🎉 成功提取了 {len(titles)} 个标题！点击上方结果框右上角的图标即可一键复制。")
         else:
-            # Show a warning if no titles were found
-            st.warning("未找到任何匹配 `title=\"...\"` 格式的标题。请检查您的 HTML 内容。")
-    else:
-        # Show an error if the text area is empty
-        st.error("文本框为空，请输入 HTML 内容后再试。")
+            # 如果没有找到任何标题，显示提示信息
+            st.error("❌ 未找到任何标题。请确认您复制的是完整的HTML源代码，并且其中包含 `title=\"...\"` 格式的内容。")
