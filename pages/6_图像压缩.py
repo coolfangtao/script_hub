@@ -4,8 +4,8 @@ import io
 from typing import Tuple
 
 # 假设您的侧边栏函数位于此路径
-# from shared.sidebar import create_common_sidebar
-# create_common_sidebar()
+from shared.sidebar import create_common_sidebar
+create_common_sidebar()
 
 # --- 页面配置 ---
 st.set_page_config(layout="wide", page_title="图片大小修改器")
