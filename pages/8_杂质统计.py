@@ -198,6 +198,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
 
             # 使用Metric展示关键信息
             st.metric(label="AI模型调用耗时", value=f"{duration:.2f} 秒")
+            classification_placeholder = st.empty()
 
             # 如果AI未能提取任何数据，则提供一个空模板
             if eds_df.empty:
@@ -220,9 +221,8 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
 
             # 使用编辑后的数据进行分类
             final_classification = classify_inclusion(edited_df)
+            classification_placeholder.success(f"**最终杂质分类:** {final_classification}")
 
-            # 使用st.success突出显示最终分类结果
-            st.success(f"**最终杂质分类:** {final_classification}")
 
         with st.expander("查看AI模型原始返回文本"):
             st.markdown(response_text)
