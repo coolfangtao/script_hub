@@ -11,18 +11,25 @@ st.set_page_config(
 # --- 2. 核心功能函数 ---
 def extract_titles(html_content: str) -> list[str]:
     """
-    使用正则表达式从给定的HTML文本中提取所有 title="..." 的内容。
+    使用更精确的正则表达式，仅从包含 class="title" 的标签中提取 title 内容。
 
     Args:
         html_content: 包含HTML的字符串。
 
     Returns:
-        一个包含所有提取到的标题的列表。
+        一个包含所有匹配到的标题的列表。
     """
     if not html_content:
         return []
-    # 正则表达式查找所有 title="..." 的双引号内的内容
-    return re.findall(r'title="([^"]+)"', html_content)
+
+    # ===================================================================
+    # 更新后的正则表达式：
+    # 它会查找一个 title="..." 属性，并且这个属性后面必须跟着 class="title"。
+    # 这确保了我们只捕获视频列表项的标题，而忽略其他无关的title。
+    # ===================================================================
+    precise_regex = r'title="([^"]+)"\s+class="title"'
+
+    return re.findall(precise_regex, html_content)
 
 # --- 3. 侧边栏 ---
 try:
