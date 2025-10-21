@@ -88,11 +88,6 @@ class Config:
             "gemini-2.5-flash-lite",  # 可用，2.15秒
             "gemini-2.5-flash",  # 可用，6.74秒
             "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
-            "gemma-3-12b",
-            "gemma-3-1b",
-            "gemma-3-27b",
-            "gemma-3-2b",
-            "gemma-3-4b",
             "learnim-2.0-flash-experimental",
             "imagen-3.0-generate",
             "veo-2.0-generate-001",
