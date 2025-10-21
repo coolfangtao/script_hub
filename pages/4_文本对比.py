@@ -1,7 +1,6 @@
 import streamlit as st
 import difflib
-import re
-from streamlit.components.v1 import html
+import html as html_converter
 
 # --- 1. 页面基础配置 ---
 st.set_page_config(
@@ -11,60 +10,51 @@ st.set_page_config(
 )
 
 # --- 2. 自定义CSS样式 ---
-# 这段CSS会覆盖 difflib 的默认颜色，以更好地适配Streamlit的浅色和深色主题
+# 适配新的左右分栏对比视图
 CUSTOM_CSS = """
 <style>
-    /* 这部分是全局样式，会影响到下面注入的 difflib 表格 */
-    table.diff {
-        border-collapse: collapse;
-        width: 100%;
+    /* 对比结果容器的样式，模仿st.text_area */
+    .diff-container {
+        border-radius: 0.5rem;
+        padding: 10px;
+        height: 400px;
+        overflow-y: scroll;
         font-family: Menlo, Monaco, 'Courier New', monospace;
         font-size: 0.9rem;
-        border: 1px solid #444; 
+        line-height: 1.4;
+        background-color: #ffffff;
+        border: 1px solid #d1d5db; 
     }
-    table.diff th {
-        background-color: #f0f2f6;
-        color: #333;
-        padding: 8px;
-        text-align: center;
-        font-weight: 600;
+
+    /* 深色主题下的容器样式 */
+    [data-theme="dark"] .diff-container {
+        background-color: #0E1117; 
+        border: 1px solid #30363d;
+        color: #fafafa;
     }
-    [data-theme="dark"] table.diff th {
-        background-color: #262730;
-        color: #FAFAFA;
-        border-bottom: 1px solid #444;
+
+    /* 容器内每一行文本的样式 */
+    .diff-container span {
+        display: block;
+        white-space: pre-wrap;
+        word-wrap: break-word;
     }
-    /* 使用半透明的RGBA颜色，这样无论在深色还是浅色背景下都能清晰显示 */
-    /* 浅色主题下的高亮背景 */
-    .diff_add {
+
+    /* 新增行的背景高亮 */
+    .diff-add {
         background-color: rgba(40, 167, 69, 0.2);
     }
-    .diff_chg {
-        background-color: rgba(255, 193, 7, 0.2);
-    }
-    .diff_sub {
+    /* 删除行的背景高亮 */
+    .diff-sub {
         background-color: rgba(220, 53, 69, 0.2);
         text-decoration: line-through;
     }
 
-    /* FIX: 专为深色主题优化，确保高亮区域的文本清晰可见 */
-    [data-theme="dark"] .diff_add,
-    [data-theme="dark"] .diff_chg,
-    [data-theme="dark"] .diff_sub {
-        color: #EAEAEA; /* 将高亮区域的文字颜色改为浅灰色，提高对比度 */
+    /* 确保深色主题下，高亮区域的文字依然清晰 */
+    [data-theme="dark"] .diff-add,
+    [data-theme="dark"] .diff-sub {
+        color: #EAEAEA;
     }
-
-    /* 可选：微调深色主题下的背景色，使其更柔和 */
-    [data-theme="dark"] .diff_add {
-        background-color: rgba(40, 167, 69, 0.3);
-    }
-    [data-theme="dark"] .diff_chg {
-        background-color: rgba(255, 193, 7, 0.3);
-    }
-    [data-theme="dark"] .diff_sub {
-        background-color: rgba(220, 53, 69, 0.3);
-    }
-
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -77,45 +67,85 @@ with st.expander("💡 使用说明"):
     st.markdown("""
         <ul>
             <li><span style="background-color: rgba(40, 167, 69, 0.2); padding: 2px 5px; border-radius: 3px;">绿色背景</span>: 表示新增的内容。</li>
-            <li><span style="background-color: rgba(255, 193, 7, 0.2); padding: 2px 5px; border-radius: 3px;">黄色背景</span>: 表示被修改的内容行。</li>
-            <li><span style="background-color: rgba(220, 53, 69, 0.2); padding: 2px 5px; border-radius: 3px;">红色背景</span>: 表示被删除的内容。</li>
+            <li><span style="background-color: rgba(220, 53, 69, 0.2); padding: 2px 5px; border-radius: 3px;">红色背景 (带删除线)</span>: 表示被删除的内容。</li>
         </ul>
     """, unsafe_allow_html=True)
 st.divider()
 
 # --- 4. 核心功能区 ---
 
-# 初始化 session_state，使用更有说明性的默认文本
+# 初始化 session_state
 if 'text1' not in st.session_state:
     st.session_state.text1 = "Streamlit is an open-source app framework.\nIt's a faster way to build and share data apps.\nThis line will be removed.\nThis line will be modified."
 if 'text2' not in st.session_state:
     st.session_state.text2 = "Streamlit is a great open-source app framework.\nIt's a faster way to build and share data apps.\nThis line is new.\nThis line has been modified."
 
-# 使用带边框的容器来美化布局
+# 输入框布局
 with st.container(border=True):
     col1, col2 = st.columns(2, gap="medium")
     with col1:
         st.subheader("📝 原始文本 (Original)")
-        text1_input = st.text_area(
-            "原始文本",
-            value=st.session_state.text1,
-            height=300,
-            key="text1_area",
-            label_visibility="collapsed"
-        )
+        text1_input = st.text_area("原始文本", value=st.session_state.text1, height=300, key="text1_area",
+                                   label_visibility="collapsed")
     with col2:
         st.subheader("🖋️ 修改后文本 (Modified)")
-        text2_input = st.text_area(
-            "修改后文本",
-            value=st.session_state.text2,
-            height=300,
-            key="text2_area",
-            label_visibility="collapsed"
-        )
+        text2_input = st.text_area("修改后文本", value=st.session_state.text2, height=300, key="text2_area",
+                                   label_visibility="collapsed")
 
-st.write("")  # 增加一点垂直间距
+st.write("")
 
-# 创建对比按钮
+
+# --- 5. 对比逻辑和结果展示 ---
+
+def generate_side_by_side_diff(text1_lines, text2_lines):
+    """
+    生成左右分栏对比视图的HTML。
+    """
+    left_html = []
+    right_html = []
+
+    matcher = difflib.SequenceMatcher(None, text1_lines, text2_lines)
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == 'equal':
+            for line in text1_lines[i1:i2]:
+                escaped_line = html_converter.escape(line)
+                left_html.append(f"<span>{escaped_line}</span>")
+                right_html.append(f"<span>{escaped_line}</span>")
+
+        elif tag == 'replace':
+            # 将“替换”操作分解为“删除”和“添加”
+            for line in text1_lines[i1:i2]:
+                escaped_line = html_converter.escape(line)
+                left_html.append(f'<span class="diff-sub">{escaped_line}</span>')
+            for line in text2_lines[j1:j2]:
+                escaped_line = html_converter.escape(line)
+                right_html.append(f'<span class="diff-add">{escaped_line}</span>')
+
+            # 通过添加空行来保持两侧对齐
+            len_left = i2 - i1
+            len_right = j2 - j1
+            if len_left < len_right:
+                left_html.extend(['<span>&nbsp;</span>'] * (len_right - len_left))
+            elif len_right < len_left:
+                right_html.extend(['<span>&nbsp;</span>'] * (len_left - len_right))
+
+        elif tag == 'delete':
+            for line in text1_lines[i1:i2]:
+                escaped_line = html_converter.escape(line)
+                left_html.append(f'<span class="diff-sub">{escaped_line}</span>')
+                right_html.append('<span>&nbsp;</span>')
+
+        elif tag == 'insert':
+            for line in text2_lines[j1:j2]:
+                left_html.append('<span>&nbsp;</span>')
+                escaped_line = html_converter.escape(line)
+                right_html.append(f'<span class="diff-add">{escaped_line}</span>')
+
+    # 使用<br>连接每一行，以便在HTML中正确换行
+    return "<br>".join(left_html), "<br>".join(right_html)
+
+
 if st.button("🚀 开始对比", type="primary", use_container_width=True):
     if not text1_input or not text2_input:
         st.warning("⚠️ 请确保左右两个文本框都输入了内容。")
@@ -123,30 +153,15 @@ if st.button("🚀 开始对比", type="primary", use_container_width=True):
         text1_lines = text1_input.splitlines()
         text2_lines = text2_input.splitlines()
 
-        d = difflib.HtmlDiff(wrapcolumn=80)
-
-        # 生成包含内联样式的完整HTML文件
-        full_diff_html = d.make_file(
-            fromlines=text1_lines,
-            tolines=text2_lines,
-            fromdesc='原始文本',
-            todesc='修改后文本'
-        )
-
-        # 提取 difflib 生成的 <style> 内容
-        style_match = re.search(r'<style type="text/css">(.*?)</style>', full_diff_html, re.DOTALL)
-        diff_style = style_match.group(1) if style_match else ""
-
-        # 提取 <body> 内部的内容
-        body_match = re.search(r'<body>(.*)</body>', full_diff_html, re.DOTALL)
-        diff_body = body_match.group(1).strip() if body_match else "<p>错误：无法提取对比结果。</p>"
-
-        # 将提取出的样式和内容组合起来，注入到页面中
-        # 这样既保留了difflib的布局，又允许我们的CUSTOM_CSS覆盖颜色
-        final_html = f"<style>{diff_style}</style>\n{diff_body}"
+        left_diff_html, right_diff_html = generate_side_by_side_diff(text1_lines, text2_lines)
 
         st.divider()
         st.subheader("📊 对比结果")
 
-        html(final_html, height=400, scrolling=True)
+        # 使用新的左右分栏布局来展示结果
+        col1, col2 = st.columns(2, gap="medium")
+        with col1:
+            st.markdown(f'<div class="diff-container">{left_diff_html}</div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'<div class="diff-container">{right_diff_html}</div>', unsafe_allow_html=True)
 
