@@ -8,6 +8,7 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 import re
+import time  # 导入 time 模块用于计时
 
 
 def configure_genai(api_key):
@@ -34,21 +35,19 @@ def get_gemini_response(image, prompt):
     prompt (str): 用于指导模型分析图片的提示词。
 
     返回:
-    str: 模型的文本响应，如果出错则返回 None。
+    tuple: 模型的文本响应和API调用耗时，如果出错则返回 (None, 0)。
     """
+    start_time = time.time()  # 记录开始时间
     try:
-        print(image)
-        print("收到img")
         model = genai.GenerativeModel('gemini-2.0-flash')
-        print("等待响应中")
         response = model.generate_content([prompt, image], stream=True)
-        print("已输出响应")
-        print(response)
         response.resolve()
-        return response.text
+        end_time = time.time()  # 记录结束时间
+        duration = end_time - start_time  # 计算耗时
+        return response.text, duration
     except Exception as e:
         st.error(f"调用 Gemini API 时发生错误: {e}")
-        return None
+        return None, 0
 
 
 def perform_integrity_check(response_text):
@@ -171,9 +170,13 @@ def main():
                         请以 Markdown 表格的格式呈现这些数据，确保所有数值及其对应的不确定度都完整且准确地体现在输出中。同时，请注意表格底部的‘总计’行，提取其质量百分比和原子百分比的总和数值（应为100.00）作为完整性检查。
                         """
 
-                        response_text = get_gemini_response(image, prompt)
+                        # 更新函数调用以接收响应时间和耗时
+                        response_text, duration = get_gemini_response(image, prompt)
 
                         if response_text:
+                            # 在页面上显示耗时
+                            st.info(f"模型响应耗时: **{duration:.2f}** 秒")
+
                             st.markdown("#### Gemini 模型提取内容:")
                             st.markdown(response_text)
 
