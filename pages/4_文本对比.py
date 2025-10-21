@@ -4,7 +4,7 @@ import re
 from typing import List, Tuple
 
 
-# --- CSS Styling (No Changes Here) ---
+# --- CSS样式 (无需改动) ---
 def inject_custom_css():
     """
     注入自定义CSS样式，以美化差异化文本的展示效果，并兼容亮暗两种主题。
@@ -63,37 +63,38 @@ def inject_custom_css():
     )
 
 
-# --- 核心逻辑 (Bug Fix) ---
+# --- 核心逻辑 (Bug已修复) ---
 
 def tokenize_text(text: str) -> List[str]:
     """
-    【修复】将文本分割成单词和空白符的序列，以精确保留换行等格式。
-    使用正则表达式匹配所有非空白字符序列或所有空白字符序列。
+    【修复】将文本分割成单个字符的序列，以实现字符级的精确对比。
+    这对于处理中文、日文等无空格语言至关重要。
     """
-    return re.findall(r'\S+|\s+', text)
+    return list(text)
 
 
 def get_diff_ops(text1: str, text2: str) -> List[Tuple[str, int, int, int, int]]:
     """
     使用difflib和新的分词器计算两段文本的差异操作码。
     """
-    # 使用新的分词器
-    matcher = difflib.SequenceMatcher(None, tokenize_text(text1), tokenize_text(text2))
+    # 使用修复后的分词器
+    matcher = difflib.SequenceMatcher(None, tokenize_text(text1), tokenize_text(text2), autojunk=False)
     return matcher.get_opcodes()
 
 
 def generate_diff_html(text: str, ops: List[Tuple[str, int, int, int, int]], is_original: bool) -> str:
     """
-    【修复】根据差异操作码生成用于展示的HTML字符串。
-    现在能正确处理包含换行符的文本片段。
+    根据差异操作码生成用于展示的HTML字符串。
+    此函数无需改动，因为它能正确处理字符列表。
     """
     tokens = tokenize_text(text)
     html_parts = []
 
     for tag, i1, i2, j1, j2 in ops:
         if is_original:
+            # 获取原文的字符片段并用span包裹
             segment_tokens = tokens[i1:i2]
-            segment_html = "".join(segment_tokens)  # 直接连接，因为空白符已是独立token
+            segment_html = "".join(segment_tokens)
             if tag == 'equal':
                 html_parts.append(segment_html)
             elif tag == 'delete':
@@ -101,6 +102,7 @@ def generate_diff_html(text: str, ops: List[Tuple[str, int, int, int, int]], is_
             elif tag == 'replace':
                 html_parts.append(f'<span class="diff-replace">{segment_html}</span>')
         else:
+            # 获取修改后文本的字符片段并用span包裹
             segment_tokens = tokens[j1:j2]
             segment_html = "".join(segment_tokens)
             if tag == 'equal':
@@ -110,21 +112,21 @@ def generate_diff_html(text: str, ops: List[Tuple[str, int, int, int, int]], is_
             elif tag == 'replace':
                 html_parts.append(f'<span class="diff-replace">{segment_html}</span>')
 
-    return "".join(html_parts)  # 直接连接所有HTML部分
+    return "".join(html_parts)
 
 
-# --- UI展示 ---
+# --- UI展示 (无需改动) ---
 
 def display_legend():
     """
-    【新增】在页面上显示标记说明。
+    在页面上显示标记说明。
     """
     st.subheader("标记说明")
     st.markdown(
         """
-        - <span class="legend-add">荧光绿高亮</span>: 新增的内容
-        - <span class="legend-delete">红色删除线</span>: 被删除的内容
-        - <span class="legend-replace">荧光黄高亮</span>: 被修改的内容
+        - <span class="legend-add" style="color: black;">荧光绿高亮</span>: 新增的内容
+        - <span class="legend-delete" style="color: black;">红色删除线</span>: 被删除的内容
+        - <span class="legend-replace" style="color: black;">荧光黄高亮</span>: 被修改的内容
         """,
         unsafe_allow_html=True
     )
@@ -141,12 +143,11 @@ def main():
     st.caption("输入原文和修改后的文本，快速高亮显示差异之处。")
     st.divider()
 
-    # 【新增】显示图例
     display_legend()
 
-    # 使用您截图中的示例文本作为默认值，方便测试
+    # 使用一个更能体现字符级差异的示例文本
     sample_original = "这是第一行。\n这是第二行，内容相同。\n这是将被修改的第三行。"
-    sample_modified = "这是第一行。\n这是第二行，内容不相同。\n这是被修改过的第三行。"
+    sample_modified = "这是第一行。\n这是第二行，内容不同。\n这是被修改过的第三行。"
 
     col1, col2 = st.columns(2)
     with col1:
