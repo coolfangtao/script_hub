@@ -172,6 +172,25 @@ def setup_ui():
 
     return api_key, model_name, uploaded_files, analyze_button
 
+def display_elemental_composition_chart(df: pd.DataFrame):
+    """
+    在Streamlit中创建一个可折叠区域，用精美的条形图展示元素的质量和原子百分比。
+
+    Args:
+        df (pd.DataFrame): 包含元素分析数据的DataFrame，
+                           需要有 '元素', '质量百分比(%)', 和 '原子百分比(%)' 这几列。
+    """
+    # 确保DataFrame不为空且包含所需列，避免在空数据时显示图表
+    if df is not None and not df.empty and all(col in df.columns for col in ['元素', '质量百分比(%)', '原子百分比(%)']):
+        with st.expander("📊 图表分析：元素组成"):
+            # 准备用于图表的数据：将'元素'列设为索引，这样它会成为X轴的标签
+            # 同时选择我们需要展示的百分比数据列
+            chart_data = df.set_index('元素')[['质量百分比(%)', '原子百分比(%)']]
+
+            # 使用Streamlit内置的条形图功能，它简洁且美观
+            st.bar_chart(chart_data)
+            st.caption("上图展示了识别出的各种元素的质量百分比与原子百分比的对比。")
+
 
 def process_and_display_image(image_file, prompt, model_name, image_index):
     """
@@ -247,8 +266,15 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
             classification_placeholder.markdown(styled_classification_html, unsafe_allow_html=True)
             # --- 主要改动结束 ---
 
-        with st.expander("查看AI模型原始返回文本"):
-            st.markdown(response_text)
+        # --- 全宽区域：显示图表和原始数据 ---
+        # 这个代码块现在位于 col_results 的外面，因此它将占据全部可用宽度
+        if response_text and not df_template.empty:
+            # 调用图表函数，它会创建一个全宽的折叠区域
+            display_elemental_composition_chart(df_template)
+
+            # 将原始文本的折叠区域也放在这里，保持布局一致性
+            with st.expander("查看AI模型原始返回文本"):
+                st.markdown(response_text)
 
     else:
         # 如果API调用失败，仍然在右侧列显示错误信息
