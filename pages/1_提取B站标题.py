@@ -44,11 +44,6 @@ except Exception as e:
 st.title("📌 B站标题提取工具")
 st.caption("一个简单的小工具，用于从 Bilibili 播放列表等页面的 HTML 源码中批量提取视频标题。")
 
-# 返回主页按钮
-if st.button("← 返回主页"):
-    # 在多页面应用中，此行代码会切换回主应用页面
-    st.switch_page("streamlit_app.py")
-
 # 使用可折叠容器来组织输入区域，使界面更整洁
 with st.expander("第一步：粘贴HTML内容", expanded=True):
     st.markdown("""
