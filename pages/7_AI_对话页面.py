@@ -61,13 +61,8 @@ def main():
         st.stop()  # 如果API密钥配置失败，则停止运行
 
     # --- 模型选择 ---
-    MODEL_OPTIONS = [
-        "gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-pro",
-        # 以下是您提供的其他模型，为了简洁可以折叠或按需选择
-        # "gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.0-flash-exp",
-        # "gemini-2.0-flash-lite", "gemini-2.5-flash-lite", "gemini-2.5-flash",
-        # ... 其他模型
-    ]
+    temp = Config()
+    MODEL_OPTIONS = temp.GEMINI_MODEL_OPTIONS
     selected_model = st.selectbox(
         "请选择一个 AI 模型:",
         options=MODEL_OPTIONS,
