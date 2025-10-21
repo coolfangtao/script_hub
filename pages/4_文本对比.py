@@ -2,8 +2,6 @@ import streamlit as st
 import difflib
 import re
 from streamlit.components.v1 import html
-from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
-create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 # --- 1. 页面基础配置 ---
 st.set_page_config(
@@ -37,6 +35,7 @@ CUSTOM_CSS = """
         border-bottom: 1px solid #444;
     }
     /* 使用半透明的RGBA颜色，这样无论在深色还是浅色背景下都能清晰显示 */
+    /* 浅色主题下的高亮背景 */
     .diff_add {
         background-color: rgba(40, 167, 69, 0.2);
     }
@@ -47,6 +46,25 @@ CUSTOM_CSS = """
         background-color: rgba(220, 53, 69, 0.2);
         text-decoration: line-through;
     }
+
+    /* FIX: 专为深色主题优化，确保高亮区域的文本清晰可见 */
+    [data-theme="dark"] .diff_add,
+    [data-theme="dark"] .diff_chg,
+    [data-theme="dark"] .diff_sub {
+        color: #EAEAEA; /* 将高亮区域的文字颜色改为浅灰色，提高对比度 */
+    }
+
+    /* 可选：微调深色主题下的背景色，使其更柔和 */
+    [data-theme="dark"] .diff_add {
+        background-color: rgba(40, 167, 69, 0.3);
+    }
+    [data-theme="dark"] .diff_chg {
+        background-color: rgba(255, 193, 7, 0.3);
+    }
+    [data-theme="dark"] .diff_sub {
+        background-color: rgba(220, 53, 69, 0.3);
+    }
+
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
