@@ -39,7 +39,7 @@ def get_gemini_response(image, prompt):
     try:
         print(image)
         print("收到img")
-        model = genai.GenerativeModel('gemini-2.5-pro')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         print("等待响应中")
         response = model.generate_content([prompt, image], stream=True)
         print("已输出响应")
