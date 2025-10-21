@@ -1,168 +1,168 @@
 import streamlit as st
 import difflib
-import html as html_converter
+from typing import List, Tuple
 
-# --- 1. 页面基础配置 ---
-st.set_page_config(
-    page_title="文本对比工具 | Diff Checker",
-    page_icon="🔎",
-    layout="wide"
-)
 
-# --- 2. 自定义CSS样式 (已更新) ---
-# 移除了不再使用的 .diff-mod 和 .diff-change 样式
-CUSTOM_CSS = """
-<style>
-    /* 对比结果容器的样式 */
-    .diff-container {
-        border-radius: 0.5rem;
-        padding: 10px;
-        height: 400px;
-        overflow-y: scroll;
-        font-family: Menlo, Monaco, 'Courier New', monospace;
-        font-size: 0.9rem;
-        line-height: 1.5;
-        background-color: #ffffff;
-        border: 1px solid #d1d5db;
-    }
+# --- CSS Styling ---
+# 为了确保在不同主题下都有良好的可读性，我们为高亮效果定义了独立的CSS样式。
+# 使用st.markdown来注入CSS。
+def inject_custom_css():
+    """
+    注入自定义CSS样式，以美化差异化文本的展示效果，并兼容亮暗两种主题。
+    """
+    st.markdown(
+        """
+        <style>
+            .diff-container {
+                display: flex;
+                flex-wrap: wrap;
+                font-family: 'Courier New', Courier, monospace;
+                line-height: 1.6;
+            }
+            .diff-container span {
+                padding: 0.1em 0.2em;
+                margin: 0.1em 0;
+                border-radius: 0.3em;
+            }
+            .diff-add {
+                background-color: rgba(46, 125, 50, 0.3); /* 荧光绿，增加透明度 */
+                border: 1px solid rgba(46, 125, 50, 0.8);
+            }
+            .diff-delete {
+                background-color: rgba(198, 40, 40, 0.3); /* 红色，增加透明度 */
+                border: 1px solid rgba(198, 40, 40, 0.8);
+                text-decoration: line-through;
+            }
+            .diff-replace {
+                background-color: rgba(255, 179, 0, 0.3); /* 荧光黄，增加透明度 */
+                border: 1px solid rgba(255, 179, 0, 0.8);
+            }
 
-    /* 深色主题下的容器样式 */
-    [data-theme="dark"] .diff-container {
-        background-color: #0E1117;
-        border: 1px solid #30363d;
-        color: #fafafa;
-    }
+            /* 针对Streamlit暗色主题的微调 */
+            body[data-theme="dark"] .diff-add {
+                background-color: rgba(46, 125, 50, 0.5);
+            }
+            body[data-theme="dark"] .diff-delete {
+                background-color: rgba(198, 40, 40, 0.5);
+            }
+            body[data-theme="dark"] .diff-replace {
+                background-color: rgba(255, 179, 0, 0.5);
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    /* 容器内每一行文本的样式 */
-    .diff-container span {
-        display: block;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-    }
 
-    /* 新增行的背景高亮 (绿色) */
-    .diff-add {
-        background-color: rgba(40, 167, 69, 0.2);
-    }
-    /* 删除行的背景高亮 (红色) */
-    .diff-sub {
-        background-color: rgba(220, 53, 69, 0.2);
-        text-decoration: line-through;
-    }
+# --- 核心逻辑 ---
+# 这部分代码负责计算文本差异，并且与Streamlit的UI代码解耦。
 
-    /* 确保深色主题下，高亮区域的文字依然清晰 */
-    [data-theme="dark"] .diff-add,
-    [data-theme="dark"] .diff-sub {
-        color: #EAEAEA;
-    }
-</style>
-"""
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+def get_diff_ops(text1: str, text2: str) -> List[Tuple[str, int, int, int, int]]:
+    """
+    使用difflib计算两段文本的差异操作码。
 
-# --- 3. 页面标题和简介 ---
-st.title("🔎 文本对比工具 (Diff Checker)")
-st.markdown("一个简单的小工具，用于比较两段文本之间的差异。请在下方左右两个文本框中输入或粘贴内容，然后点击“开始对比”按钮。")
+    Args:
+        text1: 原文。
+        text2: 修改后的文本。
 
-# 更新使用说明
-with st.expander("💡 使用说明"):
-    st.markdown("""
-        <ul>
-            <li><span style="background-color: rgba(40, 167, 69, 0.2); padding: 2px 5px; border-radius: 3px;">绿色背景</span>: 表示该行是新增或修改后的内容。</li>
-            <li><span style="background-color: rgba(220, 53, 69, 0.2); padding: 2px 5px; border-radius: 3px;">红色背景 (带删除线)</span>: 表示该行是被删除或修改前的内容。</li>
-            <li><strong>未高亮的行</strong>: 表示该行在两个版本中完全相同。</li>
-        </ul>
-    """, unsafe_allow_html=True)
-st.divider()
+    Returns:
+        一个包含差异操作码的列表。
+    """
+    matcher = difflib.SequenceMatcher(None, text1.split(), text2.split())
+    return matcher.get_opcodes()
 
-# --- 4. 核心功能区 ---
 
-# 初始化 session_state
-if 'text1' not in st.session_state:
-    st.session_state.text1 = "Streamlit is an open-source app framework.\nIt's a faster way to build and share data apps.\nThis line will be removed.\nThis line will be modified."
-if 'text2' not in st.session_state:
-    st.session_state.text2 = "Streamlit is a great open-source app framework.\nIt's a faster way to build and share data apps.\nThis line is new.\nThis line has been modified."
+def generate_diff_html(text: str, ops: List[Tuple[str, int, int, int, int]], is_original: bool) -> str:
+    """
+    根据差异操作码生成用于展示的HTML字符串。
 
-# 输入框布局
-with st.container(border=True):
-    col1, col2 = st.columns(2, gap="medium")
+    Args:
+        text: 要处理的文本（原文或修改后的文本）。
+        ops: difflib生成的差异操作码。
+        is_original: 布尔值，如果为True，则处理原文；否则处理修改后的文本。
+
+    Returns:
+        一个包含高亮标记的HTML字符串。
+    """
+    words = text.split()
+    html_parts = []
+
+    for tag, i1, i2, j1, j2 in ops:
+        if is_original:
+            segment = words[i1:i2]
+            if tag == 'equal':
+                html_parts.append(' '.join(segment))
+            elif tag == 'delete':
+                html_parts.append(f'<span class="diff-delete">{" ".join(segment)}</span>')
+            elif tag == 'replace':
+                html_parts.append(f'<span class="diff-replace">{" ".join(segment)}</span>')
+        else:
+            segment = words[j1:j2]
+            if tag == 'equal':
+                html_parts.append(' '.join(segment))
+            elif tag == 'insert':
+                html_parts.append(f'<span class="diff-add">{" ".join(segment)}</span>')
+            elif tag == 'replace':
+                html_parts.append(f'<span class="diff-replace">{" ".join(segment)}</span>')
+
+    # 用一个空格连接所有部分，并处理连续空格，以保留原始格式
+    return ' '.join(html_parts).replace(' \n ', '\n')
+
+
+# --- Streamlit UI ---
+# 这部分代码负责构建网页界面。
+
+def main():
+    """
+    主函数，构建Streamlit应用界面。
+    """
+    st.set_page_config(page_title="文本对比工具", layout="wide")
+    inject_custom_css()
+
+    st.title("📝 文本对比工具")
+    st.caption("输入原文和修改后的文本，快速高亮显示差异之处。")
+
+    col1, col2 = st.columns(2)
+
     with col1:
-        st.subheader("📝 原始文本 (Original)")
-        text1_input = st.text_area("原始文本", value=st.session_state.text1, height=300, key="text1_area",
-                                   label_visibility="collapsed")
+        st.subheader("原文")
+        original_text = st.text_area(
+            "输入原始文本",
+            height=300,
+            key="original",
+            value="Streamlit is an open-source Python library that makes it easy to create and share beautiful, custom web apps for machine learning and data science."
+        )
+
     with col2:
-        st.subheader("🖋️ 修改后文本 (Modified)")
-        text2_input = st.text_area("修改后文本", value=st.session_state.text2, height=300, key="text2_area",
-                                   label_visibility="collapsed")
+        st.subheader("修改后")
+        modified_text = st.text_area(
+            "输入修改后的文本",
+            height=300,
+            key="modified",
+            value="Streamlit is a great open-source library that makes it simple to build and share powerful web apps for data science."
+        )
 
-st.write("")
+    if st.button("🔍 对比文本", use_container_width=True):
+        if original_text and modified_text:
+            ops = get_diff_ops(original_text, modified_text)
 
+            st.divider()
+            st.subheader("对比结果")
 
-# --- 5. 对比逻辑和结果展示 (已重构) ---
+            res_col1, res_col2 = st.columns(2)
 
-def generate_side_by_side_diff(text1_lines, text2_lines):
-    """
-    生成左右分栏对比视图的HTML。
-    此版本将“替换”操作视为“删除”+“新增”，以获得更清晰的行级对比。
-    """
-    left_html = []
-    right_html = []
-    # 使用 difflib 进行比较
-    matcher = difflib.SequenceMatcher(None, text1_lines, text2_lines, autojunk=False)
+            with res_col1:
+                st.markdown("#### 原文差异")
+                original_diff_html = generate_diff_html(original_text, ops, is_original=True)
+                st.markdown(f'<div class="diff-container">{original_diff_html}</div>', unsafe_allow_html=True)
 
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == 'equal':
-            # 如果内容相同，直接添加
-            for line in text1_lines[i1:i2]:
-                escaped_line = html_converter.escape(line)
-                left_html.append(f"<span>{escaped_line}</span>")
-                right_html.append(f"<span>{escaped_line}</span>")
-
-        elif tag == 'replace':
-            # 将“替换”视为“删除”旧行，然后“新增”新行
-            for line in text1_lines[i1:i2]:
-                escaped_line = html_converter.escape(line)
-                left_html.append(f'<span class="diff-sub">{escaped_line}</span>')
-                right_html.append('<span>&nbsp;</span>') # 右侧留空
-            for line in text2_lines[j1:j2]:
-                escaped_line = html_converter.escape(line)
-                left_html.append('<span>&nbsp;</span>') # 左侧留空
-                right_html.append(f'<span class="diff-add">{escaped_line}</span>')
-
-        elif tag == 'delete':
-            # 处理删除的行
-            for line in text1_lines[i1:i2]:
-                escaped_line = html_converter.escape(line)
-                left_html.append(f'<span class="diff-sub">{escaped_line}</span>')
-                right_html.append('<span>&nbsp;</span>') # 右侧留空
-
-        elif tag == 'insert':
-            # 处理新增的行
-            for line in text2_lines[j1:j2]:
-                escaped_line = html_converter.escape(line)
-                left_html.append('<span>&nbsp;</span>') # 左侧留空
-                right_html.append(f'<span class="diff-add">{escaped_line}</span>')
-
-    return "".join(left_html), "".join(right_html)
+            with res_col2:
+                st.markdown("#### 修改后差异")
+                modified_diff_html = generate_diff_html(modified_text, ops, is_original=False)
+                st.markdown(f'<div class="diff-container">{modified_diff_html}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("请输入原文和修改后的文本以便进行对比。")
 
 
-if st.button("🚀 开始对比", type="primary", use_container_width=True):
-    # 检查输入是否为空
-    if not text1_input or not text2_input:
-        st.warning("⚠️ 请确保左右两个文本框都输入了内容。")
-    else:
-        # 按行分割文本
-        text1_lines = text1_input.splitlines()
-        text2_lines = text2_input.splitlines()
-
-        # 生成对比结果的HTML
-        left_diff_html, right_diff_html = generate_side_by_side_diff(text1_lines, text2_lines)
-
-        st.divider()
-        st.subheader("📊 对比结果")
-
-        # 使用列布局展示结果
-        col1, col2 = st.columns(2, gap="medium")
-        with col1:
-            st.markdown(f'<div class="diff-container">{left_diff_html}</div>', unsafe_allow_html=True)
-        with col2:
-            st.markdown(f'<div class="diff-container">{right_diff_html}</div>', unsafe_allow_html=True)
+if __name__ == "__main__":
+    main()
