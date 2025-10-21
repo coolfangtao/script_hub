@@ -224,7 +224,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
                 # 3. 创建一个包含总计信息的新DataFrame
                 #    为了让“总计”更突出，我们使用Markdown的加粗语法
                 total_row = pd.DataFrame({
-                    '元素': ['**总计**'],
+                    '元素': ['数据可信度（元素百分比之和）'],
                     '质量百分比(%)': [mass_sum],
                     '原子百分比(%)': [atomic_sum]
                 })
