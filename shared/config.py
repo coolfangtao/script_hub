@@ -82,7 +82,7 @@ class Config:
         # 杂质检测可用的AI模型
         self.ZAZHI_JIANCE_GEMINI_MODEL_OPTIONS = [
             "gemini-2.0-flash",  # 可用，5.11秒
-            "gemini-2.5-pro",
+            "gemini-2.5-pro",   # 可用，14.93秒
             "gemini-2.0-flash-exp",
             "gemini-2.0-flash-lite",
             "gemini-2.0-flash-preview-image-generation",
