@@ -39,7 +39,7 @@ def get_gemini_response(image, prompt):
     """
     start_time = time.time()  # 记录开始时间
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-lite')
+        model = genai.GenerativeModel('gemini-2.0-flash-preview-image-generation')
         response = model.generate_content([prompt, image], stream=True)
         response.resolve()
         end_time = time.time()  # 记录结束时间
