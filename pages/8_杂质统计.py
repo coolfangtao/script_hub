@@ -241,7 +241,7 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
             # 将最终分类结果填充到顶部的占位符中
             styled_classification_html = f"""
                         <div style="padding-top: 0.5rem;"> <div style="font-size: 0.875rem; color: #28a745; margin-bottom: 4px;">最终杂质分类</div>
-                            <div style="font-size: 1.75rem; font-weight: 600; color: #28a745;">{final_classification}</div>
+                            <div style="font-size: 2.5rem; font-weight: 600; color: #28a745;">{final_classification}</div>
                         </div>
                         """
             classification_placeholder.markdown(styled_classification_html, unsafe_allow_html=True)
