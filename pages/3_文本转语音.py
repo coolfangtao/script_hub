@@ -13,7 +13,7 @@ from langdetect import detect, LangDetectException
 st.set_page_config(
     page_title="文本转语音生成器",
     page_icon="🔊",
-    layout="centered"
+    layout="wide"
 )
 
 # 扩展语言区域代码到中文名称的映射，并添加 Emoji
@@ -200,7 +200,7 @@ def main():
             st.warning("请输入一些文本才能生成语音。")
 
     # --- 关于和说明 ---
-    with st.expander("ℹ️ 关于与说明"):
+    with st.expander("ℹ️ 关于与说明", expanded=True):
         st.markdown("""
         - **技术支持**: 本工具使用 `edge-tts` 库，调用微软 Edge 浏览器的免费文本转语音服务。
         - **数据隐私**: 您的文本仅用于生成语音，不会被存储。
