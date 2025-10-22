@@ -1,11 +1,10 @@
 import streamlit as st
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
-
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
 
 # 自动刷新，每分钟一次，用于更新时间显示
-st_autorefresh(interval=1000 * 1, key="clock_refresher")
+st_autorefresh(interval=1000 * 10, key="clock_refresher")
 create_common_sidebar() # 暂时注释掉，以便代码独立运行
 
 # 定义北京时间 (UTC+8)
@@ -29,10 +28,8 @@ class Task:
         self.task_id = f"task_{self.creation_time.timestamp()}"
 
         self.task_progress = 0  # 0 到 100
-        # --- [!! 新增 !!] ---
         # 独立的状态，决定任务所在的列
         self.status = "未开始"
-        # --- [!! 结束 !!] ---
 
         self.completion_time = None  # 任务完成的时间
         self.task_duration = None  # 任务的【总生命周期】 (创建 -> 完成)
@@ -43,7 +40,6 @@ class Task:
         self.total_active_time = timedelta(0)
         self.last_start_active_time = None
 
-    # [!! 删除 !!] get_status(self) 方法已被 self.status 属性取代
 
     def add_comment(self, content, comment_type):
         """
@@ -57,9 +53,7 @@ class Task:
         self.task_comments.append(comment)
         st.toast(f"任务 '{self.task_name}' 添加了新评论！", icon="💬")
 
-    # --- [!! 核心变更 !!] ---
 
-    # [!! 新增 !!]
     def set_status(self, new_status):
         """
         显式设置任务状态 (列)，并处理时间跟踪和进度。
@@ -77,7 +71,7 @@ class Task:
         # 1. 刚进入“进行中”状态
         if new_status == "进行中" and old_status != "进行中":
             self.last_start_active_time = now
-            # st.toast("计时开始 ⏱️")
+            st.toast("计时开始 ⏱️")
 
         # 2. 刚离开“进行中”状态 (例如变为“未开始”或“已完成”)
         elif new_status != "进行中" and old_status == "进行中":
@@ -85,7 +79,7 @@ class Task:
                 active_segment = now - self.last_start_active_time
                 self.total_active_time += active_segment
                 self.last_start_active_time = None
-                # st.toast(f"本段计时结束...")
+                st.toast(f"本段计时结束...")
 
         # --- 自动更新进度的逻辑 ---
         if new_status == "已完成":
@@ -109,12 +103,9 @@ class Task:
         elif new_status == "未开始":
             self.completion_time = None
             self.task_duration = None
-            # !! 关键：我们【不】修改 self.task_progress
-            # 这就允许一个 90% 的任务被“挂起”到“未开始”列
 
         # st.rerun() # on_click 按钮会自动 rerun
 
-    # [!! 变更 !!]
     def update_progress(self, new_progress):
         """
         由滑块调用：仅更新任务进度百分比。
@@ -355,7 +346,7 @@ tasks_doing = [t for t in sorted_tasks if t.status == "进行中"]
 tasks_done = [t for t in sorted_tasks if t.status == "已完成"]
 
 with col_todo:
-    st.header(f"📥 未开始 ({len(tasks_todo)})")
+    st.header(f"📥 未开始/挂起 ({len(tasks_todo)})")
     for task in tasks_todo:
         display_task_card(task)
 
