@@ -1,5 +1,7 @@
 import streamlit as st
 from datetime import datetime, timedelta
+from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
+create_common_sidebar()
 
 
 # 1. 任务类定义 (Task Class Definition)
