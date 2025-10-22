@@ -377,9 +377,7 @@ def display_main_controls():
                 # 当用户上传文件后，立即处理
                 handle_tasks_import(uploaded_file)
 
-        with st.container(border=True):
             st.subheader("📤 导出任务", anchor=False)
-
             # 准备导出数据
             json_data = get_export_data()
 
