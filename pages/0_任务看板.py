@@ -181,7 +181,7 @@ def display_task_card(task):
     with st.expander(f"{task.task_type}", expanded=True):
 
         # 1. 任务详情与控制
-        st.subheader(task.task_name, driver="rainbow")
+        st.subheader(task.task_name, divider="rainbow")
 
         st.slider(
             "进度",
