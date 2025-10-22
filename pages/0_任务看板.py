@@ -218,6 +218,7 @@ def initialize_app():
         st.session_state.tasks = []
 # --- [!! 结束新函数 !!] ---
 
+
 # --- [!! 新函数：显示创建任务表单 !!] ---
 def display_new_task_form():
     """
@@ -290,7 +291,7 @@ def display_task_comments(task):
     """
     显示单个任务的评论区域 (包括输入和列表)。
     """
-    st.subheader("任务评论", divider='rainbow')
+    st.subheader("任务评论", divider='gray')
 
     with st.popover("💬 创建评论"):
         with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
