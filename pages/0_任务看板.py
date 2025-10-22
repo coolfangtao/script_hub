@@ -541,7 +541,7 @@ def display_task_management(task):
     col_info, col_manage = st.columns([3, 1])
 
     with col_info:
-        st.caption(f"ID: `{task.task_id}`")
+        st.caption(f"ID: {task.task_id}")
         st.caption(f"创建于: {task.creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     with col_manage:
@@ -633,14 +633,6 @@ def display_task_card(task):
 
         # --- [!! 调用独立的管理函数 !!] ---
         display_task_management(task)
-
-        # 附加信息 (不变)
-        st.divider()
-        col3, col4 = st.columns(2)
-        with col3:
-            st.markdown(f"ID: {task.task_id}")
-        with col4:
-            st.markdown(f"创建时间: {task.creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 # --- [!! 修改：优化主卡片布局 !!] ---
