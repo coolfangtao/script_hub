@@ -1,12 +1,14 @@
 import streamlit as st
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
-from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
+
+# 假设 shared.sidebar 存在于您的项目中
+from shared.sidebar import create_common_sidebar
 
 
 # 自动刷新，每分钟一次，用于更新时间显示
-st_autorefresh(interval=1000 * 10, key="clock_refresher")
-create_common_sidebar()
+st_autorefresh(interval=1000 * 60, key="clock_refresher")
+create_common_sidebar() # 暂时注释掉，以便代码独立运行
 
 # 定义北京时间 (UTC+8)
 beijing_tz = timezone(timedelta(hours=8))
@@ -37,10 +39,16 @@ class Task:
 
         self.task_comments = []
 
-        # (时间跟踪属性保持不变)
-        self.total_active_time = timedelta(0)
-        self.last_start_active_time = None
+        # (时间跟踪属性)
+        self.total_active_time = timedelta(0)  # 仅存储已完成的总时长
+        self.last_start_active_time = None  # 当前活动时段的开始时间
 
+        # --- [!! 新增属性 !!] ---
+        # 详细记录每一次“进行中”的时间段
+        # 列表，存储格式为:
+        # { 'start_time': datetime, 'end_time': datetime, 'duration': timedelta, 'stopped_as': str }
+        self.active_time_segments = []
+        # --- [!! 结束 !!] ---
 
     def add_comment(self, content, comment_type):
         """
@@ -53,7 +61,6 @@ class Task:
         }
         self.task_comments.append(comment)
         st.toast(f"任务 '{self.task_name}' 添加了新评论！", icon="💬")
-
 
     def set_status(self, new_status):
         """
@@ -77,8 +84,20 @@ class Task:
         # 2. 刚离开“进行中”状态 (例如变为“未开始”或“已完成”)
         elif new_status != "进行中" and old_status == "进行中":
             if self.last_start_active_time:
-                active_segment = now - self.last_start_active_time
-                self.total_active_time += active_segment
+                active_segment_duration = now - self.last_start_active_time
+                self.total_active_time += active_segment_duration
+
+                # --- [!! 新增逻辑：记录时间段 !!] ---
+                new_segment = {
+                    "start_time": self.last_start_active_time,
+                    "end_time": now,
+                    "duration": active_segment_duration,
+                    # 记录是因何而停止 (挂起 还是 完成)
+                    "stopped_as": new_status
+                }
+                self.active_time_segments.append(new_segment)
+                # --- [!! 结束 !!] ---
+
                 self.last_start_active_time = None
                 st.toast(f"本段计时结束...")
 
@@ -104,8 +123,7 @@ class Task:
         elif new_status == "未开始":
             self.completion_time = None
             self.task_duration = None
-
-        # st.rerun() # on_click 按钮会自动 rerun
+            # (离开“进行中”的逻辑已在上面处理)
 
     def update_progress(self, new_progress):
         """
@@ -143,9 +161,11 @@ class Task:
         """返回任务的【总有效工作时长】"""
         current_active_duration = timedelta(0)
 
+        # 加上当前正在进行的活动时间
         if self.status == "进行中" and self.last_start_active_time:
             current_active_duration = datetime.now(beijing_tz) - self.last_start_active_time
 
+        # 总时长 = 已完成的总时长 + 当前进行中的时长
         return self.total_active_time + current_active_duration
 
 
@@ -168,13 +188,19 @@ def format_timedelta_to_str(duration):
         parts.append(f"{hours}小时")
     if minutes > 0:
         parts.append(f"{minutes}分钟")
-    if seconds > 0 and not parts:
+    # 仅当总时长小于1分钟时才显示秒
+    if seconds > 0 and total_seconds < 60:
         parts.append(f"{seconds}秒")
+    elif total_seconds >= 60 and seconds > 0:
+        # 如果有分钟，秒数会显得累赘，可以注释掉下面这行
+        # parts.append(f"{seconds}秒")
+        pass
 
     if not parts:
         return "0秒"
 
-    return f"{days}天{hours}时{minutes}分{seconds}秒"
+    # 优化显示，例如 "X天X时X分"
+    return "".join(parts)
 
 
 # --- Streamlit 界面 ---
@@ -255,7 +281,7 @@ def display_task_card(task):
                 help="这是从任务创建开始的总时长。如果任务已完成，则为创建到完成的总时长。每分钟刷新。"
             )
 
-        # --- [!! 新增 !!] 状态控制按钮 ---
+        # --- 状态控制按钮 ---
         cols = st.columns(4)
         with cols[0]:
             if task.status == "未开始":
@@ -320,7 +346,37 @@ def display_task_card(task):
                     st.markdown(f":{content_color}[{comment['content']}]")
                     st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
 
+        # --- [!! 新增：工时记录显示 !!] ---
+        st.subheader("工时记录", divider='gray')
+
+        # 1. 显示当前正在进行的
+        if task.status == "进行中" and task.last_start_active_time:
+            start_str = task.last_start_active_time.strftime('%Y-%m-%d %H:%M:%S')
+            current_duration = datetime.now(beijing_tz) - task.last_start_active_time
+            current_duration_str = format_timedelta_to_str(current_duration)
+            st.success(f"**当前:** 正在计时... ({current_duration_str})\n"
+                       f"开始于: {start_str}")
+
+        # 2. 显示所有已完成的记录 (按时间倒序)
+        if not task.active_time_segments:
+            if task.status != "进行中":  # 如果没有进行中的，也没有历史，才显示
+                st.caption("暂无完整的工时记录。")
+        else:
+            # st.write("历史记录:")
+            for i, segment in enumerate(reversed(task.active_time_segments)):
+                start_str = segment['start_time'].strftime('%H:%M:%S')
+                end_str = segment['end_time'].strftime('%H:%M:%S')
+                date_str = segment['start_time'].strftime('%Y-%m-%d')
+                duration_str = format_timedelta_to_str(segment['duration'])
+
+                # 状态图标
+                status_icon = "⏸️" if segment['stopped_as'] == '未开始' else "✅"
+
+                st.info(f"**{duration_str}** (在 {date_str} 从 {start_str} 到 {end_str}) {status_icon}")
+        # --- [!! 结束 !!] ---
+
         # 附加信息 (不变)
+        st.divider()
         col3, col4 = st.columns(2)
         with col3:
             st.markdown(f"ID: {task.task_id}")
@@ -351,4 +407,3 @@ with col_done:
     st.header(f"✅ 已完成 ({len(tasks_done)})")
     for task in tasks_done:
         display_task_card(task)
-
