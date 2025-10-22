@@ -400,7 +400,27 @@ def display_main_controls():
 
     # --- 第3栏：导出到文件 ---
     with col3:
-        pass
+        st.markdown("##### ⚙️ GitHub 同步配置")
+
+        # GitHub 仓库地址输入框
+        st.text_input(
+            "仓库地址",
+            placeholder="例如：your-username/your-repo-name",
+            help="填写您在 GitHub 上的 `用户名/仓库名`。"
+        )
+
+        # GitHub Personal Access Token 输入框
+        st.text_input(
+            "个人访问Token",
+            type="password",
+            help="请使用具有 repo 范围权限的 Personal Access Token 以确保同步成功。"
+        )
+
+        # 同步按钮
+        st.button("保存并同步到 GitHub", use_container_width=True)
+
+        # 提示信息
+        st.caption("您的 Token 仅用于本次同步，不会被存储。")
 
 
 
