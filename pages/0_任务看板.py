@@ -196,11 +196,9 @@ def display_task_card(task):
     icon = "👔" if task.task_type == "主线任务" else "🤸"
 
     with st.expander(f"{icon} {task.task_name} (进度: {task.task_progress}%)", expanded=True):
-        # 1. 任务名称
-        st.subheader(task.task_name, divider='rainbow')
 
         # 1. 任务详情与控制
-        st.subheader("任务状态", divider='rainbow')
+        st.subheader(task.task_name, divider='rainbow')
         col1, col2 = st.columns(2)
 
         with col1:
