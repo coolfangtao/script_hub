@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
-st_autorefresh(interval=1000, key="clock_refresher")
+st_autorefresh(interval=1000*3600, key="clock_refresher")
 create_common_sidebar()
 
 # 定义北京时间 (UTC+8)
