@@ -1,8 +1,6 @@
 import streamlit as st
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
-
-# 假设 shared.sidebar 存在于您的项目中
 from shared.sidebar import create_common_sidebar
 
 
@@ -203,33 +201,41 @@ def format_timedelta_to_str(duration):
     return "".join(parts)
 
 
-# --- Streamlit 界面 ---
+# --- [!! 新函数：初始化应用 !!] ---
+def initialize_app():
+    """
+    设置页面配置、标题和初始化 session_state。
+    """
+    st.set_page_config(
+        page_title="每日任务看板",
+        page_icon="📋",
+        layout="wide"
+    )
+    st.title("📋 每日任务看板")
+    st.markdown("---")
 
-st.set_page_config(
-    page_title="每日任务看板",
-    page_icon="📋",
-    layout="wide"
-)
+    if 'tasks' not in st.session_state:
+        st.session_state.tasks = []
+# --- [!! 结束新函数 !!] ---
 
-st.title("📋 每日任务看板")
-st.markdown("---")
+# --- [!! 新函数：显示创建任务表单 !!] ---
+def display_new_task_form():
+    """
+    显示用于创建新任务的表单。
+    """
+    with st.expander("🚀 点击创建新任务", expanded=True):
+        with st.form(key="new_task_form", clear_on_submit=True):
+            new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
+            new_task_type = st.selectbox("任务类型", ["主线任务", "副线任务"])
 
-if 'tasks' not in st.session_state:
-    st.session_state.tasks = []
+            submit_button = st.form_submit_button(label="添加任务")
 
-# --- 创建新任务 ---
-with st.expander("🚀 点击创建新任务", expanded=True):
-    with st.form(key="new_task_form", clear_on_submit=True):
-        new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
-        new_task_type = st.selectbox("任务类型", ["主线任务", "副线任务"])
-
-        submit_button = st.form_submit_button(label="添加任务")
-
-        if submit_button and new_task_name:
-            new_task = Task(task_name=new_task_name, task_type=new_task_type)
-            st.session_state.tasks.append(new_task)
-            st.success(f"任务 '{new_task_name}' 已添加！")
-            st.rerun()
+            if submit_button and new_task_name:
+                new_task = Task(task_name=new_task_name, task_type=new_task_type)
+                st.session_state.tasks.append(new_task)
+                st.success(f"任务 '{new_task_name}' 已添加！")
+                st.rerun()
+# --- [!! 结束新函数 !!] ---
 
 
 def get_task_by_id(task_id):
@@ -251,13 +257,110 @@ def handle_progress_change(task_id):
     task.update_progress(new_progress)
 
 
+# --- [!! 新函数：显示状态控制按钮 !!] ---
+def display_task_controls(task):
+    """
+    显示任务的状态控制按钮 (开始、挂起、完成、重新打开)。
+    """
+    cols = st.columns(4)
+    with cols[0]:
+        if task.status == "未开始":
+            st.button("▶️ 开始", key=f"start_{task.task_id}", on_click=task.set_status, args=("进行中",),
+                      use_container_width=True)
+    with cols[1]:
+        if task.status == "进行中":
+            st.button("⏸️ 挂起", key=f"pause_{task.task_id}", on_click=task.set_status, args=("未开始",),
+                      help="将任务移回“未开始”并暂停计时，不改变当前进度。", use_container_width=True)
+    with cols[2]:
+        # "完成"按钮现在只在“进行中”时显示
+        if task.status == "进行中":
+            st.button("✅ 完成", key=f"done_{task.task_id}", on_click=task.set_status, args=("已完成",),
+                      use_container_width=True)
+    with cols[3]:
+        if task.status == "已完成":
+            st.button("🔄 重新打开", key=f"reopen_{task.task_id}", on_click=task.set_status, args=("进行中",),
+                      use_container_width=True)
+
+    st.write("")  # 增加一点间距
+# --- [!! 结束新函数 !!] ---
+
+
+# --- [!! 新函数：显示评论区 !!] ---
+def display_task_comments(task):
+    """
+    显示单个任务的评论区域 (包括输入和列表)。
+    """
+    st.subheader("任务评论", divider='rainbow')
+
+    with st.popover("💬 创建评论"):
+        with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
+            comment_type = st.selectbox("评论类型", ["感悟", "问题", "备注"], key=f"ctype_{task.task_id}")
+            comment_content = st.text_area("评论内容...", key=f"ctext_{task.task_id}", height=100)
+
+            if st.form_submit_button("提交"):
+                if comment_content:
+                    task.add_comment(comment_content, comment_type)
+                    st.rerun()
+                else:
+                    st.warning("评论内容不能为空")
+
+    if not task.task_comments:
+        pass
+    else:
+        for comment in reversed(task.task_comments):
+            icon_map = {"感悟": "💡", "问题": "❓", "备注": "📌"}
+            color_map = {"感悟": "green", "问题": "red", "备注": "blue"}
+
+            comment_icon = icon_map.get(comment['type'], "💬")
+            content_color = color_map.get(comment['type'], "gray")
+
+            with st.chat_message(name=comment['type'], avatar=comment_icon):
+                st.markdown(f":{content_color}[{comment['content']}]")
+                st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
+# --- [!! 结束新函数 !!] ---
+
+
+# --- [!! 新函数：显示工时记录 !!] ---
+def display_task_time_logs(task):
+    """
+    显示单个任务的详细工时记录 (当前和历史)。
+    """
+    st.subheader("工时记录", divider='gray')
+
+    # 1. 显示当前正在进行的
+    if task.status == "进行中" and task.last_start_active_time:
+        start_str = task.last_start_active_time.strftime('%Y-%m-%d %H:%M:%S')
+        current_duration = datetime.now(beijing_tz) - task.last_start_active_time
+        current_duration_str = format_timedelta_to_str(current_duration)
+        st.success(f"**当前:** 正在计时... ({current_duration_str})\n"
+                   f"开始于: {start_str}")
+
+    # 2. 显示所有已完成的记录 (按时间倒序)
+    if not task.active_time_segments:
+        if task.status != "进行中":  # 如果没有进行中的，也没有历史，才显示
+            st.caption("暂无完整的工时记录。")
+    else:
+        # st.write("历史记录:")
+        for i, segment in enumerate(reversed(task.active_time_segments)):
+            start_str = segment['start_time'].strftime('%H:%M:%S')
+            end_str = segment['end_time'].strftime('%H:%M:%S')
+            date_str = segment['start_time'].strftime('%Y-%m-%d')
+            duration_str = format_timedelta_to_str(segment['duration'])
+
+            # 状态图标
+            status_icon = "⏸️" if segment['stopped_as'] == '未开始' else "✅"
+
+            st.info(f"**{duration_str}** (在 {date_str} 从 {start_str} 到 {end_str}) {status_icon}")
+# --- [!! 结束新函数 !!] ---
+
+
 # --- 任务卡片显示函数 (Task Card Display Function) ---
 def display_task_card(task):
     """
     在UI上显示一个任务卡片。
     """
 
-    with st.expander(f"{task.task_type}", expanded=True):
+    with st.expander(f"{task.task_name}", expanded=True):
 
         st.subheader(task.task_name, divider="rainbow")
 
@@ -282,26 +385,7 @@ def display_task_card(task):
             )
 
         # --- 状态控制按钮 ---
-        cols = st.columns(4)
-        with cols[0]:
-            if task.status == "未开始":
-                st.button("▶️ 开始", key=f"start_{task.task_id}", on_click=task.set_status, args=("进行中",),
-                          use_container_width=True)
-        with cols[1]:
-            if task.status == "进行中":
-                st.button("⏸️ 挂起", key=f"pause_{task.task_id}", on_click=task.set_status, args=("未开始",),
-                          help="将任务移回“未开始”并暂停计时，不改变当前进度。", use_container_width=True)
-        with cols[2]:
-            # "完成"按钮现在只在“进行中”时显示
-            if task.status == "进行中":
-                st.button("✅ 完成", key=f"done_{task.task_id}", on_click=task.set_status, args=("已完成",),
-                          use_container_width=True)
-        with cols[3]:
-            if task.status == "已完成":
-                st.button("🔄 重新打开", key=f"reopen_{task.task_id}", on_click=task.set_status, args=("进行中",),
-                          use_container_width=True)
-
-        st.write("")  # 增加一点间距
+        display_task_controls(task)
 
         # 进度条
         st.slider(
@@ -318,62 +402,10 @@ def display_task_card(task):
         )
 
         # --- 评论区 (保持不变) ---
-        st.subheader("任务评论", divider='rainbow')
+        display_task_comments(task)
 
-        with st.popover("💬 创建评论"):
-            with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
-                comment_type = st.selectbox("评论类型", ["感悟", "问题", "备注"], key=f"ctype_{task.task_id}")
-                comment_content = st.text_area("评论内容...", key=f"ctext_{task.task_id}", height=100)
-
-                if st.form_submit_button("提交"):
-                    if comment_content:
-                        task.add_comment(comment_content, comment_type)
-                        st.rerun()
-                    else:
-                        st.warning("评论内容不能为空")
-
-        if not task.task_comments:
-            pass
-        else:
-            for comment in reversed(task.task_comments):
-                icon_map = {"感悟": "💡", "问题": "❓", "备注": "📌"}
-                color_map = {"感悟": "green", "问题": "red", "备注": "blue"}
-
-                comment_icon = icon_map.get(comment['type'], "💬")
-                content_color = color_map.get(comment['type'], "gray")
-
-                with st.chat_message(name=comment['type'], avatar=comment_icon):
-                    st.markdown(f":{content_color}[{comment['content']}]")
-                    st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
-
-        # --- [!! 新增：工时记录显示 !!] ---
-        st.subheader("工时记录", divider='gray')
-
-        # 1. 显示当前正在进行的
-        if task.status == "进行中" and task.last_start_active_time:
-            start_str = task.last_start_active_time.strftime('%Y-%m-%d %H:%M:%S')
-            current_duration = datetime.now(beijing_tz) - task.last_start_active_time
-            current_duration_str = format_timedelta_to_str(current_duration)
-            st.success(f"**当前:** 正在计时... ({current_duration_str})\n"
-                       f"开始于: {start_str}")
-
-        # 2. 显示所有已完成的记录 (按时间倒序)
-        if not task.active_time_segments:
-            if task.status != "进行中":  # 如果没有进行中的，也没有历史，才显示
-                st.caption("暂无完整的工时记录。")
-        else:
-            # st.write("历史记录:")
-            for i, segment in enumerate(reversed(task.active_time_segments)):
-                start_str = segment['start_time'].strftime('%H:%M:%S')
-                end_str = segment['end_time'].strftime('%H:%M:%S')
-                date_str = segment['start_time'].strftime('%Y-%m-%d')
-                duration_str = format_timedelta_to_str(segment['duration'])
-
-                # 状态图标
-                status_icon = "⏸️" if segment['stopped_as'] == '未开始' else "✅"
-
-                st.info(f"**{duration_str}** (在 {date_str} 从 {start_str} 到 {end_str}) {status_icon}")
-        # --- [!! 结束 !!] ---
+        # --- 工时记录 ---
+        display_task_time_logs(task)
 
         # 附加信息 (不变)
         st.divider()
@@ -384,26 +416,47 @@ def display_task_card(task):
             st.markdown(f"创建时间: {task.creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-# --- 主看板布局 (Main Kanban Layout) ---
-col_todo, col_doing, col_done = st.columns(3)
+# --- [!! 新函数：显示主看板布局 !!] ---
+def display_kanban_layout():
+    """
+    显示主看板的三栏布局 (未开始, 进行中, 已完成)。
+    """
+    col_todo, col_doing, col_done = st.columns(3)
 
-sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=False)
+    sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=False)
 
-tasks_todo = [t for t in sorted_tasks if t.status == "未开始"]
-tasks_doing = [t for t in sorted_tasks if t.status == "进行中"]
-tasks_done = [t for t in sorted_tasks if t.status == "已完成"]
+    tasks_todo = [t for t in sorted_tasks if t.status == "未开始"]
+    tasks_doing = [t for t in sorted_tasks if t.status == "进行中"]
+    tasks_done = [t for t in sorted_tasks if t.status == "已完成"]
 
-with col_todo:
-    st.header(f"📥 未开始/挂起 ({len(tasks_todo)})")
-    for task in tasks_todo:
-        display_task_card(task)
+    with col_todo:
+        st.header(f"📥 未开始/挂起 ({len(tasks_todo)})")
+        for task in tasks_todo:
+            display_task_card(task)
 
-with col_doing:
-    st.header(f"💻 进行中 ({len(tasks_doing)})")
-    for task in tasks_doing:
-        display_task_card(task)
+    with col_doing:
+        st.header(f"💻 进行中 ({len(tasks_doing)})")
+        for task in tasks_doing:
+            display_task_card(task)
 
-with col_done:
-    st.header(f"✅ 已完成 ({len(tasks_done)})")
-    for task in tasks_done:
-        display_task_card(task)
+    with col_done:
+        st.header(f"✅ 已完成 ({len(tasks_done)})")
+        for task in tasks_done:
+            display_task_card(task)
+# --- [!! 结束新函数 !!] ---
+
+
+# --- [!! 新函数：主函数 !!] ---
+def main():
+    """
+    主函数：按顺序运行应用。
+    """
+    initialize_app()
+    display_new_task_form()
+    display_kanban_layout()
+# --- [!! 结束新函数 !!] ---
+
+
+# --- 启动应用 ---
+if __name__ == "__main__":
+    main()
