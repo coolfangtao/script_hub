@@ -1,14 +1,10 @@
 import streamlit as st
 from datetime import datetime, timedelta, timezone
-import pandas as pd
-import io
-
-# --- [!! 新增 !!] ---
+from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
+create_common_sidebar()
 # 定义北京时间 (UTC+8)
 beijing_tz = timezone(timedelta(hours=8))
 
-
-# ---------------------
 
 # 1. 任务类定义 (Task Class Definition)
 # [!! 保持不变 !!]
@@ -23,7 +19,6 @@ class Task:
         """
         self.task_name = task_name
         self.task_type = task_type  # '主线任务' 或 '副线任务'
-        # [!! 修改 !!] 使用北京时间
         self.creation_time = datetime.now(beijing_tz)
         # 使用高精度的Unix时间戳作为唯一ID
         self.task_id = f"task_{self.creation_time.timestamp()}"
@@ -43,7 +38,6 @@ class Task:
         comment = {
             "content": content,
             "type": comment_type,
-            # [!! 修改 !!] 使用北京时间
             "time": datetime.now(beijing_tz)
         }
         self.task_comments.append(comment)
@@ -61,7 +55,6 @@ class Task:
 
         if new_status == "已完成":
             if not self.completion_time:  # 只有在第一次标记为完成时才记录
-                # [!! 修改 !!] 使用北京时间
                 self.completion_time = datetime.now(beijing_tz)
                 self.task_duration = self.completion_time - self.creation_time
             self.task_progress = 100  # 自动将进度设为100
@@ -106,7 +99,6 @@ class Task:
         if self.task_status == "已完成" and self.task_duration:
             duration = self.task_duration
         elif self.task_status == "进行中":
-            # [!! 修改 !!] 使用北京时间
             duration = datetime.now(beijing_tz) - self.creation_time
         elif self.task_status == "未开始":
             return "尚未开始"
@@ -132,12 +124,14 @@ st.set_page_config(
 )
 
 st.title("📋 个人任务看板")
+st.markdown("---")
 
 # 初始化 session_state
 if 'tasks' not in st.session_state:
     st.session_state.tasks = []
 
-# --- [!! 保持不变 !!] 创建新任务功能区移到主页顶部 ---
+# --- 侧边栏：创建新任务 (Sidebar: Create New Task) ---
+# [!! 保持不变 !!]
 with st.expander("🚀 点击创建新任务"):
     with st.form(key="new_task_form", clear_on_submit=True):
         new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
@@ -149,22 +143,12 @@ with st.expander("🚀 点击创建新任务"):
             new_task = Task(task_name=new_task_name, task_type=new_task_type)
             st.session_state.tasks.append(new_task)
             st.success(f"任务 '{new_task_name}' 已添加！")
-            st.rerun()  # 添加 Rerun 以便立即刷新看板
-
-# --- [!! 新增 !!] 工具栏 ---
-st.markdown("---")  # 添加分隔线
-col_tools_1, col_tools_2, _ = st.columns([1, 1, 3])  # 布局
-
-with col_tools_1:
-    if st.button("🔄 刷新用时", help="手动刷新“进行中”任务的已用时间"):
-        st.rerun()
+            st.rerun() # 添加 Rerun 以便立即刷新看板
 
 
-# (Excel 按钮在下面，因为它需要 helper 函数)
+# --- [!! 优化 !!] ---
+# 1. 将回调函数和辅助函数放在主逻辑区
 
-
-# --- 回调函数和辅助函数 ---
-# [!! 保持不变 !!]
 def get_task_by_id(task_id):
     """
     辅助函数：根据ID从 session_state 中查找任务对象。
@@ -201,78 +185,10 @@ def handle_progress_change(task_id):
     task.update_progress(new_progress)
 
 
-# --- [!! 新增 !!] Excel 导出辅助函数 ---
-def generate_excel_export():
-    """
-    将 session_state 中的任务数据转换为 Excel 文件的内存字节流。
-    """
-    if not st.session_state.tasks:
-        return None
-
-    tasks_list = []
-    for task in st.session_state.tasks:
-        # 将评论合并为单个字符串
-        comments_str = ""
-        if task.task_comments:
-            comment_lines = []
-            for c in task.task_comments:
-                time_str = c['time'].strftime('%Y-%m-%d %H:%M')
-                comment_lines.append(f"[{c['type']} @ {time_str}]: {c['content']}")
-            comments_str = "\n------------------\n".join(comment_lines)
-
-        tasks_list.append({
-            "任务ID": task.task_id,
-            "任务名称": task.task_name,
-            "任务类型": task.task_type,
-            "任务状态": task.task_status,
-            "任务进度(%)": task.task_progress,
-            "创建时间": task.creation_time.strftime('%Y-%m-%d %H:%M:%S'),
-            "完成时间": task.completion_time.strftime('%Y-%m-%d %H:%M:%S') if task.completion_time else "N/A",
-            "当前用时": task.get_duration_str(),
-            "评论详情": comments_str
-        })
-
-    df = pd.DataFrame(tasks_list)
-
-    output = io.BytesIO()
-    df.to_excel(output, index=False, sheet_name='任务列表', engine='openpyxl')
-    output.seek(0)  # 将指针移回开头
-    return output.getvalue()
-
-
 # ---------------------
 
-# --- [!! 新增 !!] 工具栏的继续部分 (Excel 按钮) ---
-with col_tools_2:
-    if not st.session_state.tasks:
-        # 如果没有任务，禁用按钮
-        st.download_button(
-            label="📥 导出Excel",
-            data="",
-            file_name="tasks_export.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="暂无任务可导出",
-            disabled=True
-        )
-    else:
-        # 准备 Excel 数据
-        excel_data = generate_excel_export()
-        # 获取当前时间
-        now_str = datetime.now(beijing_tz).strftime("%Y%m%d_%H%M%S")
-
-        st.download_button(
-            label="📥 导出Excel",
-            data=excel_data,
-            file_name=f"tasks_export_{now_str}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            help="点击下载所有任务的Excel报告"
-        )
-
-
-# ---------------------
 
 # --- 任务卡片显示函数 (Task Card Display Function) ---
-# [!! 保持不变 !!]
 def display_task_card(task):
     """
     在UI上显示一个任务卡片。
@@ -282,38 +198,44 @@ def display_task_card(task):
     with st.expander(f"{icon} {task.task_name} (进度: {task.task_progress}%)", expanded=True):
 
         # 1. 任务详情与控制
+        st.subheader("任务进度", divider='rainbow')
         col1, col2 = st.columns(2)
 
         with col1:
-            # 状态选择 (使用 on_change)
+            # 状态选择
             status_options = ["未开始", "进行中", "已完成"]
             current_status_index = status_options.index(task.task_status)
 
+            # --- [!! 优化 !!] ---
+            # 使用 on_change 回调函数
+            # 不再需要 if new_status != ... 的判断
             st.selectbox(
                 "状态",
                 options=status_options,
                 index=current_status_index,
-                key=f"status_{task.task_id}",
-                on_change=handle_status_change,
-                args=(task.task_id,)
+                key=f"status_{task.task_id}",  # key 是必须的
+                on_change=handle_status_change,  # 指定回调
+                args=(task.task_id,)  # 传递参数给回调
             )
+            # ---------------------
 
         with col2:
-            # 进度条 (使用 on_change)
+            # 进度条
             st.slider(
-                "进度 (0-100%)",
+                "进度",
                 min_value=0,
                 max_value=100,
-                value=task.task_progress,
+                value=task.task_progress,  # 'value' 确保滑块在“进行中”时显示 10%
                 step=10,
-                key=f"progress_{task.task_id}",
-                on_change=handle_progress_change,
-                args=(task.task_id,),
-                format="%d%%",  # 美化：添加百分号
-                help="拖动滑块更新进度，状态会自动同步"
+                format="%d%%",
+                key=f"progress_{task.task_id}",  # key 是必须的
+                help="拖动滑块来更新任务进度",
+                on_change=handle_progress_change,  # 指定回调
+                args=(task.task_id,)  # 传递参数给回调
             )
+            # ---------------------
 
-        # 用时信息
+        # 用时信息 (不变)
         if task.task_status == "已完成":
             st.success(f"**总用时:** {task.get_duration_str()}")
         elif task.task_status == "进行中":
@@ -343,19 +265,15 @@ def display_task_card(task):
             for comment in reversed(task.task_comments):
                 comment_icon = "💡" if comment['type'] == "感悟" else "❓"
                 with st.chat_message(name=comment['type'], avatar=comment_icon):
-
-                    # --- [!! 修改 !!] 根据类型显示不同颜色 ---
                     if comment['type'] == "感悟":
                         # 使用 markdown 语法 :green[...] 来显示绿色
                         st.markdown(f":green[{comment['content']}]")
                     else:
                         # "问题" 或其他类型为红色
                         st.markdown(f":red[{comment['content']}]")
-                    # -------------------------------------
-
                     st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
 
-        # 附加信息
+        # 附加信息 (不变)
         col3, col4 = st.columns(2)
         with col3:
             st.markdown(f"ID: {task.task_id}")
@@ -364,32 +282,25 @@ def display_task_card(task):
 
 
 # --- 主看板布局 (Main Kanban Layout) ---
-st.markdown("---")  # 添加分隔线
 col_todo, col_doing, col_done = st.columns(3)
 
-# 按创建时间倒序排序任务 (最新的在最前面)
-sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=True)
+sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=False)
 
-# 过滤任务到对应的列
 tasks_todo = [t for t in sorted_tasks if t.task_status == "未开始"]
 tasks_doing = [t for t in sorted_tasks if t.task_status == "进行中"]
 tasks_done = [t for t in sorted_tasks if t.task_status == "已完成"]
 
-# 渲染 "未开始" 列
 with col_todo:
     st.header(f"📥 未开始 ({len(tasks_todo)})")
     for task in tasks_todo:
         display_task_card(task)
 
-# 渲染 "进行中" 列
 with col_doing:
-    st.header(f"💻 进行中 ({len(tasks_todo)})")
+    st.header(f"💻 进行中 ({len(tasks_doing)})")
     for task in tasks_doing:
         display_task_card(task)
 
-# 渲染 "已完成" 列
 with col_done:
     st.header(f"✅ 已完成 ({len(tasks_done)})")
     for task in tasks_done:
         display_task_card(task)
-
