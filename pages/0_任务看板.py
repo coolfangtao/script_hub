@@ -398,7 +398,7 @@ def display_main_controls():
                 disabled=not st.session_state.tasks
             )
 
-    # --- 第3栏：导出到文件 ---
+    # --- 第3栏：github同步配置 ---
     with col3:
         with st.container(border=True, height=container_height):
             st.markdown("##### ⚙️ GitHub 同步配置")
@@ -677,21 +677,18 @@ def display_kanban_layout():
 
     with col_todo:
         st.header(f"📥 未开始/挂起 ({len(tasks_todo)})", divider="rainbow")
-        with st.container(border=True):
-            for task in tasks_todo:
-                display_task_card(task)
+        for task in tasks_todo:
+            display_task_card(task)
 
     with col_doing:
         st.header(f"💻 进行中 ({len(tasks_doing)})", divider="rainbow")
-        with st.container(border=True):
-            for task in tasks_doing:
-                display_task_card(task)
+        for task in tasks_doing:
+            display_task_card(task)
 
     with col_done:
         st.header(f"✅ 已完成 ({len(tasks_done)})", divider="rainbow")
-        with st.container(border=True):
-            for task in tasks_done:
-                display_task_card(task)
+        for task in tasks_done:
+            display_task_card(task)
 
 
 # --- [!! 新函数：主函数 !!] ---
