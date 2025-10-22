@@ -13,3 +13,4 @@ google-generativeai
 akshare
 libsql-client
 opencv-python
+st_autorefresh
