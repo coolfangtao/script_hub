@@ -1,4 +1,5 @@
 import streamlit as st
+from itertools import groupby
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
 from shared.sidebar import create_common_sidebar
@@ -308,10 +309,8 @@ def display_task_comments(task):
     if not task.task_comments:
         st.info("暂无评论，点击上方“💬 创建评论”来添加第一条吧！")
     else:
-        # vvvvvvvvvvvv 这是核心改动 vvvvvvvvvvvv
         # 你可以根据需要调整 height 的值
         with st.container(height=400):
-        # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
             for comment in reversed(task.task_comments):
                 icon_map = {"心得": "💡", "问题": "❓", "备注": "📌"}
                 color_map = {"心得": "green", "问题": "red", "备注": "blue"}
@@ -325,13 +324,13 @@ def display_task_comments(task):
 
 
 # --- [!! 新函数：显示工时记录 !!] ---
-def display_task_time_logs(task):
+def display_task_time_logs_v3(task):
     """
-    显示单个任务的详细工时记录 (当前和历史)。
+    方案三：按日期对历史记录进行分组折叠，体验最佳。
     """
     st.subheader("工时记录", divider='rainbow')
 
-    # 1. 显示当前正在进行的
+    # 1. 当前计时部分保持不变
     if task.status == "进行中" and task.last_start_active_time:
         start_str = task.last_start_active_time.strftime('%Y-%m-%d %H:%M:%S')
         current_duration = datetime.now(beijing_tz) - task.last_start_active_time
@@ -339,22 +338,32 @@ def display_task_time_logs(task):
         st.success(f"**当前:** 正在计时... ({current_duration_str})\n"
                    f"开始于: {start_str}")
 
-    # 2. 显示所有已完成的记录 (按时间倒序)
+    # 2. 按日期对历史记录进行分组
     if not task.active_time_segments:
-        if task.status != "进行中":  # 如果没有进行中的，也没有历史，才显示
+        if task.status != "进行中":
             st.caption("暂无完整的工时记录。")
     else:
-        # st.write("历史记录:")
-        for i, segment in enumerate(reversed(task.active_time_segments)):
-            start_str = segment['start_time'].strftime('%H:%M:%S')
-            end_str = segment['end_time'].strftime('%H:%M:%S')
-            date_str = segment['start_time'].strftime('%Y-%m-%d')
-            duration_str = format_timedelta_to_str(segment['duration'])
+        # vvvvvvvvvvvv 这是核心改动 vvvvvvvvvvvv
+        # 使用 groupby 需要先排序，这里我们按倒序排，让最新的日期在最前面
+        sorted_segments = sorted(task.active_time_segments, key=lambda s: s['start_time'], reverse=True)
 
-            # 状态图标
-            status_icon = "⏸️" if segment['stopped_as'] == '未开始' else "✅"
+        # 按日期（date）进行分组
+        for date, group in groupby(sorted_segments, key=lambda s: s['start_time'].date()):
+            group_list = list(group)
+            # 计算当天的总时长
+            total_duration_today = sum((s['duration'] for s in group_list), timedelta())
+            total_duration_str = format_timedelta_to_str(total_duration_today)
+            date_str = date.strftime('%Y-%m-%d')
 
-            st.info(f"**{duration_str}** (在 {date_str} 从 {start_str} 到 {end_str}) {status_icon}")
+            # 为每一天创建一个 Expander
+            with st.expander(f"**{date_str}** - 总计: **{total_duration_str}** ({len(group_list)} 条记录)"):
+                for segment in group_list:  # 组内已经是倒序的
+                    start_str = segment['start_time'].strftime('%H:%M:%S')
+                    end_str = segment['end_time'].strftime('%H:%M:%S')
+                    duration_str = format_timedelta_to_str(segment['duration'])
+                    status_icon = "⏸️" if segment['stopped_as'] == '未开始' else "✅"
+                    st.info(f"**{duration_str}** (从 {start_str} 到 {end_str}) {status_icon}")
+        # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 # --- 任务卡片显示函数 (Task Card Display Function) ---
