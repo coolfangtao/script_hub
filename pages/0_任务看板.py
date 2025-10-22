@@ -83,11 +83,11 @@ class Task:
 
         if new_progress == 100:
             self.update_status("已完成")
-        elif new_progress > 0:
+        elif new_progress > 0 and self.task_status == "未开始":
             self.update_status("进行中")
-        elif new_progress == 0:
+        elif new_progress == 0 and self.task_status != "未开始":
             self.update_status("未开始")
-        elif 0 < new_progress < 100:
+        elif 0 < new_progress < 100 and self.task_status != "进行中":
             self.update_status("进行中")
 
     def get_duration_str(self):
@@ -265,7 +265,12 @@ def display_task_card(task):
             for comment in reversed(task.task_comments):
                 comment_icon = "💡" if comment['type'] == "感悟" else "❓"
                 with st.chat_message(name=comment['type'], avatar=comment_icon):
-                    st.write(comment['content'])
+                    if comment['type'] == "感悟":
+                        # 使用 markdown 语法 :green[...] 来显示绿色
+                        st.markdown(f":green[{comment['content']}]")
+                    else:
+                        # "问题" 或其他类型为红色
+                        st.markdown(f":red[{comment['content']}]")
                     st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
 
         # 附加信息 (不变)
