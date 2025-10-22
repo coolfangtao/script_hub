@@ -345,10 +345,12 @@ def display_main_controls():
     """
     st.header("控制面板", divider="gray")
     col1, col2, col3 = st.columns(3)
+    # 设置统一的高度
+    container_height = 400  # 根据你的内容调整这个值
 
     # --- 第1栏：创建新任务 ---
     with col1:
-        with st.container(border=True):
+        with st.container(border=True, height=container_height):
             st.subheader("🚀 创建新任务", anchor=False)
             with st.form(key="new_task_form", clear_on_submit=True):
                 new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
@@ -364,7 +366,7 @@ def display_main_controls():
 
     # --- 第2栏：从文件导入 ---
     with col2:
-        with st.container(border=True):
+        with st.container(border=True, height=container_height):
             st.subheader("📥 导入任务", anchor=False)
             uploaded_file = st.file_uploader(
                 "选择一个 .json 任务文件",
@@ -377,7 +379,7 @@ def display_main_controls():
 
     # --- 第3栏：导出到文件 ---
     with col3:
-        with st.container(border=True):
+        with st.container(border=True, height=container_height):
             st.subheader("📤 导出任务", anchor=False)
 
             # 准备导出数据
