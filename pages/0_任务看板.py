@@ -354,7 +354,7 @@ def display_main_controls():
             st.subheader("🚀 创建新任务", anchor=False)
             with st.form(key="new_task_form", clear_on_submit=True):
                 new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
-                new_task_type = st.selectbox("任务类型", ["主线任务", "副线任务"])
+                new_task_type = st.selectbox("任务标签", ["主线任务", "副线任务"])
                 if st.form_submit_button("添加任务", use_container_width=True):
                     if new_task_name:
                         new_task = Task(task_name=new_task_name, task_type=new_task_type)
@@ -593,33 +593,36 @@ def display_task_card(task):
             st.markdown(f"创建时间: {task.creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-# --- [!! 新函数：显示主看板布局 !!] ---
+# --- [!! 修改：优化主卡片布局 !!] ---
 def display_kanban_layout():
     """
     显示主看板的三栏布局 (未开始, 进行中, 已完成)。
     """
-    col_todo, col_doing, col_done = st.columns(3)
+    col_todo, col_doing, col_done = st.columns(3, gap="large")
 
-    sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=False)
+    sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=True)
 
     tasks_todo = [t for t in sorted_tasks if t.status == "未开始"]
     tasks_doing = [t for t in sorted_tasks if t.status == "进行中"]
     tasks_done = [t for t in sorted_tasks if t.status == "已完成"]
 
     with col_todo:
-        st.header(f"📥 未开始/挂起 ({len(tasks_todo)})")
+        st.header(f"📥 未开始/挂起 ({len(tasks_todo)})", divider="gray")
         for task in tasks_todo:
-            display_task_card(task)
+            with st.container(border=True):
+                display_task_card(task)
 
     with col_doing:
-        st.header(f"💻 进行中 ({len(tasks_doing)})")
+        st.header(f"💻 进行中 ({len(tasks_doing)})", divider="gray")
         for task in tasks_doing:
-            display_task_card(task)
+            with st.container(border=True):
+                display_task_card(task)
 
     with col_done:
-        st.header(f"✅ 已完成 ({len(tasks_done)})")
+        st.header(f"✅ 已完成 ({len(tasks_done)})", divider="gray")
         for task in tasks_done:
-            display_task_card(task)
+            with st.container(border=True):
+                display_task_card(task)
 
 
 # --- [!! 新函数：主函数 !!] ---
