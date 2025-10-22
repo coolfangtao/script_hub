@@ -204,7 +204,7 @@ def display_task_card(task):
             )
 
         st.slider(
-            "进度",
+            "当前进度（0-100%）",
             min_value=0,
             max_value=100,
             value=task.task_progress,  # 'value' 同样只在初次渲染时起作用
