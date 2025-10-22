@@ -561,7 +561,7 @@ def display_task_management(task):
                     "任务标签",
                     options=type_options,
                     index=current_type_index,
-                    key=f"task_type_{task.id}"
+                    key=f"task_type_{task.task_id}"
                 )
 
                 if st.form_submit_button("💾 保存更改", use_container_width=True):
