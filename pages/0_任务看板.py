@@ -293,14 +293,14 @@ def display_task_comments(task):
     # --- 评论创建区域保持不变 ---
     with st.popover("💬 创建评论"):
         with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
-            comment_type = st.selectbox("评论类型", ["感悟", "问题", "备注"], key=f"ctype_{task.task_id}")
+            comment_type = st.selectbox("评论类型", ["备注", "问题", "新的"], key=f"ctype_{task.task_id}")
             comment_content = st.text_area("评论内容...", key=f"ctext_{task.task_id}", height=100)
 
             if st.form_submit_button("提交"):
                 if comment_content:
                     st.success("评论已添加！")
-                    # task.add_comment(comment_content, comment_type)
-                    # st.rerun()
+                    task.add_comment(comment_content, comment_type)
+                    st.rerun()
                 else:
                     st.warning("评论内容不能为空")
 
@@ -313,8 +313,8 @@ def display_task_comments(task):
         with st.container(height=400):
         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
             for comment in reversed(task.task_comments):
-                icon_map = {"感悟": "💡", "问题": "❓", "备注": "📌"}
-                color_map = {"感悟": "green", "问题": "red", "备注": "blue"}
+                icon_map = {"心得": "💡", "问题": "❓", "备注": "📌"}
+                color_map = {"心得": "green", "问题": "red", "备注": "blue"}
 
                 comment_icon = icon_map.get(comment['type'], "💬")
                 content_color = color_map.get(comment['type'], "gray")
