@@ -183,20 +183,6 @@ def display_task_card(task):
         # 1. 任务详情与控制
         st.subheader(task.task_name, divider="rainbow")
 
-        st.slider(
-            "进度",
-            min_value=0,
-            max_value=100,
-            value=task.task_progress,  # 'value' 同样只在初次渲染时起作用
-            step=10,
-            format="%d%%",
-            key=f"progress_{task.task_id}",  # key 是必须的
-            help="拖动滑块来更新任务进度",
-            on_change=handle_progress_change,  # 指定回调
-            args=(task.task_id,)  # 传递参数给回调
-        )
-        # ---------------------
-
         # 用时信息
         current_status = task.get_status()
         duration_str = task.get_duration_str()
@@ -216,6 +202,19 @@ def display_task_card(task):
                 value=duration_str,
                 help="任务正在进行中，这是目前已花费的时间。"
             )
+
+        st.slider(
+            "进度",
+            min_value=0,
+            max_value=100,
+            value=task.task_progress,  # 'value' 同样只在初次渲染时起作用
+            step=10,
+            format="%d%%",
+            key=f"progress_{task.task_id}",  # key 是必须的
+            help="拖动滑块来更新任务进度",
+            on_change=handle_progress_change,  # 指定回调
+            args=(task.task_id,)  # 传递参数给回调
+        )
 
         # --- [!! 评论区优化 !!] --- (保持不变)
         st.subheader("任务评论", divider='rainbow')
