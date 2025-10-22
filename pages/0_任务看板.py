@@ -366,7 +366,7 @@ def display_main_controls():
 
     # --- 第2栏：从文件导入 ---
     with col2:
-        with st.container(border=True, height=container_height):
+        with st.container(border=True):
             st.subheader("📥 导入任务", anchor=False)
             uploaded_file = st.file_uploader(
                 "选择一个 .json 任务文件",
@@ -377,7 +377,7 @@ def display_main_controls():
                 # 当用户上传文件后，立即处理
                 handle_tasks_import(uploaded_file)
 
-        with st.container(border=True, height=container_height):
+        with st.container(border=True):
             st.subheader("📤 导出任务", anchor=False)
 
             # 准备导出数据
