@@ -138,19 +138,16 @@ class Task:
         else:
             return datetime.now(beijing_tz) - self.creation_time
 
-    # [!! 变更 !!]
     def get_total_active_duration(self):
         """返回任务的【总有效工作时长】"""
         current_active_duration = timedelta(0)
 
-        # [!! 变更 !!] 使用 self.status
         if self.status == "进行中" and self.last_start_active_time:
             current_active_duration = datetime.now(beijing_tz) - self.last_start_active_time
 
         return self.total_active_time + current_active_duration
 
 
-# --- [!! 新增 !!] 辅助函数 ---
 def format_timedelta_to_str(duration):
     """
     将 timedelta 对象格式化为 "X天 X小时 X分钟 X秒" 的字符串
@@ -176,7 +173,7 @@ def format_timedelta_to_str(duration):
     if not parts:
         return "0秒"
 
-    return f"{days}天 {hours}小时 {minutes}分钟 {seconds}秒"
+    return f"{days}天{hours}时{minutes}分{seconds}秒"
 
 
 # --- Streamlit 界面 ---
@@ -224,11 +221,7 @@ def handle_progress_change(task_id):
         return
 
     new_progress = st.session_state[f"progress_{task_id}"]
-
-    # [!! 变更 !!] 调用我们重写的 update_progress
     task.update_progress(new_progress)
-
-    # (不需要 st.rerun()，on_change 会自动触发)
 
 
 # --- 任务卡片显示函数 (Task Card Display Function) ---
@@ -288,7 +281,6 @@ def display_task_card(task):
             "当前进度（0-100%）",
             min_value=0,
             max_value=100,
-            # [!! 变更 !!] value 必须用 task.task_progress，以响应按钮的自动更改
             value=task.task_progress,
             step=10,
             format="%d%%",
@@ -340,7 +332,6 @@ col_todo, col_doing, col_done = st.columns(3)
 
 sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=False)
 
-# [!! 变更 !!] 使用 task.status 来分类
 tasks_todo = [t for t in sorted_tasks if t.status == "未开始"]
 tasks_doing = [t for t in sorted_tasks if t.status == "进行中"]
 tasks_done = [t for t in sorted_tasks if t.status == "已完成"]
