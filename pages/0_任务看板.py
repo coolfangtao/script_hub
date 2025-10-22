@@ -346,7 +346,7 @@ def display_main_controls():
     st.header("控制面板", divider="gray")
     col1, col2, col3 = st.columns(3)
     # 设置统一的高度
-    container_height = 300  # 根据你的内容调整这个值
+    container_height = 310  # 根据你的内容调整这个值
 
     # --- 第1栏：创建新任务 ---
     with col1:
