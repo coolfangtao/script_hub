@@ -311,7 +311,7 @@ def display_task_comments(task):
         pass
     else:
         # 你可以根据需要调整 height 的值
-        with st.container(height=400):
+        with st.container(height=250):
             for comment in reversed(task.task_comments):
                 icon_map = {"心得": "💡", "问题": "❓", "备注": "📌"}
                 color_map = {"心得": "green", "问题": "red", "备注": "blue"}
