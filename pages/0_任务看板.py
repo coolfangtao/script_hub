@@ -3,6 +3,13 @@ from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
 
+st.markdown("""
+    <style>
+        .st-emotion-cache-1v0mbdj.e115fcil1 {
+            display: none !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
 # 自动刷新，每分钟一次，用于更新时间显示
 st_autorefresh(interval=1000 * 10, key="clock_refresher")
 create_common_sidebar() # 暂时注释掉，以便代码独立运行

@@ -29,7 +29,7 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/2_Listing生成.py"
         },
         {
-            "label": "任务看板",
+            "label": "每日任务看板",
             "path": r"pages/0_任务看板.py"
         },
     ],
