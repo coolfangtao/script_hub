@@ -650,20 +650,20 @@ def display_kanban_layout():
 
     with col_todo:
         st.header(f"📥 未开始/挂起 ({len(tasks_todo)})", divider="gray")
-        for task in tasks_todo:
-            with st.container(border=True):
+        with st.container(border=True):
+            for task in tasks_todo:
                 display_task_card(task)
 
     with col_doing:
         st.header(f"💻 进行中 ({len(tasks_doing)})", divider="gray")
-        for task in tasks_doing:
-            with st.container(border=True):
+        with st.container(border=True):
+            for task in tasks_doing:
                 display_task_card(task)
 
     with col_done:
         st.header(f"✅ 已完成 ({len(tasks_done)})", divider="gray")
-        for task in tasks_done:
-            with st.container(border=True):
+        with st.container(border=True):
+            for task in tasks_done:
                 display_task_card(task)
 
 
