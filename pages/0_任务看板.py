@@ -366,7 +366,7 @@ def display_main_controls():
 
     # --- 第2栏：从文件导入 ---
     with col2:
-        with st.container(border=True):
+        with st.container(border=True, height=container_height):
             # 数据导入
             st.subheader("📥 导入任务", anchor=False)
             uploaded_file = st.file_uploader(
