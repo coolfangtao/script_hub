@@ -5,7 +5,8 @@ from io import BytesIO
 from langdetect import detect, LangDetectException
 
 # 假设您的侧边栏文件位于项目的 "shared" 文件夹中
-# from shared.sidebar import create_common_sidebar
+from shared.sidebar import create_common_sidebar
+create_common_sidebar()
 
 # --- 全局常量与配置 ---
 

@@ -199,64 +199,6 @@ def extract_titles(text):
     return titles, remaining_text
 
 
-def extract_titles(text):
-    """
-    从多行文本中提取标题
-
-    参数:
-    text (str): 多行文本
-
-    返回:
-    tuple: (标题列表, 剩余文本)
-    """
-    lines = text.splitlines()
-
-    # 1. 去除最前面的所有空白行
-    start_index = 0
-    for i, line in enumerate(lines):
-        if line.strip():  # 找到第一个非空行
-            start_index = i
-            break
-    else:
-        # 如果所有行都是空白行，返回空结果
-        return [], text
-
-    # 保留从第一个非空行开始的所有行
-    processed_lines = lines[start_index:]
-
-    # 2. 在最前面加入两个空白行
-    processed_lines = ['', ''] + processed_lines
-
-    # 3. 提取标题行（不以字符◆开头，且前面有两个空白行的行）
-    titles = []
-    remaining_lines = []
-    i = 0
-
-    while i < len(processed_lines):
-        # 检查当前行是否是标题行
-        if (i + 2 < len(processed_lines) and
-                not processed_lines[i].strip() and
-                not processed_lines[i + 1].strip() and
-                processed_lines[i + 2].strip() and
-                not processed_lines[i + 2].startswith('◆')):
-
-            # 找到标题行
-            title_line = processed_lines[i + 2]
-            titles.append(title_line.strip())
-
-            # 跳过这个标题块（两个空白行 + 标题行）
-            i += 3
-        else:
-            # 不是标题行，保留到剩余文本
-            remaining_lines.append(processed_lines[i])
-            i += 1
-
-    # 将剩余行转换回字符串
-    remaining_text = '\n'.join(remaining_lines)
-
-    return titles, remaining_text
-
-
 def remove_empty_lines(text):
     """
     去除字符串中的所有空白行
