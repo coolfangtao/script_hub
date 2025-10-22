@@ -291,7 +291,7 @@ def display_task_comments(task):
     """
     显示单个任务的评论区域 (包括输入和列表)。
     """
-    st.subheader("任务评论", divider='gray')
+    st.subheader("任务评论", divider='rainbow')
 
     with st.popover("💬 创建评论"):
         with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
@@ -326,7 +326,7 @@ def display_task_time_logs(task):
     """
     显示单个任务的详细工时记录 (当前和历史)。
     """
-    st.subheader("工时记录", divider='gray')
+    st.subheader("工时记录", divider='rainbow')
 
     # 1. 显示当前正在进行的
     if task.status == "进行中" and task.last_start_active_time:
