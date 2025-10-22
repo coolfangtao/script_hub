@@ -199,10 +199,23 @@ def display_task_card(task):
 
         # 用时信息
         current_status = task.get_status()
+        duration_str = task.get_duration_str()
+
         if current_status == "已完成":
-            st.success(f"**总用时:** {task.get_duration_str()}")
+            # 对于已完成任务，使用 st.metric 显示总用时
+            # help 参数可以在鼠标悬停时显示提示信息
+            st.metric(
+                label="✅ 总用时",
+                value=duration_str,
+                help="任务已完成，这是记录的总耗时。"
+            )
         elif current_status == "进行中":
-            st.info(f"**已用时:** {task.get_duration_str()}")
+            # 对于进行中任务，同样使用 st.metric，但标签不同
+            st.metric(
+                label="⏳ 已用时",
+                value=duration_str,
+                help="任务正在进行中，这是目前已花费的时间。"
+            )
 
         # --- [!! 评论区优化 !!] --- (保持不变)
         st.subheader("任务评论", divider='rainbow')
