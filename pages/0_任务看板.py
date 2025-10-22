@@ -295,6 +295,7 @@ def get_github_repo():
         st.error(f"连接到 GitHub 仓库失败: {e}。请检查你的 secrets.toml 文件配置。")
         return None
 
+
 def load_tasks_from_github():
     """从 GitHub 加载任务数据。"""
     repo = get_github_repo()
@@ -308,12 +309,22 @@ def load_tasks_from_github():
         tasks = [Task.from_dict(task_data) for task_data in tasks_data]
         st.toast("✅ 已从 GitHub 成功加载任务！", icon="🎉")
         return tasks
+
+    # 当仓库存在但文件不存在时，会触发这个特定的异常
     except UnknownObjectException:
-        st.info("在仓库中未找到任务文件，将创建一个新文件。")
-        return [] # 文件不存在，返回空列表
-    except Exception as e:
-        st.error(f"从 GitHub 加载任务失败: {e}")
+        st.info("在仓库中未找到任务文件。当你第一次推送时，将自动创建。")
         return []
+
+    # 捕获其他所有异常
+    except Exception as e:
+        # 专门检查“仓库为空”的这个特定错误信息
+        if "This repository is empty" in str(e):
+            st.info("检测到 GitHub 数据仓库为空。当你第一次推送任务时，将自动创建数据文件。")
+            return []
+        # 如果是其他未知错误（如网络问题、Token失效等），则显示错误
+        else:
+            st.error(f"从 GitHub 加载任务时发生未知错误: {e}")
+            return []
 
 def save_tasks_to_github():
     """将当前任务数据保存到 GitHub。"""
