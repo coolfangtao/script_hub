@@ -531,6 +531,53 @@ def display_task_time_logs(task):
         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
+# --- [!! 新增函数：显示任务管理区域 !!] ---
+def display_task_management(task):
+    """
+    显示任务的管理控件 (ID、创建时间、编辑和删除功能)。
+    此函数从 display_task_card 中分离出来，以提高模块化。
+    """
+    st.divider()
+    col_info, col_manage = st.columns([3, 1])
+
+    with col_info:
+        st.caption(f"ID: `{task.task_id}`")
+        st.caption(f"创建于: {task.creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    with col_manage:
+        with st.popover("⚙️ 管理"):
+            # --- 1. 编辑表单 ---
+            with st.form(key=f"edit_form_{task.task_id}"):
+                st.subheader("编辑任务", anchor=False)
+                edited_task_name = st.text_input("任务名称", value=task.task_name)
+
+                # 获取当前 task_type 的索引，以便正确设置 selectbox 的默认值
+                type_options = ["主线任务", "副线任务"]
+                try:
+                    current_type_index = type_options.index(task.task_type)
+                except ValueError:
+                    current_type_index = 0  # 如果找不到，默认为第一个
+
+                edited_task_type = st.selectbox(
+                    "任务标签",
+                    options=type_options,
+                    index=current_type_index
+                )
+
+                if st.form_submit_button("💾 保存更改", use_container_width=True):
+                    task.task_name = edited_task_name
+                    task.task_type = edited_task_type
+                    st.toast(f"任务 '{task.task_name}' 已更新!", icon="✅")
+                    st.rerun()
+
+            # --- 2. 删除按钮 ---
+            st.divider()
+            if st.button("🗑️ 删除任务", type="primary", use_container_width=True, help="此操作不可撤销！"):
+                st.session_state.tasks = [t for t in st.session_state.tasks if t.task_id != task.task_id]
+                st.toast(f"任务 '{task.task_name}' 已删除。", icon="🗑️")
+                st.rerun()
+
+
 # --- 任务卡片显示函数 (Task Card Display Function) ---
 def display_task_card(task):
     """
@@ -583,6 +630,9 @@ def display_task_card(task):
 
         # --- 评论区 (保持不变) ---
         display_task_comments(task)
+
+        # --- [!! 调用独立的管理函数 !!] ---
+        display_task_management(task)
 
         # 附加信息 (不变)
         st.divider()
