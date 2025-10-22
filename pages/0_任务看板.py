@@ -3,16 +3,10 @@ from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
 
-st.markdown("""
-    <style>
-        .st-emotion-cache-1v0mbdj.e115fcil1 {
-            display: none !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
+
 # 自动刷新，每分钟一次，用于更新时间显示
 st_autorefresh(interval=1000 * 10, key="clock_refresher")
-create_common_sidebar() # 暂时注释掉，以便代码独立运行
+create_common_sidebar()
 
 # 定义北京时间 (UTC+8)
 beijing_tz = timezone(timedelta(hours=8))
@@ -38,7 +32,7 @@ class Task:
         # 独立的状态，决定任务所在的列
         self.status = "未开始"
 
-        self.completion_time = None  # 任务完成的时间
+        self.completion_time = None  # 任务完成的时间点
         self.task_duration = None  # 任务的【总生命周期】 (创建 -> 完成)
 
         self.task_comments = []
@@ -198,7 +192,7 @@ if 'tasks' not in st.session_state:
     st.session_state.tasks = []
 
 # --- 创建新任务 ---
-with st.expander("🚀 点击创建新任务"):
+with st.expander("🚀 点击创建新任务", expanded=True):
     with st.form(key="new_task_form", clear_on_submit=True):
         new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
         new_task_type = st.selectbox("任务类型", ["主线任务", "副线任务"])
