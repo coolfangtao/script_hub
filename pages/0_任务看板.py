@@ -130,9 +130,7 @@ if 'tasks' not in st.session_state:
 
 # --- 侧边栏：创建新任务 (Sidebar: Create New Task) ---
 # [!! 保持不变 !!]
-with st.sidebar:
-    st.header("🚀 创建新任务")
-
+with st.expander("🚀 点击创建新任务"):
     with st.form(key="new_task_form", clear_on_submit=True):
         new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
         new_task_type = st.selectbox("任务类型", ["主线任务", "副线任务"])
@@ -143,6 +141,7 @@ with st.sidebar:
             new_task = Task(task_name=new_task_name, task_type=new_task_type)
             st.session_state.tasks.append(new_task)
             st.success(f"任务 '{new_task_name}' 已添加！")
+            st.rerun() # 添加 Rerun 以便立即刷新看板
 
 
 # --- [!! 优化 !!] ---
