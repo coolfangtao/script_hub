@@ -1,7 +1,9 @@
 import streamlit as st
 from datetime import datetime, timedelta, timezone
-from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
-create_common_sidebar()
+
+# from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
+# create_common_sidebar() # 暂时注释掉导入，以便代码独立运行
+
 # 定义北京时间 (UTC+8)
 beijing_tz = timezone(timedelta(hours=8))
 
@@ -54,9 +56,9 @@ class Task:
         self.task_status = new_status
 
         if new_status == "已完成":
-            if not self.completion_time:  # 只有在第一次标记为完成时才记录
-                self.completion_time = datetime.now(beijing_tz)
-                self.task_duration = self.completion_time - self.creation_time
+            # if not self.completion_time:  # 只有在第一次标记为完成时才记录
+            self.completion_time = datetime.now(beijing_tz)
+            self.task_duration = self.completion_time - self.creation_time
             self.task_progress = 100  # 自动将进度设为100
             st.balloons()  # 完成时庆祝一下
 
@@ -83,10 +85,13 @@ class Task:
 
         if new_progress == 100:
             self.update_status("已完成")
+
         elif new_progress > 0 and self.task_status == "未开始":
             self.update_status("进行中")
+
         elif new_progress == 0 and self.task_status != "未开始":
             self.update_status("未开始")
+
         elif 0 < new_progress < 100 and self.task_status != "进行中":
             self.update_status("进行中")
 
@@ -143,10 +148,10 @@ with st.expander("🚀 点击创建新任务"):
             new_task = Task(task_name=new_task_name, task_type=new_task_type)
             st.session_state.tasks.append(new_task)
             st.success(f"任务 '{new_task_name}' 已添加！")
-            st.rerun() # 添加 Rerun 以便立即刷新看板
+            st.rerun()  # 添加 Rerun 以便立即刷新看板
 
 
-# --- [!! 优化 !!] ---
+# --- [!! 修复 !!] ---
 # 1. 将回调函数和辅助函数放在主逻辑区
 
 def get_task_by_id(task_id):
@@ -167,9 +172,15 @@ def handle_status_change(task_id):
     if not task:
         return
 
-    # 从 session_state 中获取 selectbox 的新值
+    # 1. 从 session_state 中获取 selectbox 的新值
     new_status = st.session_state[f"status_{task_id}"]
+
+    # 2. 更新 task 对象 (这也会自动更新 task.task_progress)
     task.update_status(new_status)
+
+    # 3. [!! 修复 !!] 手动将 task 对象中更新后的 *进度* 同步到 progress slider 的 session_state
+    # 这样滑块在下次 Rerun 时会显示正确的值（例如 0 或 100）
+    st.session_state[f"progress_{task_id}"] = task.task_progress
 
 
 def handle_progress_change(task_id):
@@ -180,9 +191,15 @@ def handle_progress_change(task_id):
     if not task:
         return
 
-    # 从 session_state 中获取 slider 的新值
+    # 1. 从 session_state 中获取 slider 的新值
     new_progress = st.session_state[f"progress_{task_id}"]
+
+    # 2. 更新 task 对象 (这也会自动更新 task.task_status)
     task.update_progress(new_progress)
+
+    # 3. [!! 修复 !!] 手动将 task 对象中更新后的 *状态* 同步到 status selectbox 的 session_state
+    # 这样下拉框在下次 Rerun 时会显示正确的值（例如 "已完成"）
+    st.session_state[f"status_{task_id}"] = task.task_status
 
 
 # ---------------------
@@ -206,9 +223,11 @@ def display_task_card(task):
             status_options = ["未开始", "进行中", "已完成"]
             current_status_index = status_options.index(task.task_status)
 
-            # --- [!! 优化 !!] ---
-            # 使用 on_change 回调函数
-            # 不再需要 if new_status != ... 的判断
+            # --- [!! 修复 !!] ---
+            # Streamlit 在 Rerun 时，如果 key 存在于 session_state 中，
+            # 它会*忽略* index/value 参数，并使用 session_state 中的值。
+            # 因为我们的回调现在能确保 session_state 总是同步的，
+            # 所以这里的 index 参数只在*第一次*渲染时起作用，后续都由 session_state 控制。
             st.selectbox(
                 "状态",
                 options=status_options,
@@ -225,7 +244,7 @@ def display_task_card(task):
                 "进度",
                 min_value=0,
                 max_value=100,
-                value=task.task_progress,  # 'value' 确保滑块在“进行中”时显示 10%
+                value=task.task_progress,  # 'value' 同样只在初次渲染时起作用
                 step=10,
                 format="%d%%",
                 key=f"progress_{task.task_id}",  # key 是必须的
