@@ -1,7 +1,9 @@
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
 create_common_sidebar()
+# 定义北京时间 (UTC+8)
+beijing_tz = timezone(timedelta(hours=8))
 
 
 # 1. 任务类定义 (Task Class Definition)
@@ -17,7 +19,7 @@ class Task:
         """
         self.task_name = task_name
         self.task_type = task_type  # '主线任务' 或 '副线任务'
-        self.creation_time = datetime.now()
+        self.creation_time = datetime.now(beijing_tz)
         # 使用高精度的Unix时间戳作为唯一ID
         self.task_id = f"task_{self.creation_time.timestamp()}"
         self.task_status = "未开始"  # '未开始', '进行中', '已完成'
@@ -36,7 +38,7 @@ class Task:
         comment = {
             "content": content,
             "type": comment_type,
-            "time": datetime.now()
+            "time": datetime.now(beijing_tz)
         }
         self.task_comments.append(comment)
         st.toast(f"任务 '{self.task_name}' 添加了新评论！", icon="💬")
@@ -53,7 +55,7 @@ class Task:
 
         if new_status == "已完成":
             if not self.completion_time:  # 只有在第一次标记为完成时才记录
-                self.completion_time = datetime.now()
+                self.completion_time = datetime.now(beijing_tz)
                 self.task_duration = self.completion_time - self.creation_time
             self.task_progress = 100  # 自动将进度设为100
             st.balloons()  # 完成时庆祝一下
@@ -97,7 +99,7 @@ class Task:
         if self.task_status == "已完成" and self.task_duration:
             duration = self.task_duration
         elif self.task_status == "进行中":
-            duration = datetime.now() - self.creation_time
+            duration = datetime.now(beijing_tz) - self.creation_time
         elif self.task_status == "未开始":
             return "尚未开始"
 
