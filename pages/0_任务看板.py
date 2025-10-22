@@ -1,8 +1,7 @@
 import streamlit as st
 from datetime import datetime, timedelta, timezone
-
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
-create_common_sidebar() # 暂时注释掉导入，以便代码独立运行
+create_common_sidebar()
 
 # 定义北京时间 (UTC+8)
 beijing_tz = timezone(timedelta(hours=8))
@@ -44,7 +43,7 @@ class Task:
     def add_comment(self, content, comment_type):
         """
         为任务添加评论。
-        comment_type: '感悟' 或 '问题'
+        comment_type: '感悟' 或 '问题' 或 '备注'
         """
         comment = {
             "content": content,
@@ -118,19 +117,19 @@ class Task:
 
 # 页面配置 (Page Configuration)
 st.set_page_config(
-    page_title="个人任务看板",
+    page_title="每日任务看板",
     page_icon="📋",
     layout="wide"
 )
 
-st.title("📋 个人任务看板")
+st.title("📋 每日任务看板")
 st.markdown("---")
 
 # 初始化 session_state
 if 'tasks' not in st.session_state:
     st.session_state.tasks = []
 
-# --- 侧边栏：创建新任务 (Sidebar: Create New Task) ---
+# --- 创建新任务 (Sidebar: Create New Task) ---
 with st.expander("🚀 点击创建新任务"):
     with st.form(key="new_task_form", clear_on_submit=True):
         new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
@@ -209,9 +208,9 @@ def display_task_card(task):
         st.subheader("任务评论", divider='rainbow')
 
         # 1. 使用 st.popover 来隐藏“添加评论”表单
-        with st.popover("💬 添加新评论"):
+        with st.popover("💬 创建评论"):
             with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
-                comment_type = st.selectbox("评论类型", ["感悟", "问题"], key=f"ctype_{task.task_id}")
+                comment_type = st.selectbox("评论类型", ["感悟", "问题", "备注"], key=f"ctype_{task.task_id}")
                 comment_content = st.text_area("评论内容...", key=f"ctext_{task.task_id}", height=100)
 
                 if st.form_submit_button("提交"):
@@ -223,18 +222,23 @@ def display_task_card(task):
 
         # 2. 优化“暂无评论”的提示
         if not task.task_comments:
-            st.info("还没有评论，快来添加第一条感悟或问题吧！", icon="📝")
+            pass
         else:
             # 倒序显示，最新评论在最上面
             for comment in reversed(task.task_comments):
-                comment_icon = "💡" if comment['type'] == "感悟" else "❓"
+                if comment['type'] == "感悟":
+                    comment_icon = "💡"
+                    content_color = "green"
+                elif comment['type'] == "问题":
+                    comment_icon = "❓"
+                    content_color = "red"
+                elif comment['type'] == "备注":  # 新增的类型
+                    comment_icon = "📌"
+                    content_color = "blue"
+
                 with st.chat_message(name=comment['type'], avatar=comment_icon):
-                    if comment['type'] == "感悟":
-                        # 使用 markdown 语法 :green[...] 来显示绿色
-                        st.markdown(f":green[{comment['content']}]")
-                    else:
-                        # "问题" 或其他类型为红色
-                        st.markdown(f":red[{comment['content']}]")
+                    # 使用 markdown 语法来显示带颜色的内容
+                    st.markdown(f":{content_color}[{comment['content']}]")
                     st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
 
         # 附加信息 (不变)
