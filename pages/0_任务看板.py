@@ -4,7 +4,14 @@ from itertools import groupby
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
 from shared.sidebar import create_common_sidebar
+### --- 新增/修改：GitHub 同步功能 --- ###
+from github import Github, UnknownObjectException
+### ------------------------------------ ###
 
+### --- 新增/修改：GitHub 同步功能 --- ###
+# 定义数据在 GitHub 仓库中的文件名
+DATA_FILE_NAME = "tasks_data.json"
+### ------------------------------------ ###
 
 # 自动刷新，每分钟一次，用于更新时间显示
 st_autorefresh(interval=1000 * 60, key="clock_refresher")
@@ -275,11 +282,80 @@ def format_timedelta_to_str(duration):
     # 优化显示，例如 "X天X时X分"
     return "".join(parts)
 
+### --- 新增/修改：GitHub 同步功能 --- ###
 
-# --- [!! 新函数：初始化应用 !!] ---
+@st.cache_resource
+def get_github_repo():
+    """使用缓存连接到 GitHub 仓库，避免每次重载都重新认证。"""
+    try:
+        g = Github(st.secrets["GITHUB_TOKEN"])
+        repo = g.get_repo(st.secrets["GITHUB_REPO"])
+        return repo
+    except Exception as e:
+        st.error(f"连接到 GitHub 仓库失败: {e}。请检查你的 secrets.toml 文件配置。")
+        return None
+
+def load_tasks_from_github():
+    """从 GitHub 加载任务数据。"""
+    repo = get_github_repo()
+    if repo is None:
+        return []
+
+    try:
+        content_file = repo.get_contents(DATA_FILE_NAME)
+        content = content_file.decoded_content.decode("utf-8")
+        tasks_data = json.loads(content)
+        tasks = [Task.from_dict(task_data) for task_data in tasks_data]
+        st.toast("✅ 已从 GitHub 成功加载任务！", icon="🎉")
+        return tasks
+    except UnknownObjectException:
+        st.info("在仓库中未找到任务文件，将创建一个新文件。")
+        return [] # 文件不存在，返回空列表
+    except Exception as e:
+        st.error(f"从 GitHub 加载任务失败: {e}")
+        return []
+
+def save_tasks_to_github():
+    """将当前任务数据保存到 GitHub。"""
+    repo = get_github_repo()
+    if repo is None:
+        st.error("无法保存，因为未能连接到 GitHub 仓库。")
+        return
+
+    # 准备要上传的数据
+    tasks_as_dicts = [task.to_dict() for task in st.session_state.tasks]
+    content = json.dumps(tasks_as_dicts, indent=2)
+    commit_message = f"Tasks updated at {datetime.now(beijing_tz).strftime('%Y-%m-%d %H:%M:%S')}"
+
+    try:
+        # 检查文件是否存在
+        try:
+            file = repo.get_contents(DATA_FILE_NAME)
+            # 如果存在，则更新
+            repo.update_file(
+                path=file.path,
+                message=commit_message,
+                content=content,
+                sha=file.sha
+            )
+            st.success("✅ 任务已成功同步到 GitHub！")
+        except UnknownObjectException:
+            # 如果不存在，则创建
+            repo.create_file(
+                path=DATA_FILE_NAME,
+                message=commit_message,
+                content=content
+            )
+            st.success("✅ 在 GitHub 上创建了新的任务文件并已同步！")
+    except Exception as e:
+        st.error(f"同步到 GitHub 失败: {e}")
+
+
+# --- [!! 新函数：初始化应用 !!] --- (已修改)
 def initialize_app():
     """
     设置页面配置、标题和初始化 session_state。
+    (新增：在首次加载时从 GitHub 拉取数据)
     """
     st.set_page_config(
         page_title="每日任务看板",
@@ -289,8 +365,10 @@ def initialize_app():
     st.title("📋 每日任务看板")
     st.markdown("---")
 
+    # 仅在 session_state 中没有 'tasks' 时才加载
     if 'tasks' not in st.session_state:
-        st.session_state.tasks = []
+        # 首次运行时从 GitHub 加载
+        st.session_state.tasks = load_tasks_from_github()
 
 
 # --- [!! 新函数：处理任务导入 !!] ---
@@ -338,17 +416,16 @@ def get_export_data():
     return json.dumps(tasks_as_dicts, indent=2)
 
 
-# --- [!! 重构函数：显示主控制区 (原 display_new_task_form) !!] ---
+# --- [!! 重构函数：显示主控制区 (原 display_new_task_form) !!] --- (已修改)
 def display_main_controls():
     """
-    显示三栏布局的顶部控制区域：创建、导入、导出。
+    显示三栏布局的顶部控制区域：创建、导入/导出、GitHub同步。
     """
     st.header("控制面板", divider="rainbow")
     col1, col2, col3 = st.columns(3)
-    # 设置统一的高度
-    container_height = 325  # 根据你的内容调整这个值
+    container_height = 250  # 调整统一高度
 
-    # --- 第1栏：创建新任务 ---
+    # --- 第1栏：创建新任务 --- (保持不变)
     with col1:
         with st.container(border=True, height=container_height):
             st.subheader("🚀 创建新任务", anchor=False)
@@ -364,29 +441,19 @@ def display_main_controls():
                     else:
                         st.warning("任务名称不能为空！")
 
-    # --- 第2栏：从文件导入 ---
+    # --- 第2栏：本地导入/导出 --- (保持不变)
     with col2:
         with st.container(border=True, height=container_height):
-            # 数据导入
-            st.subheader("📥 导入任务", anchor=False)
+            st.subheader("📥 本地导入/导出", anchor=False)
             uploaded_file = st.file_uploader(
-                "选择一个 .json 任务文件",
-                type=["json"],
-                help="请上传之前从本应用导出的任务文件。"
+                "选择一个 .json 任务文件", type=["json"], help="从本地文件恢复任务。"
             )
             if uploaded_file is not None:
-                # 当用户上传文件后，立即处理
                 handle_tasks_import(uploaded_file)
 
-            # 数据导出
-            st.subheader("📤 导出任务", anchor=False)
-            # 准备导出数据
             json_data = get_export_data()
-
-            # 生成文件名
             timestamp = datetime.now(beijing_tz).strftime("%Y%m%d_%H%M%S")
             file_name = f"tasks_export_{timestamp}.json"
-
             st.download_button(
                 label="📥 下载任务到本地",
                 data=json_data,
@@ -394,34 +461,23 @@ def display_main_controls():
                 mime="application/json",
                 help="将当前看板上的所有任务保存为一个 JSON 文件。",
                 use_container_width=True,
-                # 如果没有任务，则禁用按钮
                 disabled=not st.session_state.tasks
             )
 
-    # --- 第3栏：github同步配置 ---
+    # --- 第3栏：GitHub 同步 --- (已修改)
     with col3:
         with st.container(border=True, height=container_height):
-            st.markdown("##### ⚙️ GitHub 同步配置")
+            st.subheader("☁️ GitHub 云同步", anchor=False)
+            st.caption(f"仓库: `{st.secrets.get('GITHUB_REPO', '未配置')}`")
 
-            # GitHub 仓库地址输入框
-            st.text_input(
-                "仓库地址",
-                placeholder="例如：your-username/your-repo-name",
-                help="填写您在 GitHub 上的 `用户名/仓库名`。"
-            )
+            if st.button("⬆️ 推送到 GitHub", use_container_width=True, help="将当前看板数据保存到云端。"):
+                save_tasks_to_github()
 
-            # GitHub Personal Access Token 输入框
-            st.text_input(
-                "个人访问Token",
-                type="password",
-                help="请使用具有 repo 范围权限的 Personal Access Token 以确保同步成功。"
-            )
+            if st.button("⬇️ 从 GitHub 拉取", use_container_width=True, help="从云端获取最新数据，会覆盖当前看板！"):
+                st.session_state.tasks = load_tasks_from_github()
+                st.rerun()
 
-            # 同步按钮
-            st.button("保存并同步到 GitHub", use_container_width=True)
-
-            # 提示信息
-            st.caption("您的 Token 仅用于本次同步，不会被存储。")
+            st.info("数据同步基于你的 `secrets.toml` 配置文件。")
 
 
 
