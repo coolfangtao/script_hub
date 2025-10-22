@@ -4,14 +4,9 @@ from itertools import groupby
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
 from shared.sidebar import create_common_sidebar
-### --- 新增/修改：GitHub 同步功能 --- ###
 from github import Github, UnknownObjectException
-### ------------------------------------ ###
 
-### --- 新增/修改：GitHub 同步功能 --- ###
-# 定义数据在 GitHub 仓库中的文件名
 DATA_FILE_NAME = "tasks_data.json"
-### ------------------------------------ ###
 
 # 自动刷新，每分钟一次，用于更新时间显示
 st_autorefresh(interval=1000 * 60, key="clock_refresher")
@@ -50,15 +45,12 @@ class Task:
         self.total_active_time = timedelta(0)  # 仅存储已完成的总时长
         self.last_start_active_time = None  # 当前活动时段的开始时间
 
-        # --- [!! 新增属性 !!] ---
         # 详细记录每一次“进行中”的时间段
         # 列表，存储格式为:
         # { 'start_time': datetime, 'end_time': datetime, 'duration': timedelta, 'stopped_as': str }
         self.active_time_segments = []
-        # --- [!! 结束 !!] ---
 
-        # --- [!! 新增方法：序列化与反序列化 !!] ---
-
+    # --- [!! 序列化与反序列化 !!] ---
     def to_dict(self):
         """将 Task 对象转换为可序列化为 JSON 的字典。"""
         return {
@@ -167,7 +159,7 @@ class Task:
                 active_segment_duration = now - self.last_start_active_time
                 self.total_active_time += active_segment_duration
 
-                # --- [!! 新增逻辑：记录时间段 !!] ---
+                # --- [!! 记录时间段 !!] ---
                 new_segment = {
                     "start_time": self.last_start_active_time,
                     "end_time": now,
@@ -282,7 +274,7 @@ def format_timedelta_to_str(duration):
     # 优化显示，例如 "X天X时X分"
     return "".join(parts)
 
-### --- 新增/修改：GitHub 同步功能 --- ###
+### --- GitHub 同步功能 --- ###
 
 @st.cache_resource
 def get_github_repo():
@@ -349,7 +341,7 @@ def save_tasks_to_github():
                 content=content,
                 sha=file.sha
             )
-            st.success("✅ 任务已成功同步到 GitHub！")
+            st.toast("✅ 任务已成功同步到 GitHub！", icon="⬆️")
         except UnknownObjectException:
             # 如果不存在，则创建
             repo.create_file(
@@ -357,12 +349,16 @@ def save_tasks_to_github():
                 message=commit_message,
                 content=content
             )
-            st.success("✅ 在 GitHub 上创建了新的任务文件并已同步！")
+            st.toast("✅ 在 GitHub 上创建了新的任务文件并已同步！", icon="☁️")
     except Exception as e:
         st.error(f"同步到 GitHub 失败: {e}")
 
+# <<< 创建一个中央同步函数
+def sync_state():
+    """一个集中的函数，用于在任何数据更改后触发向 GitHub 的保存。"""
+    save_tasks_to_github()
 
-# --- [!! 新函数：初始化应用 !!] --- (已修改)
+# --- [!! 初始化应用 !!] ---
 def initialize_app():
     """
     设置页面配置、标题和初始化 session_state。
@@ -382,7 +378,7 @@ def initialize_app():
         st.session_state.tasks = load_tasks_from_github()
 
 
-# --- [!! 新函数：处理任务导入 !!] ---
+# --- [!! 处理任务导入 !!] ---
 def handle_tasks_import(uploaded_file):
     """
     处理上传的 JSON 文件，将其中的任务加载到 session_state。
@@ -414,7 +410,7 @@ def handle_tasks_import(uploaded_file):
         st.error(f"导入时发生未知错误: {e}")
 
 
-# --- [!! 新函数：获取导出数据 !!] ---
+# --- [!! 获取导出数据 !!] ---
 def get_export_data():
     """
     将 session_state 中的所有任务转换为 JSON 字符串。
@@ -427,14 +423,14 @@ def get_export_data():
     return json.dumps(tasks_as_dicts, indent=2)
 
 
-# --- [!! 重构函数：显示主控制区 (原 display_new_task_form) !!] --- (已修改)
+# --- [!! 显示主控制区 !!]
 def display_main_controls():
     """
     显示三栏布局的顶部控制区域：创建、导入/导出、GitHub同步。
     """
     st.header("控制面板", divider="rainbow")
     col1, col2, col3 = st.columns(3)
-    container_height = 250  # 调整统一高度
+    container_height = 300  # 调整统一高度
 
     # --- 第1栏：创建新任务 --- (保持不变)
     with col1:
@@ -448,6 +444,7 @@ def display_main_controls():
                         new_task = Task(task_name=new_task_name, task_type=new_task_type)
                         st.session_state.tasks.append(new_task)
                         st.success(f"任务 '{new_task_name}' 已添加！")
+                        sync_state()  # <<< 创建任务后自动同步
                         st.rerun()
                     else:
                         st.warning("任务名称不能为空！")
@@ -475,11 +472,11 @@ def display_main_controls():
                 disabled=not st.session_state.tasks
             )
 
-    # --- 第3栏：GitHub 同步 --- (已修改)
+    # --- 第3栏：GitHub 同步 ---
     with col3:
         with st.container(border=True, height=container_height):
             st.subheader("☁️ GitHub 云同步", anchor=False)
-            st.caption(f"仓库: `{st.secrets.get('GITHUB_REPO', '未配置')}`")
+            st.caption("数据在每次更改后会自动同步。这里提供手动操作以备不时之需。")
 
             if st.button("⬆️ 推送到 GitHub", use_container_width=True, help="将当前看板数据保存到云端。"):
                 save_tasks_to_github()
@@ -509,9 +506,16 @@ def handle_progress_change(task_id):
 
     new_progress = st.session_state[f"progress_{task_id}"]
     task.update_progress(new_progress)
+    sync_state()  # <<< 进度更新后自动同步
+
+# <<< 为状态按钮创建的回调函数
+def handle_status_change(task, new_status):
+    """在更改任务状态后触发同步。"""
+    task.set_status(new_status)
+    sync_state()
 
 
-# --- [!! 新函数：显示状态控制按钮 !!] ---
+# --- [!! 显示状态控制按钮 !!] ---
 def display_task_controls(task):
     """
     显示任务的状态控制按钮 (开始、挂起、完成、重新打开)。
@@ -519,33 +523,33 @@ def display_task_controls(task):
     cols = st.columns(4)
     with cols[0]:
         if task.status == "未开始":
-            st.button("▶️ 开始", key=f"start_{task.task_id}", on_click=task.set_status, args=("进行中",),
+            st.button("▶️ 开始", key=f"start_{task.task_id}", on_click=handle_status_change, args=(task, "进行中"),
                       use_container_width=True)
     with cols[1]:
         if task.status == "进行中":
-            st.button("⏸️ 挂起", key=f"pause_{task.task_id}", on_click=task.set_status, args=("未开始",),
+            st.button("⏸️ 挂起", key=f"pause_{task.task_id}", on_click=handle_status_change, args=(task, "未开始"),
                       help="将任务移回“未开始”并暂停计时，不改变当前进度。", use_container_width=True)
     with cols[2]:
         # "完成"按钮现在只在“进行中”时显示
         if task.status == "进行中":
-            st.button("✅ 完成", key=f"done_{task.task_id}", on_click=task.set_status, args=("已完成",),
+            st.button("✅ 完成", key=f"done_{task.task_id}", on_click=handle_status_change, args=(task, "已完成"),
                       use_container_width=True)
     with cols[3]:
         if task.status == "已完成":
-            st.button("🔄 重新打开", key=f"reopen_{task.task_id}", on_click=task.set_status, args=("进行中",),
+            st.button("🔄 重新打开", key=f"reopen_{task.task_id}", on_click=handle_status_change, args=(task, "进行中"),
                       use_container_width=True)
 
     st.write("")  # 增加一点间距
 
 
-# --- [!! 新函数：显示评论区 !!] ---
+# --- [!! 显示评论区 !!] ---
 def display_task_comments(task):
     """
     显示单个任务的评论区域 (评论列表在固定高度容器内滚动)。
     """
     st.subheader("任务评论", divider='rainbow')
 
-    # --- 评论创建区域保持不变 ---
+    # --- 评论创建区域 ---
     with st.popover("💬 创建评论"):
         with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
             comment_type = st.selectbox("评论类型", ["备注", "问题", "新的"], key=f"ctype_{task.task_id}")
@@ -555,6 +559,7 @@ def display_task_comments(task):
                 if comment_content:
                     st.success("评论已添加！")
                     task.add_comment(comment_content, comment_type)
+                    sync_state()  # <<< 添加评论后自动同步
                     st.rerun()
                 else:
                     st.warning("评论内容不能为空")
@@ -578,7 +583,7 @@ def display_task_comments(task):
                     st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
 
 
-# --- [!! 新函数：显示工时记录 !!] ---
+# --- [!! 显示工时记录 !!] ---
 def display_task_time_logs(task):
     """
     方案三：按日期对历史记录进行分组折叠，体验最佳。
@@ -621,7 +626,7 @@ def display_task_time_logs(task):
         # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
-# --- [!! 新增函数：显示任务管理区域 !!] ---
+# --- [!! 显示任务管理区域 !!] ---
 def display_task_management(task):
     """
     显示任务管理操作：编辑、删除等。
@@ -658,6 +663,7 @@ def display_task_management(task):
                     task.task_name = edited_task_name
                     task.task_type = edited_task_type
                     st.toast(f"任务 '{task.task_name}' 已更新!", icon="✅")
+                    sync_state()  # <<< 编辑后自动同步
                     st.rerun()
 
             # --- 2. 删除按钮 ---
@@ -669,6 +675,7 @@ def display_task_management(task):
                          key=f"delete_btn_{task.task_id}"):  # 关键：为每个按钮添加唯一标识
                 st.session_state.tasks = [t for t in st.session_state.tasks if t.task_id != task.task_id]
                 st.toast(f"任务 '{task.task_name}' 已删除。", icon="🗑️")
+                sync_state()  # <<< 删除后自动同步
                 st.rerun()
 
 
@@ -729,7 +736,7 @@ def display_task_card(task):
         display_task_management(task)
 
 
-# --- [!! 修改：优化主卡片布局 !!] ---
+# --- [!! 优化主卡片布局 !!] ---
 def display_kanban_layout():
     """
     显示主看板的三栏布局 (未开始, 进行中, 已完成)。
@@ -758,13 +765,13 @@ def display_kanban_layout():
             display_task_card(task)
 
 
-# --- [!! 新函数：主函数 !!] ---
+# --- [!! 主函数 !!] ---
 def main():
     """
     主函数：按顺序运行应用。
     """
     initialize_app()
-    display_main_controls() # <--- 使用重构后的函数
+    display_main_controls()
     display_kanban_layout()
 
 
