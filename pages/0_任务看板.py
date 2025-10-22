@@ -7,7 +7,7 @@ from shared.sidebar import create_common_sidebar
 
 
 # 自动刷新，每分钟一次，用于更新时间显示
-st_autorefresh(interval=1000 * 60, key="clock_refresher")
+st_autorefresh(interval=1000 * 5, key="clock_refresher")
 create_common_sidebar() # 暂时注释掉，以便代码独立运行
 
 # 定义北京时间 (UTC+8)
