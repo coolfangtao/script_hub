@@ -288,8 +288,8 @@ def format_timedelta_to_str(duration):
 def get_github_repo():
     """使用缓存连接到 GitHub 仓库，避免每次重载都重新认证。"""
     try:
-        g = Github(st.secrets["GITHUB_TOKEN"])
-        repo = g.get_repo(st.secrets["GITHUB_REPO"])
+        g = Github(st.secrets["github_data_token"])
+        repo = g.get_repo(st.secrets["github_data_repo"])
         return repo
     except Exception as e:
         st.error(f"连接到 GitHub 仓库失败: {e}。请检查你的 secrets.toml 文件配置。")
