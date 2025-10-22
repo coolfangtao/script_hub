@@ -52,37 +52,37 @@ class Task:
 
         # --- [!! 新增方法：序列化与反序列化 !!] ---
 
-        def to_dict(self):
-            """将 Task 对象转换为可序列化为 JSON 的字典。"""
-            return {
-                "task_name": self.task_name,
-                "task_type": self.task_type,
-                # 将 datetime 对象转换为 ISO 8601 格式的字符串
-                "creation_time": self.creation_time.isoformat() if self.creation_time else None,
-                "task_id": self.task_id,
-                "task_progress": self.task_progress,
-                "status": self.status,
-                "completion_time": self.completion_time.isoformat() if self.completion_time else None,
-                # 将 timedelta 对象转换为总秒数 (浮点数)
-                "task_duration_seconds": self.task_duration.total_seconds() if self.task_duration else None,
-                "task_comments": [
-                    {
-                        "content": c["content"],
-                        "type": c["type"],
-                        "time": c["time"].isoformat()
-                    } for c in self.task_comments
-                ],
-                "total_active_time_seconds": self.total_active_time.total_seconds(),
-                "last_start_active_time": self.last_start_active_time.isoformat() if self.last_start_active_time else None,
-                "active_time_segments": [
-                    {
-                        "start_time": s["start_time"].isoformat(),
-                        "end_time": s["end_time"].isoformat(),
-                        "duration_seconds": s["duration"].total_seconds(),
-                        "stopped_as": s["stopped_as"]
-                    } for s in self.active_time_segments
-                ]
-            }
+    def to_dict(self):
+        """将 Task 对象转换为可序列化为 JSON 的字典。"""
+        return {
+            "task_name": self.task_name,
+            "task_type": self.task_type,
+            # 将 datetime 对象转换为 ISO 8601 格式的字符串
+            "creation_time": self.creation_time.isoformat() if self.creation_time else None,
+            "task_id": self.task_id,
+            "task_progress": self.task_progress,
+            "status": self.status,
+            "completion_time": self.completion_time.isoformat() if self.completion_time else None,
+            # 将 timedelta 对象转换为总秒数 (浮点数)
+            "task_duration_seconds": self.task_duration.total_seconds() if self.task_duration else None,
+            "task_comments": [
+                {
+                    "content": c["content"],
+                    "type": c["type"],
+                    "time": c["time"].isoformat()
+                } for c in self.task_comments
+            ],
+            "total_active_time_seconds": self.total_active_time.total_seconds(),
+            "last_start_active_time": self.last_start_active_time.isoformat() if self.last_start_active_time else None,
+            "active_time_segments": [
+                {
+                    "start_time": s["start_time"].isoformat(),
+                    "end_time": s["end_time"].isoformat(),
+                    "duration_seconds": s["duration"].total_seconds(),
+                    "stopped_as": s["stopped_as"]
+                } for s in self.active_time_segments
+            ]
+        }
 
     @classmethod
     def from_dict(cls, data):
