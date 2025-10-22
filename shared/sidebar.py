@@ -28,6 +28,10 @@ SCRIPTS_BY_GROUP = {
             "label": "Listing自动生成",
             "path": r"pages/2_Listing生成.py"
         },
+        {
+            "label": "任务看板",
+            "path": r"pages/0_任务看板.py"
+        },
     ],
     "📝 文本处理": [
         {
