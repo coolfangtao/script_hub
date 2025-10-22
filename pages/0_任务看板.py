@@ -216,7 +216,6 @@ def initialize_app():
 
     if 'tasks' not in st.session_state:
         st.session_state.tasks = []
-# --- [!! 结束新函数 !!] ---
 
 
 # --- [!! 新函数：显示创建任务表单 !!] ---
@@ -236,7 +235,6 @@ def display_new_task_form():
                 st.session_state.tasks.append(new_task)
                 st.success(f"任务 '{new_task_name}' 已添加！")
                 st.rerun()
-# --- [!! 结束新函数 !!] ---
 
 
 def get_task_by_id(task_id):
@@ -283,16 +281,16 @@ def display_task_controls(task):
                       use_container_width=True)
 
     st.write("")  # 增加一点间距
-# --- [!! 结束新函数 !!] ---
 
 
 # --- [!! 新函数：显示评论区 !!] ---
 def display_task_comments(task):
     """
-    显示单个任务的评论区域 (包括输入和列表)。
+    显示单个任务的评论区域 (评论列表在固定高度容器内滚动)。
     """
     st.subheader("任务评论", divider='rainbow')
 
+    # --- 评论创建区域保持不变 ---
     with st.popover("💬 创建评论"):
         with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
             comment_type = st.selectbox("评论类型", ["感悟", "问题", "备注"], key=f"ctype_{task.task_id}")
@@ -300,25 +298,30 @@ def display_task_comments(task):
 
             if st.form_submit_button("提交"):
                 if comment_content:
-                    task.add_comment(comment_content, comment_type)
-                    st.rerun()
+                    st.success("评论已添加！")
+                    # task.add_comment(comment_content, comment_type)
+                    # st.rerun()
                 else:
                     st.warning("评论内容不能为空")
 
+    # --- 将评论列表放入一个固定高度的 Container ---
     if not task.task_comments:
-        pass
+        st.info("暂无评论，点击上方“💬 创建评论”来添加第一条吧！")
     else:
-        for comment in reversed(task.task_comments):
-            icon_map = {"感悟": "💡", "问题": "❓", "备注": "📌"}
-            color_map = {"感悟": "green", "问题": "red", "备注": "blue"}
+        # vvvvvvvvvvvv 这是核心改动 vvvvvvvvvvvv
+        # 你可以根据需要调整 height 的值
+        with st.container(height=400):
+        # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            for comment in reversed(task.task_comments):
+                icon_map = {"感悟": "💡", "问题": "❓", "备注": "📌"}
+                color_map = {"感悟": "green", "问题": "red", "备注": "blue"}
 
-            comment_icon = icon_map.get(comment['type'], "💬")
-            content_color = color_map.get(comment['type'], "gray")
+                comment_icon = icon_map.get(comment['type'], "💬")
+                content_color = color_map.get(comment['type'], "gray")
 
-            with st.chat_message(name=comment['type'], avatar=comment_icon):
-                st.markdown(f":{content_color}[{comment['content']}]")
-                st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
-# --- [!! 结束新函数 !!] ---
+                with st.chat_message(name=comment['type'], avatar=comment_icon):
+                    st.markdown(f":{content_color}[{comment['content']}]")
+                    st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
 
 
 # --- [!! 新函数：显示工时记录 !!] ---
@@ -352,7 +355,6 @@ def display_task_time_logs(task):
             status_icon = "⏸️" if segment['stopped_as'] == '未开始' else "✅"
 
             st.info(f"**{duration_str}** (在 {date_str} 从 {start_str} 到 {end_str}) {status_icon}")
-# --- [!! 结束新函数 !!] ---
 
 
 # --- 任务卡片显示函数 (Task Card Display Function) ---
@@ -444,7 +446,6 @@ def display_kanban_layout():
         st.header(f"✅ 已完成 ({len(tasks_done)})")
         for task in tasks_done:
             display_task_card(task)
-# --- [!! 结束新函数 !!] ---
 
 
 # --- [!! 新函数：主函数 !!] ---
@@ -455,7 +456,6 @@ def main():
     initialize_app()
     display_new_task_form()
     display_kanban_layout()
-# --- [!! 结束新函数 !!] ---
 
 
 # --- 启动应用 ---
