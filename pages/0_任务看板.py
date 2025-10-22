@@ -324,7 +324,7 @@ def display_task_comments(task):
 
 
 # --- [!! 新函数：显示工时记录 !!] ---
-def display_task_time_logs_v3(task):
+def display_task_time_logs(task):
     """
     方案三：按日期对历史记录进行分组折叠，体验最佳。
     """
