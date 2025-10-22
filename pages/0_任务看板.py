@@ -83,11 +83,11 @@ class Task:
 
         if new_progress == 100:
             self.update_status("已完成")
-        elif new_progress > 0 and self.task_status == "未开始":
+        elif new_progress > 0:
             self.update_status("进行中")
-        elif new_progress == 0 and self.task_status != "未开始":
+        elif new_progress == 0:
             self.update_status("未开始")
-        elif 0 < new_progress < 100 and self.task_status != "进行中":
+        elif 0 < new_progress < 100:
             self.update_status("进行中")
 
     def get_duration_str(self):
