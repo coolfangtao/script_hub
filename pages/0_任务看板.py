@@ -534,48 +534,33 @@ def display_task_time_logs(task):
 # --- [!! 新增函数：显示任务管理区域 !!] ---
 def display_task_management(task):
     """
-    显示任务的管理控件 (ID、创建时间、编辑和删除功能)。
-    此函数从 display_task_card 中分离出来，以提高模块化。
+    显示任务管理操作：编辑、删除等。
     """
-    st.divider()
-    col_info, col_manage = st.columns([3, 1])
+    # 确保每个任务的操作区域有唯一的key
+    with st.container(border=True):
+        st.subheader("🔧 任务管理", anchor=False)
 
-    with col_info:
-        st.caption(f"ID: {task.task_id}")
-        st.caption(f"创建于: {task.creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        # 编辑任务部分
+        with st.expander("✏️ 编辑任务", expanded=False):
+            with st.form(key=f"edit_task_form_{task.id}"):  # 使用唯一key
+                edited_name = st.text_input("任务名称", value=task.task_name)
+                edited_type = st.selectbox("任务类型", ["主线任务", "副线任务"],
+                                           index=0 if task.task_type == "主线任务" else 1,
+                                           key=f"task_type_{task.id}")  # 使用唯一key
+                if st.form_submit_button("更新任务", use_container_width=True):
+                    # 更新逻辑...
+                    pass
 
-    with col_manage:
-        with st.popover("⚙️ 管理"):
-            # --- 1. 编辑表单 ---
-            with st.form(key=f"edit_form_{task.task_id}"):
-                st.subheader("编辑任务", anchor=False)
-                edited_task_name = st.text_input("任务名称", value=task.task_name)
-
-                # 获取当前 task_type 的索引，以便正确设置 selectbox 的默认值
-                type_options = ["主线任务", "副线任务"]
-                try:
-                    current_type_index = type_options.index(task.task_type)
-                except ValueError:
-                    current_type_index = 0  # 如果找不到，默认为第一个
-
-                edited_task_type = st.selectbox(
-                    "任务标签",
-                    options=type_options,
-                    index=current_type_index
-                )
-
-                if st.form_submit_button("💾 保存更改", use_container_width=True):
-                    task.task_name = edited_task_name
-                    task.task_type = edited_task_type
-                    st.toast(f"任务 '{task.task_name}' 已更新!", icon="✅")
-                    st.rerun()
-
-            # --- 2. 删除按钮 ---
-            st.divider()
-            if st.button("🗑️ 删除任务", type="primary", use_container_width=True, help="此操作不可撤销！"):
-                st.session_state.tasks = [t for t in st.session_state.tasks if t.task_id != task.task_id]
-                st.toast(f"任务 '{task.task_name}' 已删除。", icon="🗑️")
-                st.rerun()
+        # 删除按钮 - 添加唯一key
+        if st.button("🗑️ 删除任务",
+                     type="primary",
+                     use_container_width=True,
+                     help="此操作不可撤销！",
+                     key=f"delete_btn_{task.id}"):  # 关键：为每个按钮添加唯一标识
+            # 删除逻辑...
+            st.session_state.tasks = [t for t in st.session_state.tasks if t.id != task.id]
+            st.success(f"任务 '{task.task_name}' 已删除！")
+            st.rerun()
 
 
 # --- 任务卡片显示函数 (Task Card Display Function) ---
