@@ -1,9 +1,12 @@
 import streamlit as st
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
+
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
-st_autorefresh(interval=1000*60, key="clock_refresher")
-create_common_sidebar()
+
+# 自动刷新，每分钟一次，用于更新时间显示
+st_autorefresh(interval=1000 * 1, key="clock_refresher")
+create_common_sidebar() # 暂时注释掉，以便代码独立运行
 
 # 定义北京时间 (UTC+8)
 beijing_tz = timezone(timedelta(hours=8))
@@ -13,6 +16,7 @@ beijing_tz = timezone(timedelta(hours=8))
 class Task:
     """
     一个类，用于表示和管理单个任务。
+    (已更新时间跟踪逻辑)
     """
 
     def __init__(self, task_name, task_type):
@@ -20,16 +24,22 @@ class Task:
         初始化一个新任务。
         """
         self.task_name = task_name
-        self.task_type = task_type  # '主线任务' 或 '副线任务'
+        self.task_type = task_type
         self.creation_time = datetime.now(beijing_tz)
-        # 使用高精度的Unix时间戳作为唯一ID
         self.task_id = f"task_{self.creation_time.timestamp()}"
         self.task_progress = 0  # 0 到 100
 
         self.completion_time = None  # 任务完成的时间
-        self.task_duration = None  # timedelta 对象
+        self.task_duration = None  # 任务的【总生命周期】 (创建 -> 完成)
 
-        self.task_comments = []  # 存储评论字典的列表
+        self.task_comments = []
+
+        # --- [!! 新增 !!] ---
+        # 1. 用于累积所有“进行中”时段的总和
+        self.total_active_time = timedelta(0)
+        # 2. 标记最近一次进入“进行中”状态的时间点
+        self.last_start_active_time = None
+        # --- [!! 结束 !!] ---
 
     def get_status(self):
         """
@@ -45,7 +55,6 @@ class Task:
     def add_comment(self, content, comment_type):
         """
         为任务添加评论。
-        comment_type: '感悟' 或 '问题' 或 '备注'
         """
         comment = {
             "content": content,
@@ -55,69 +64,115 @@ class Task:
         self.task_comments.append(comment)
         st.toast(f"任务 '{self.task_name}' 添加了新评论！", icon="💬")
 
-
+    # --- [!! 核心变更 !!] ---
     def update_progress(self, new_progress):
         """
-        更新任务进度，并自动处理相关逻辑（如完成时间）。
+        更新任务进度，并智能跟踪“有效工作时长”。
         """
-        # 防止不必要的更新
         if self.task_progress == new_progress:
             return
 
-        # 获取旧状态，用于比较
         old_status = self.get_status()
-
         self.task_progress = new_progress
-
-        # 获取新状态
         new_status = self.get_status()
+        now = datetime.now(beijing_tz)
 
+        # 状态机：处理有效时长的累积
+
+        # 1. 刚进入“进行中”状态 (从“未开始”或“已完成”)
+        if new_status == "进行中" and old_status != "进行中":
+            self.last_start_active_time = now
+            # st.toast("计时开始 ⏱️")
+
+        # 2. 刚离开“进行中”状态 (变为“未开始”或“已完成”)
+        elif new_status != "进行中" and old_status == "进行中":
+            if self.last_start_active_time:
+                # 计算刚刚结束的这段时长，并累加
+                active_segment = now - self.last_start_active_time
+                self.total_active_time += active_segment
+                self.last_start_active_time = None
+                # st.toast(f"本段计时结束，累积 {active_segment.total_seconds() // 60} 分钟")
+
+        # --- 原有的完成逻辑 ---
         if new_status == "已完成":
             if old_status != "已完成":
-                self.completion_time = datetime.now(beijing_tz)
+                self.completion_time = now
+                # task_duration 存储的是【总生命周期】
                 self.task_duration = self.completion_time - self.creation_time
                 st.balloons()
 
-        elif new_status == "进行中":
-            # 如果是从“已完成”或“未开始”变来的，重置完成时间
-            if old_status != "进行中":
-                self.completion_time = None
-                self.task_duration = None
+        # 如果从“已完成”状态改回“未完成”
+        elif old_status == "已完成" and new_status != "已完成":
+            self.completion_time = None
+            self.task_duration = None
 
+        # 如果重置为“未开始”
         elif new_status == "未开始":
-            # 如果是从其他状态变来的，重置完成时间
-            if old_status != "未开始":
-                self.completion_time = None
-                self.task_duration = None
+            self.completion_time = None
+            self.task_duration = None
+            # 注意：这里我们【不】重置 self.total_active_time
+            # 允许任务在“未开始”和“进行中”之间切换
 
-    def get_duration_str(self):
-        """
-        使用 self.get_status() 代替 self.task_status
-        """
-        duration = None
-        current_status = self.get_status()  # [!! 变更 !!]
+    # --- [!! 新增 !!] ---
+    def get_total_lifespan_duration(self):
+        """返回任务的【总生命周期】 (从创建到现在，或到完成)"""
+        if self.completion_time:
+            # 已完成：创建 -> 完成
+            return self.task_duration  # 已在 update_progress 中计算
+        else:
+            # 未完成：创建 -> 现在
+            return datetime.now(beijing_tz) - self.creation_time
 
-        if current_status == "已完成" and self.task_duration:
-            duration = self.task_duration
-        elif current_status == "进行中":
-            duration = datetime.now(beijing_tz) - self.creation_time
-        elif current_status == "未开始":
-            return "尚未开始"
+    # --- [!! 新增 !!] ---
+    def get_total_active_duration(self):
+        """返回任务的【总有效工作时长】"""
+        current_active_duration = timedelta(0)
 
-        if duration is None:
-            return "N/A"
+        # 如果任务当前“进行中”，计算当前时段的时长
+        if self.get_status() == "进行中" and self.last_start_active_time:
+            current_active_duration = datetime.now(beijing_tz) - self.last_start_active_time
 
-        total_seconds = int(duration.total_seconds())
-        days, remainder = divmod(total_seconds, 86400)
-        hours, remainder = divmod(remainder, 3600)
-        minutes, seconds = divmod(remainder, 60)
+        # 总有效时长 = 历史上已保存的时长 + 当前时段的时长
+        return self.total_active_time + current_active_duration
 
-        return f"{days}天 {hours}小时 {minutes}分钟 {seconds}秒"
+    # [!! 删除 !!] get_duration_str(self) 方法不再需要，
+    # 因为我们现在有两个更精确的方法
+
+
+# --- [!! 新增 !!] 辅助函数 ---
+def format_timedelta_to_str(duration):
+    """
+    将 timedelta 对象格式化为 "X天 X小时 X分钟 X秒" 的字符串
+    """
+    if not isinstance(duration, timedelta) or duration.total_seconds() <= 0:
+        return "0秒"
+
+    total_seconds = int(duration.total_seconds())
+    days, remainder = divmod(total_seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    # 为了简洁，可以只显示有值的部分
+    parts = []
+    if days > 0:
+        parts.append(f"{days}天")
+    if hours > 0:
+        parts.append(f"{hours}小时")
+    if minutes > 0:
+        parts.append(f"{minutes}分钟")
+    if seconds > 0 and not parts:  # 仅当没有天/小时/分钟时才显示秒
+        parts.append(f"{seconds}秒")
+
+    if not parts:
+        return "0秒"
+
+    # 返回原始的完整格式
+    return f"{days}天 {hours}小时 {minutes}分钟 {seconds}秒"
 
 
 # --- Streamlit 界面 ---
 
-# 页面配置 (Page Configuration)
+# 页面配置
 st.set_page_config(
     page_title="每日任务看板",
     page_icon="📋",
@@ -143,7 +198,7 @@ with st.expander("🚀 点击创建新任务"):
             new_task = Task(task_name=new_task_name, task_type=new_task_type)
             st.session_state.tasks.append(new_task)
             st.success(f"任务 '{new_task_name}' 已添加！")
-            st.rerun()  # 添加 Rerun 以便立即刷新看板
+            st.rerun()
 
 
 def get_task_by_id(task_id):
@@ -158,20 +213,18 @@ def get_task_by_id(task_id):
 
 def handle_progress_change(task_id):
     """
-    [!! 变更 !!] 回调函数：当进度 slider 发生变化时调用。
+    回调函数：当进度 slider 发生变化时调用。
     """
     task = get_task_by_id(task_id)
     if not task:
         return
 
-    # 1. 从 session_state 中获取 slider 的新值
     new_progress = st.session_state[f"progress_{task_id}"]
 
-    # 2. 更新 task 对象 (这也会自动更新完成时间等)
+    # 调用我们重写的 update_progress
     task.update_progress(new_progress)
 
-
-# ---------------------
+    # (不需要 st.rerun()，on_change 会自动触发)
 
 
 # --- 任务卡片显示函数 (Task Card Display Function) ---
@@ -182,46 +235,50 @@ def display_task_card(task):
 
     with st.expander(f"{task.task_type}", expanded=True):
 
-        # 1. 任务详情与控制
         st.subheader(task.task_name, divider="rainbow")
 
-        # 用时信息
-        current_status = task.get_status()
-        duration_str = task.get_duration_str()
+        # --- [!! 变更 !!] ---
+        # 1. 获取总生命周期 (从创建到现在的总时间)
+        lifespan_duration = task.get_total_lifespan_duration()
+        lifespan_str = format_timedelta_to_str(lifespan_duration)
 
-        if current_status == "已完成":
-            # 对于已完成任务，使用 st.metric 显示总用时
-            # help 参数可以在鼠标悬停时显示提示信息
-            st.metric(
-                label="✅ 总用时",
-                value=duration_str,
-                help="任务已完成，这是记录的总耗时。"
-            )
-        elif current_status == "进行中":
-            # 对于进行中任务，同样使用 st.metric，但标签不同
-            st.metric(
-                label="⏳ 已用时",
-                value=duration_str,
-                help="任务正在进行中，这是目前已花费的时间。"
-            )
+        # 2. 获取总有效工作时长 (只计算“进行中”的时间)
+        active_duration = task.get_total_active_duration()
+        active_str = format_timedelta_to_str(active_duration)
 
+        # 3. 使用两列来显示这两个时间
+        col_time1, col_time2 = st.columns(2)
+        with col_time1:
+            st.metric(
+                label="⏱️ 任务总耗时 (有效工作)",
+                value=active_str,
+                help="这是任务在“进行中”状态下所花费的实际时间总和。每分钟刷新。"
+            )
+        with col_time2:
+            st.metric(
+                label="🗓️ 任务生命周期 (自创建)",
+                value=lifespan_str,
+                help="这是从任务创建开始的总时长。如果任务已完成，则为创建到完成的总时长。每分钟刷新。"
+            )
+        # --- [!! 结束变更 !!] ---
+
+        # 进度条
         st.slider(
             "当前进度（0-100%）",
             min_value=0,
             max_value=100,
-            value=task.task_progress,  # 'value' 同样只在初次渲染时起作用
+            value=task.task_progress,
             step=10,
             format="%d%%",
-            key=f"progress_{task.task_id}",  # key 是必须的
+            key=f"progress_{task.task_id}",
             help="拖动滑块来更新任务进度",
-            on_change=handle_progress_change,  # 指定回调
-            args=(task.task_id,)  # 传递参数给回调
+            on_change=handle_progress_change,
+            args=(task.task_id,)
         )
 
-        # --- [!! 评论区优化 !!] --- (保持不变)
+        # --- 评论区 (保持不变) ---
         st.subheader("任务评论", divider='rainbow')
 
-        # 1. 使用 st.popover 来隐藏“添加评论”表单
         with st.popover("💬 创建评论"):
             with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
                 comment_type = st.selectbox("评论类型", ["感悟", "问题", "备注"], key=f"ctype_{task.task_id}")
@@ -234,24 +291,17 @@ def display_task_card(task):
                     else:
                         st.warning("评论内容不能为空")
 
-        # 2. 优化“暂无评论”的提示
         if not task.task_comments:
             pass
         else:
-            # 倒序显示，最新评论在最上面
             for comment in reversed(task.task_comments):
-                if comment['type'] == "感悟":
-                    comment_icon = "💡"
-                    content_color = "green"
-                elif comment['type'] == "问题":
-                    comment_icon = "❓"
-                    content_color = "red"
-                elif comment['type'] == "备注":  # 新增的类型
-                    comment_icon = "📌"
-                    content_color = "blue"
+                icon_map = {"感悟": "💡", "问题": "❓", "备注": "📌"}
+                color_map = {"感悟": "green", "问题": "red", "备注": "blue"}
+
+                comment_icon = icon_map.get(comment['type'], "💬")
+                content_color = color_map.get(comment['type'], "gray")
 
                 with st.chat_message(name=comment['type'], avatar=comment_icon):
-                    # 使用 markdown 语法来显示带颜色的内容
                     st.markdown(f":{content_color}[{comment['content']}]")
                     st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
 
@@ -268,7 +318,6 @@ col_todo, col_doing, col_done = st.columns(3)
 
 sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=False)
 
-# [!! 变更 !!] 使用 task.get_status() 来分类
 tasks_todo = [t for t in sorted_tasks if t.get_status() == "未开始"]
 tasks_doing = [t for t in sorted_tasks if t.get_status() == "进行中"]
 tasks_done = [t for t in sorted_tasks if t.get_status() == "已完成"]
