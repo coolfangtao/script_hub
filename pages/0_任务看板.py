@@ -366,40 +366,38 @@ def display_main_controls():
 
     # --- 第2栏：从文件导入 ---
     with col2:
-        col21, col22 = st.columns(2)
-        with col21:
-            with st.container(border=True, height=container_height):
-                st.subheader("📥 导入任务", anchor=False)
-                uploaded_file = st.file_uploader(
-                    "选择一个 .json 任务文件",
-                    type=["json"],
-                    help="请上传之前从本应用导出的任务文件。"
-                )
-                if uploaded_file is not None:
-                    # 当用户上传文件后，立即处理
-                    handle_tasks_import(uploaded_file)
-        with col22:
-            with st.container(border=True, height=container_height):
-                st.subheader("📤 导出任务", anchor=False)
+        with st.container(border=True, height=container_height):
+            st.subheader("📥 导入任务", anchor=False)
+            uploaded_file = st.file_uploader(
+                "选择一个 .json 任务文件",
+                type=["json"],
+                help="请上传之前从本应用导出的任务文件。"
+            )
+            if uploaded_file is not None:
+                # 当用户上传文件后，立即处理
+                handle_tasks_import(uploaded_file)
 
-                # 准备导出数据
-                json_data = get_export_data()
+        with st.container(border=True, height=container_height):
+            st.subheader("📤 导出任务", anchor=False)
 
-                # 生成文件名
-                timestamp = datetime.now(beijing_tz).strftime("%Y%m%d_%H%M%S")
-                file_name = f"tasks_export_{timestamp}.json"
+            # 准备导出数据
+            json_data = get_export_data()
 
-                st.download_button(
-                    label="📥 下载任务到本地",
-                    data=json_data,
-                    file_name=file_name,
-                    mime="application/json",
-                    help="将当前看板上的所有任务保存为一个 JSON 文件。",
-                    use_container_width=True,
-                    # 如果没有任务，则禁用按钮
-                    disabled=not st.session_state.tasks
-                )
-                st.caption(f"文件名: {file_name}")
+            # 生成文件名
+            timestamp = datetime.now(beijing_tz).strftime("%Y%m%d_%H%M%S")
+            file_name = f"tasks_export_{timestamp}.json"
+
+            st.download_button(
+                label="📥 下载任务到本地",
+                data=json_data,
+                file_name=file_name,
+                mime="application/json",
+                help="将当前看板上的所有任务保存为一个 JSON 文件。",
+                use_container_width=True,
+                # 如果没有任务，则禁用按钮
+                disabled=not st.session_state.tasks
+            )
+            st.caption(f"文件名: {file_name}")
 
     # --- 第3栏：导出到文件 ---
     with col3:
