@@ -1,4 +1,5 @@
 import streamlit as st
+import json
 from itertools import groupby
 from datetime import datetime, timedelta, timezone
 from streamlit_autorefresh import st_autorefresh
@@ -17,7 +18,7 @@ beijing_tz = timezone(timedelta(hours=8))
 class Task:
     """
     一个类，用于表示和管理单个任务。
-    (已更新时间跟踪逻辑 和 独立的状态管理)
+    (已更新时间跟踪逻辑 和 独立的状态管理、以及导入导出功能)
     """
 
     def __init__(self, task_name, task_type):
@@ -48,6 +49,79 @@ class Task:
         # { 'start_time': datetime, 'end_time': datetime, 'duration': timedelta, 'stopped_as': str }
         self.active_time_segments = []
         # --- [!! 结束 !!] ---
+
+        # --- [!! 新增方法：序列化与反序列化 !!] ---
+
+        def to_dict(self):
+            """将 Task 对象转换为可序列化为 JSON 的字典。"""
+            return {
+                "task_name": self.task_name,
+                "task_type": self.task_type,
+                # 将 datetime 对象转换为 ISO 8601 格式的字符串
+                "creation_time": self.creation_time.isoformat() if self.creation_time else None,
+                "task_id": self.task_id,
+                "task_progress": self.task_progress,
+                "status": self.status,
+                "completion_time": self.completion_time.isoformat() if self.completion_time else None,
+                # 将 timedelta 对象转换为总秒数 (浮点数)
+                "task_duration_seconds": self.task_duration.total_seconds() if self.task_duration else None,
+                "task_comments": [
+                    {
+                        "content": c["content"],
+                        "type": c["type"],
+                        "time": c["time"].isoformat()
+                    } for c in self.task_comments
+                ],
+                "total_active_time_seconds": self.total_active_time.total_seconds(),
+                "last_start_active_time": self.last_start_active_time.isoformat() if self.last_start_active_time else None,
+                "active_time_segments": [
+                    {
+                        "start_time": s["start_time"].isoformat(),
+                        "end_time": s["end_time"].isoformat(),
+                        "duration_seconds": s["duration"].total_seconds(),
+                        "stopped_as": s["stopped_as"]
+                    } for s in self.active_time_segments
+                ]
+            }
+
+    @classmethod
+    def from_dict(cls, data):
+        """从字典创建 Task 对象。"""
+        # 先创建一个基础的 Task 对象
+        task = cls(data["task_name"], data["task_type"])
+
+        # 逐个恢复属性
+        task.creation_time = datetime.fromisoformat(data["creation_time"]) if data.get("creation_time") else None
+        task.task_id = data.get("task_id", f"task_{task.creation_time.timestamp()}")  # 兼容旧数据
+        task.task_progress = data["task_progress"]
+        task.status = data["status"]
+        task.completion_time = datetime.fromisoformat(data["completion_time"]) if data.get("completion_time") else None
+
+        if data.get("task_duration_seconds") is not None:
+            task.task_duration = timedelta(seconds=data["task_duration_seconds"])
+
+        task.task_comments = [
+            {
+                "content": c["content"],
+                "type": c["type"],
+                "time": datetime.fromisoformat(c["time"])
+            } for c in data.get("task_comments", [])
+        ]
+
+        task.total_active_time = timedelta(seconds=data.get("total_active_time_seconds", 0))
+
+        if data.get("last_start_active_time"):
+            task.last_start_active_time = datetime.fromisoformat(data["last_start_active_time"])
+
+        task.active_time_segments = [
+            {
+                "start_time": datetime.fromisoformat(s["start_time"]),
+                "end_time": datetime.fromisoformat(s["end_time"]),
+                "duration": timedelta(seconds=s["duration_seconds"]),
+                "stopped_as": s["stopped_as"]
+            } for s in data.get("active_time_segments", [])
+        ]
+        return task
 
     def add_comment(self, content, comment_type):
         """
@@ -219,23 +293,111 @@ def initialize_app():
         st.session_state.tasks = []
 
 
-# --- [!! 新函数：显示创建任务表单 !!] ---
-def display_new_task_form():
+# --- [!! 新函数：处理任务导入 !!] ---
+def handle_tasks_import(uploaded_file):
     """
-    显示用于创建新任务的表单。
+    处理上传的 JSON 文件，将其中的任务加载到 session_state。
     """
-    with st.expander("🚀 点击创建新任务", expanded=True):
-        with st.form(key="new_task_form", clear_on_submit=True):
-            new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
-            new_task_type = st.selectbox("任务类型", ["主线任务", "副线任务"])
+    if uploaded_file is None:
+        return
+    try:
+        # 使用 .read() 来获取文件内容
+        tasks_data = json.load(uploaded_file)
 
-            submit_button = st.form_submit_button(label="添加任务")
+        # 为了避免重复导入，我们可以基于 task_id 进行检查
+        existing_task_ids = {task.task_id for task in st.session_state.tasks}
+        new_tasks_added = 0
 
-            if submit_button and new_task_name:
-                new_task = Task(task_name=new_task_name, task_type=new_task_type)
-                st.session_state.tasks.append(new_task)
-                st.success(f"任务 '{new_task_name}' 已添加！")
-                st.rerun()
+        for task_dict in tasks_data:
+            if task_dict.get("task_id") not in existing_task_ids:
+                task = Task.from_dict(task_dict)
+                st.session_state.tasks.append(task)
+                new_tasks_added += 1
+
+        if new_tasks_added > 0:
+            st.success(f"成功导入 {new_tasks_added} 个新任务！")
+            st.rerun()
+        else:
+            st.info("文件中没有发现新任务。")
+    except json.JSONDecodeError:
+        st.error("导入失败：文件格式不是有效的 JSON。")
+    except Exception as e:
+        st.error(f"导入时发生未知错误: {e}")
+
+
+# --- [!! 新函数：获取导出数据 !!] ---
+def get_export_data():
+    """
+    将 session_state 中的所有任务转换为 JSON 字符串。
+    """
+    if not st.session_state.tasks:
+        return "{}"  # 返回一个空的 JSON 对象
+
+    tasks_as_dicts = [task.to_dict() for task in st.session_state.tasks]
+    # indent=2 使得 JSON 文件更具可读性
+    return json.dumps(tasks_as_dicts, indent=2)
+
+
+# --- [!! 重构函数：显示主控制区 (原 display_new_task_form) !!] ---
+def display_main_controls():
+    """
+    显示三栏布局的顶部控制区域：创建、导入、导出。
+    """
+    st.header("控制面板", divider="gray")
+    col1, col2, col3 = st.columns(3)
+
+    # --- 第1栏：创建新任务 ---
+    with col1:
+        with st.container(border=True):
+            st.subheader("🚀 创建新任务", anchor=False)
+            with st.form(key="new_task_form", clear_on_submit=True):
+                new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
+                new_task_type = st.selectbox("任务类型", ["主线任务", "副线任务"])
+                if st.form_submit_button("添加任务", use_container_width=True):
+                    if new_task_name:
+                        new_task = Task(task_name=new_task_name, task_type=new_task_type)
+                        st.session_state.tasks.append(new_task)
+                        st.success(f"任务 '{new_task_name}' 已添加！")
+                        st.rerun()
+                    else:
+                        st.warning("任务名称不能为空！")
+
+    # --- 第2栏：从文件导入 ---
+    with col2:
+        with st.container(border=True):
+            st.subheader("📥 导入任务", anchor=False)
+            uploaded_file = st.file_uploader(
+                "选择一个 .json 任务文件",
+                type=["json"],
+                help="请上传之前从本应用导出的任务文件。"
+            )
+            if uploaded_file is not None:
+                # 当用户上传文件后，立即处理
+                handle_tasks_import(uploaded_file)
+
+    # --- 第3栏：导出到文件 ---
+    with col3:
+        with st.container(border=True):
+            st.subheader("📤 导出任务", anchor=False)
+
+            # 准备导出数据
+            json_data = get_export_data()
+
+            # 生成文件名
+            timestamp = datetime.now(beijing_tz).strftime("%Y%m%d_%H%M%S")
+            file_name = f"tasks_export_{timestamp}.json"
+
+            st.download_button(
+                label="📥 下载任务到本地",
+                data=json_data,
+                file_name=file_name,
+                mime="application/json",
+                help="将当前看板上的所有任务保存为一个 JSON 文件。",
+                use_container_width=True,
+                # 如果没有任务，则禁用按钮
+                disabled=not st.session_state.tasks
+            )
+            st.caption(f"文件名: {file_name}")
 
 
 def get_task_by_id(task_id):
@@ -464,7 +626,7 @@ def main():
     主函数：按顺序运行应用。
     """
     initialize_app()
-    display_new_task_form()
+    display_main_controls() # <--- 使用重构后的函数
     display_kanban_layout()
 
 
