@@ -277,7 +277,7 @@ def display_task_card(task):
 # --- 主看板布局 (Main Kanban Layout) ---
 col_todo, col_doing, col_done = st.columns(3)
 
-sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=True)
+sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=False)
 
 tasks_todo = [t for t in sorted_tasks if t.task_status == "未开始"]
 tasks_doing = [t for t in sorted_tasks if t.task_status == "进行中"]
