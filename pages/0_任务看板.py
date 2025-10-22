@@ -178,10 +178,8 @@ def display_task_card(task):
     """
     在UI上显示一个任务卡片。
     """
-    icon = "👔" if task.task_type == "主线任务" else "🤸"
 
-    # [!! 变更 !!] 在标题中也显示派生出的状态
-    with st.expander(f"{icon} {task.task_name} (状态: {task.get_status()}, 进度: {task.task_progress}%)", expanded=True):
+    with st.expander(f"{task.task_type}", expanded=True):
 
         # 1. 任务详情与控制
         st.subheader(task.task_name, divider='rainbow')
