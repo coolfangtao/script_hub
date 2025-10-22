@@ -414,11 +414,11 @@ def display_task_card(task):
             args=(task.task_id,)
         )
 
-        # --- 评论区 (保持不变) ---
-        display_task_comments(task)
-
         # --- 工时记录 ---
         display_task_time_logs(task)
+
+        # --- 评论区 (保持不变) ---
+        display_task_comments(task)
 
         # 附加信息 (不变)
         st.divider()
