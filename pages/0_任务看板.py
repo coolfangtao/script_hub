@@ -7,8 +7,8 @@ from shared.sidebar import create_common_sidebar
 
 
 # 自动刷新，每分钟一次，用于更新时间显示
-st_autorefresh(interval=1000 * 5, key="clock_refresher")
-create_common_sidebar() # 暂时注释掉，以便代码独立运行
+st_autorefresh(interval=1000 * 60, key="clock_refresher")
+create_common_sidebar()
 
 # 定义北京时间 (UTC+8)
 beijing_tz = timezone(timedelta(hours=8))
@@ -343,7 +343,7 @@ def display_main_controls():
     """
     显示三栏布局的顶部控制区域：创建、导入、导出。
     """
-    st.header("控制面板", divider="gray")
+    st.header("控制面板", divider="rainbow")
     col1, col2, col3 = st.columns(3)
     # 设置统一的高度
     container_height = 325  # 根据你的内容调整这个值
@@ -653,19 +653,19 @@ def display_kanban_layout():
     tasks_done = [t for t in sorted_tasks if t.status == "已完成"]
 
     with col_todo:
-        st.header(f"📥 未开始/挂起 ({len(tasks_todo)})", divider="gray")
+        st.header(f"📥 未开始/挂起 ({len(tasks_todo)})", divider="rainbow")
         with st.container(border=True):
             for task in tasks_todo:
                 display_task_card(task)
 
     with col_doing:
-        st.header(f"💻 进行中 ({len(tasks_doing)})", divider="gray")
+        st.header(f"💻 进行中 ({len(tasks_doing)})", divider="rainbow")
         with st.container(border=True):
             for task in tasks_doing:
                 display_task_card(task)
 
     with col_done:
-        st.header(f"✅ 已完成 ({len(tasks_done)})", divider="gray")
+        st.header(f"✅ 已完成 ({len(tasks_done)})", divider="rainbow")
         with st.container(border=True):
             for task in tasks_done:
                 display_task_card(task)
