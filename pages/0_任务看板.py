@@ -1,15 +1,14 @@
 import streamlit as st
 from datetime import datetime, timedelta, timezone
 
-# from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
-# create_common_sidebar() # 暂时注释掉导入，以便代码独立运行
+from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
+create_common_sidebar() # 暂时注释掉导入，以便代码独立运行
 
 # 定义北京时间 (UTC+8)
 beijing_tz = timezone(timedelta(hours=8))
 
 
 # 1. 任务类定义 (Task Class Definition)
-# [!! 保持不变 !!]
 class Task:
     """
     一个类，用于表示和管理单个任务。
@@ -24,13 +23,23 @@ class Task:
         self.creation_time = datetime.now(beijing_tz)
         # 使用高精度的Unix时间戳作为唯一ID
         self.task_id = f"task_{self.creation_time.timestamp()}"
-        self.task_status = "未开始"  # '未开始', '进行中', '已完成'
         self.task_progress = 0  # 0 到 100
 
         self.completion_time = None  # 任务完成的时间
         self.task_duration = None  # timedelta 对象
 
         self.task_comments = []  # 存储评论字典的列表
+
+    def get_status(self):
+        """
+        根据进度派生任务状态。
+        """
+        if self.task_progress == 0:
+            return "未开始"
+        elif self.task_progress == 100:
+            return "已完成"
+        else:
+            return "进行中"
 
     def add_comment(self, content, comment_type):
         """
@@ -45,67 +54,53 @@ class Task:
         self.task_comments.append(comment)
         st.toast(f"任务 '{self.task_name}' 添加了新评论！", icon="💬")
 
-    def update_status(self, new_status):
-        """
-        更新任务状态，并处理相关逻辑。
-        """
-        # 防止不必要的更新
-        if self.task_status == new_status:
-            return
-
-        self.task_status = new_status
-
-        if new_status == "已完成":
-            # if not self.completion_time:  # 只有在第一次标记为完成时才记录
-            self.completion_time = datetime.now(beijing_tz)
-            self.task_duration = self.completion_time - self.creation_time
-            self.task_progress = 100  # 自动将进度设为100
-            st.balloons()  # 完成时庆祝一下
-
-        elif new_status == "进行中":
-            self.completion_time = None  # 如果从“已完成”改回，则重置
-            self.task_duration = None
-            if self.task_progress == 0 or self.task_progress == 100:
-                self.task_progress = 10  # 自动设置一个启动进度
-
-        elif new_status == "未开始":
-            self.completion_time = None
-            self.task_duration = None
-            self.task_progress = 0  # 自动将进度归零
 
     def update_progress(self, new_progress):
         """
-        更新任务进度，并自动同步状态。
+        更新任务进度，并自动处理相关逻辑（如完成时间）。
         """
         # 防止不必要的更新
         if self.task_progress == new_progress:
             return
 
+        # 获取旧状态，用于比较
+        old_status = self.get_status()
+
         self.task_progress = new_progress
 
-        if new_progress == 100:
-            self.update_status("已完成")
+        # 获取新状态
+        new_status = self.get_status()
 
-        elif new_progress > 0 and self.task_status == "未开始":
-            self.update_status("进行中")
+        if new_status == "已完成":
+            if old_status != "已完成":
+                self.completion_time = datetime.now(beijing_tz)
+                self.task_duration = self.completion_time - self.creation_time
+                st.balloons()
 
-        elif new_progress == 0 and self.task_status != "未开始":
-            self.update_status("未开始")
+        elif new_status == "进行中":
+            # 如果是从“已完成”或“未开始”变来的，重置完成时间
+            if old_status != "进行中":
+                self.completion_time = None
+                self.task_duration = None
 
-        elif 0 < new_progress < 100 and self.task_status != "进行中":
-            self.update_status("进行中")
+        elif new_status == "未开始":
+            # 如果是从其他状态变来的，重置完成时间
+            if old_status != "未开始":
+                self.completion_time = None
+                self.task_duration = None
 
     def get_duration_str(self):
         """
-        将 task_duration (timedelta) 格式化为可读字符串。
+        使用 self.get_status() 代替 self.task_status
         """
         duration = None
+        current_status = self.get_status()  # [!! 变更 !!]
 
-        if self.task_status == "已完成" and self.task_duration:
+        if current_status == "已完成" and self.task_duration:
             duration = self.task_duration
-        elif self.task_status == "进行中":
+        elif current_status == "进行中":
             duration = datetime.now(beijing_tz) - self.creation_time
-        elif self.task_status == "未开始":
+        elif current_status == "未开始":
             return "尚未开始"
 
         if duration is None:
@@ -136,7 +131,6 @@ if 'tasks' not in st.session_state:
     st.session_state.tasks = []
 
 # --- 侧边栏：创建新任务 (Sidebar: Create New Task) ---
-# [!! 保持不变 !!]
 with st.expander("🚀 点击创建新任务"):
     with st.form(key="new_task_form", clear_on_submit=True):
         new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
@@ -151,9 +145,6 @@ with st.expander("🚀 点击创建新任务"):
             st.rerun()  # 添加 Rerun 以便立即刷新看板
 
 
-# --- [!! 修复 !!] ---
-# 1. 将回调函数和辅助函数放在主逻辑区
-
 def get_task_by_id(task_id):
     """
     辅助函数：根据ID从 session_state 中查找任务对象。
@@ -164,28 +155,9 @@ def get_task_by_id(task_id):
     return None
 
 
-def handle_status_change(task_id):
-    """
-    回调函数：当状态 selectbox 发生变化时调用。
-    """
-    task = get_task_by_id(task_id)
-    if not task:
-        return
-
-    # 1. 从 session_state 中获取 selectbox 的新值
-    new_status = st.session_state[f"status_{task_id}"]
-
-    # 2. 更新 task 对象 (这也会自动更新 task.task_progress)
-    task.update_status(new_status)
-
-    # 3. [!! 修复 !!] 手动将 task 对象中更新后的 *进度* 同步到 progress slider 的 session_state
-    # 这样滑块在下次 Rerun 时会显示正确的值（例如 0 或 100）
-    st.session_state[f"progress_{task_id}"] = task.task_progress
-
-
 def handle_progress_change(task_id):
     """
-    回调函数：当进度 slider 发生变化时调用。
+    [!! 变更 !!] 回调函数：当进度 slider 发生变化时调用。
     """
     task = get_task_by_id(task_id)
     if not task:
@@ -194,12 +166,8 @@ def handle_progress_change(task_id):
     # 1. 从 session_state 中获取 slider 的新值
     new_progress = st.session_state[f"progress_{task_id}"]
 
-    # 2. 更新 task 对象 (这也会自动更新 task.task_status)
+    # 2. 更新 task 对象 (这也会自动更新完成时间等)
     task.update_progress(new_progress)
-
-    # 3. [!! 修复 !!] 手动将 task 对象中更新后的 *状态* 同步到 status selectbox 的 session_state
-    # 这样下拉框在下次 Rerun 时会显示正确的值（例如 "已完成"）
-    st.session_state[f"status_{task_id}"] = task.task_status
 
 
 # ---------------------
@@ -212,55 +180,34 @@ def display_task_card(task):
     """
     icon = "👔" if task.task_type == "主线任务" else "🤸"
 
-    with st.expander(f"{icon} {task.task_name} (进度: {task.task_progress}%)", expanded=True):
+    # [!! 变更 !!] 在标题中也显示派生出的状态
+    with st.expander(f"{icon} {task.task_name} (状态: {task.get_status()}, 进度: {task.task_progress}%)", expanded=True):
 
         # 1. 任务详情与控制
         st.subheader(task.task_name, divider='rainbow')
-        col1, col2 = st.columns(2)
 
-        with col1:
-            # 状态选择
-            status_options = ["未开始", "进行中", "已完成"]
-            current_status_index = status_options.index(task.task_status)
+        st.slider(
+            "进度",
+            min_value=0,
+            max_value=100,
+            value=task.task_progress,  # 'value' 同样只在初次渲染时起作用
+            step=10,
+            format="%d%%",
+            key=f"progress_{task.task_id}",  # key 是必须的
+            help="拖动滑块来更新任务进度",
+            on_change=handle_progress_change,  # 指定回调
+            args=(task.task_id,)  # 传递参数给回调
+        )
+        # ---------------------
 
-            # --- [!! 修复 !!] ---
-            # Streamlit 在 Rerun 时，如果 key 存在于 session_state 中，
-            # 它会*忽略* index/value 参数，并使用 session_state 中的值。
-            # 因为我们的回调现在能确保 session_state 总是同步的，
-            # 所以这里的 index 参数只在*第一次*渲染时起作用，后续都由 session_state 控制。
-            st.selectbox(
-                "状态",
-                options=status_options,
-                index=current_status_index,
-                key=f"status_{task.task_id}",  # key 是必须的
-                on_change=handle_status_change,  # 指定回调
-                args=(task.task_id,)  # 传递参数给回调
-            )
-            # ---------------------
-
-        with col2:
-            # 进度条
-            st.slider(
-                "进度",
-                min_value=0,
-                max_value=100,
-                value=task.task_progress,  # 'value' 同样只在初次渲染时起作用
-                step=10,
-                format="%d%%",
-                key=f"progress_{task.task_id}",  # key 是必须的
-                help="拖动滑块来更新任务进度",
-                on_change=handle_progress_change,  # 指定回调
-                args=(task.task_id,)  # 传递参数给回调
-            )
-            # ---------------------
-
-        # 用时信息 (不变)
-        if task.task_status == "已完成":
+        # 用时信息
+        current_status = task.get_status()
+        if current_status == "已完成":
             st.success(f"**总用时:** {task.get_duration_str()}")
-        elif task.task_status == "进行中":
+        elif current_status == "进行中":
             st.info(f"**已用时:** {task.get_duration_str()}")
 
-        # --- [!! 评论区优化 !!] ---
+        # --- [!! 评论区优化 !!] --- (保持不变)
         st.subheader("任务评论", divider='rainbow')
 
         # 1. 使用 st.popover 来隐藏“添加评论”表单
@@ -305,9 +252,10 @@ col_todo, col_doing, col_done = st.columns(3)
 
 sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=False)
 
-tasks_todo = [t for t in sorted_tasks if t.task_status == "未开始"]
-tasks_doing = [t for t in sorted_tasks if t.task_status == "进行中"]
-tasks_done = [t for t in sorted_tasks if t.task_status == "已完成"]
+# [!! 变更 !!] 使用 task.get_status() 来分类
+tasks_todo = [t for t in sorted_tasks if t.get_status() == "未开始"]
+tasks_doing = [t for t in sorted_tasks if t.get_status() == "进行中"]
+tasks_done = [t for t in sorted_tasks if t.get_status() == "已完成"]
 
 with col_todo:
     st.header(f"📥 未开始 ({len(tasks_todo)})")
