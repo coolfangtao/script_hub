@@ -297,7 +297,7 @@ def display_main_controls():
 
     # 创建任务 和 本地导入/导出 功能区
     col1, col2 = st.columns(2)
-    with col1, st.container(border=, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
+    with col1, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_CREATE_TASK_HEADER, anchor=False)
         with st.form(key="new_task_form", clear_on_submit=True):
             name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER)
