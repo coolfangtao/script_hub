@@ -173,7 +173,7 @@ def load_tasks_from_github(token=None, repo_name=None):
 def save_tasks_to_github(token=None, repo_name=None):
     repo = get_github_repo(token, repo_name)
     if repo is None: st.error(config.kanban.T_ERROR_GITHUB_SAVE_FAILED); return
-    content = json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2)
+    content = json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2, ensure_ascii=False)
     commit_message = f"Tasks updated at {datetime.now(beijing_tz).strftime('%Y-%m-%d %H:%M:%S')}"
     try:
         try:
@@ -203,7 +203,7 @@ def load_tasks_from_local():
 def save_tasks_to_local():
     path = config.globals.LOCAL_DATA_FILE_PATH
     try:
-        content = json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2)
+        content = json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2, ensure_ascii=False)
         with open(path, 'w', encoding='utf-8') as f: f.write(content)
         st.toast(config.kanban.T_SUCCESS_LOCAL_SAVE, icon="💾")
     except Exception as e:
@@ -276,7 +276,7 @@ def handle_tasks_import(uploaded_file):
 
 
 def get_export_data():
-    return json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2) if st.session_state.tasks else "{}"
+    return json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2, ensure_ascii=False) if st.session_state.tasks else "{}"
 
 
 # =========================================================================================
