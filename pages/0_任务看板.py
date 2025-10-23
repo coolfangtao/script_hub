@@ -1,6 +1,7 @@
 # 0_任务看板.py
 import streamlit as st
 import json
+import os
 from itertools import groupby
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
@@ -143,38 +144,33 @@ def format_timedelta_to_str(duration):
 
 
 @st.cache_resource
-def get_github_repo():
+def get_github_repo(token=None, repo_name=None):
+    # 优先使用传入的凭证，其次是全局配置
+    g_token = token or config.globals.GITHUB_TOKEN
+    g_repo = repo_name or config.globals.GITHUB_REPO
+    if not g_token or not g_repo: return None
     try:
-        g = Github(config.globals.GITHUB_TOKEN)
-        return g.get_repo(config.globals.GITHUB_REPO)
+        return Github(g_token).get_repo(g_repo)
     except Exception as e:
-        st.error(config.kanban.T_ERROR_GITHUB_CONNECTION.format(e=e))
-        return None
+        st.error(config.kanban.T_ERROR_GITHUB_CONNECTION.format(e=e)); return None
 
 
-def load_tasks_from_github():
-    repo = get_github_repo()
-    if repo is None: return []
+def load_tasks_from_github(token=None, repo_name=None):
+    repo = get_github_repo(token, repo_name)
+    if repo is None: return None
     try:
         content = repo.get_contents(config.kanban.DATA_FILE_NAME).decoded_content.decode("utf-8")
         st.toast(config.kanban.T_SUCCESS_GITHUB_LOAD, icon="🎉")
         return [Task.from_dict(task_data) for task_data in json.loads(content)]
     except UnknownObjectException:
-        st.info(config.kanban.T_INFO_GITHUB_FILE_NOT_FOUND)
-        return []
+        st.info(config.kanban.T_INFO_GITHUB_FILE_NOT_FOUND); return []
     except Exception as e:
-        if "This repository is empty" in str(e):
-            st.info(config.kanban.T_INFO_GITHUB_REPO_EMPTY)
-        else:
-            st.error(config.kanban.T_ERROR_GITHUB_LOAD_UNKNOWN.format(e=e))
-        return []
+        st.error(config.kanban.T_ERROR_GITHUB_LOAD_UNKNOWN.format(e=e)); return []
 
 
-def save_tasks_to_github():
-    repo = get_github_repo()
-    if repo is None:
-        st.error(config.kanban.T_ERROR_GITHUB_SAVE_FAILED);
-        return
+def save_tasks_to_github(token=None, repo_name=None):
+    repo = get_github_repo(token, repo_name)
+    if repo is None: st.error(config.kanban.T_ERROR_GITHUB_SAVE_FAILED); return
     content = json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2)
     commit_message = f"Tasks updated at {datetime.now(beijing_tz).strftime('%Y-%m-%d %H:%M:%S')}"
     try:
@@ -189,16 +185,59 @@ def save_tasks_to_github():
         st.error(config.kanban.T_ERROR_GITHUB_SYNC_FAILED.format(e=e))
 
 
+def load_tasks_from_local():
+    path = config.globals.LOCAL_DATA_FILE_PATH
+    if not os.path.exists(path): return []
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            if not content: return []
+            st.toast(config.kanban.T_SUCCESS_LOCAL_LOAD, icon="🏠")
+            return [Task.from_dict(td) for td in json.loads(content)]
+    except Exception as e:
+        st.error(config.kanban.T_ERROR_LOCAL_LOAD.format(e=e)); return []
+
+
+def save_tasks_to_local():
+    path = config.globals.LOCAL_DATA_FILE_PATH
+    try:
+        content = json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2)
+        with open(path, 'w', encoding='utf-8') as f: f.write(content)
+        st.toast(config.kanban.T_SUCCESS_LOCAL_SAVE, icon="💾")
+    except Exception as e:
+        st.error(config.kanban.T_ERROR_LOCAL_SAVE.format(e=e))
+
+
+# <<< 统一的、基于模式的同步函数 >>>
 def sync_state():
-    save_tasks_to_github()
+    """根据运行模式自动处理数据保存"""
+    # 在本地模式下，双重保存
+    if config.globals.RUN_MODE == "local":
+        save_tasks_to_local()
+        if config.globals.GITHUB_TOKEN: # 如果配置了GitHub，就同步
+            save_tasks_to_github()
+    # 在云端模式下，只同步到用户连接的GitHub
+    else:
+        g_token = st.session_state.get("github_token") or config.globals.GITHUB_TOKEN
+        g_repo = st.session_state.get("github_repo") or config.globals.GITHUB_REPO
+        if g_token and g_repo:
+            save_tasks_to_github(g_token, g_repo)
 
 
+# <<< 修改：更清晰的初始化逻辑 >>>
 def initialize_app():
     st.set_page_config(page_title=config.kanban.PAGE_TITLE, page_icon=config.kanban.PAGE_ICON, layout="wide")
-    st.title(config.kanban.T_MAIN_TITLE);
-    st.markdown("---")
+    st.title(config.kanban.T_MAIN_TITLE); st.markdown("---")
     if 'tasks' not in st.session_state:
-        st.session_state.tasks = load_tasks_from_github()
+        if config.globals.RUN_MODE == "local":
+            # 本地模式：先从本地加载，如果本地没有，再尝试从GitHub加载
+            tasks = load_tasks_from_local()
+            if not tasks and config.globals.GITHUB_TOKEN:
+                tasks = load_tasks_from_github()
+            st.session_state.tasks = tasks
+        else:
+            # 云端模式：默认是空的，等待用户连接GitHub
+            st.session_state.tasks = []
 
 
 def handle_tasks_import(uploaded_file):
@@ -225,8 +264,40 @@ def get_export_data():
 
 def display_main_controls():
     st.header(config.kanban.T_CONTROL_PANEL_HEADER, divider="rainbow")
-    col1, col2, col3 = st.columns(3)
-    with col1, st.container(border=True, height=300):
+
+    # <<< 修改：根据运行模式显示不同的UI >>>
+    if config.globals.RUN_MODE == "local":
+        st.info(config.kanban.T_LOCAL_MODE_INFO)
+    else:  # 云端模式
+        with st.container(border=True):
+            st.subheader(config.kanban.T_GITHUB_CONNECT_HEADER, anchor=False)
+            # 如果是所有者且预设了GitHub信息
+            if config.globals.GITHUB_TOKEN and not st.session_state.get("github_token"):
+                st.info(config.kanban.T_GITHUB_PRECONFIGURED_INFO.format(repo=config.globals.GITHUB_REPO))
+                if st.button("⬇️ 从预设仓库加载我的任务", use_container_width=True):
+                    tasks = load_tasks_from_github()
+                    if tasks is not None: st.session_state.tasks = tasks; st.rerun()
+                st.caption("其他用户请在下方输入自己的信息进行连接。")
+
+            # 为所有公共用户提供输入框
+            col_token, col_repo = st.columns(2)
+            g_token = col_token.text_input(config.kanban.T_GITHUB_TOKEN_INPUT, type="password")
+            g_repo = col_repo.text_input(config.kanban.T_GITHUB_REPO_INPUT, placeholder="your-username/your-repo")
+
+            if st.button(config.kanban.T_GITHUB_CONNECT_BUTTON, use_container_width=True):
+                if g_token and g_repo:
+                    st.session_state.github_token = g_token
+                    st.session_state.github_repo = g_repo
+                    tasks = load_tasks_from_github(g_token, g_repo)
+                    if tasks is not None: st.session_state.tasks = tasks; st.rerun()
+                else:
+                    st.warning(config.kanban.T_ERROR_GITHUB_CREDS_MISSING)
+
+    st.markdown("---")
+
+    # 创建任务 和 本地导入/导出 功能区
+    col1, col2 = st.columns(2)
+    with col1, st.container(border=True):
         st.subheader(config.kanban.T_CREATE_TASK_HEADER, anchor=False)
         with st.form(key="new_task_form", clear_on_submit=True):
             name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER)
@@ -234,12 +305,13 @@ def display_main_controls():
             if st.form_submit_button(config.kanban.T_ADD_TASK_BUTTON, use_container_width=True):
                 if name:
                     st.session_state.tasks.append(Task(task_name=name, task_type=type))
-                    st.success(config.kanban.T_SUCCESS_TASK_ADDED.format(task_name=name));
-                    sync_state();
+                    st.success(config.kanban.T_SUCCESS_TASK_ADDED.format(task_name=name))
+                    sync_state()  # <<< 统一调用
                     st.rerun()
                 else:
                     st.warning(config.kanban.T_WARN_EMPTY_TASK_NAME)
-    with col2, st.container(border=True, height=300):
+
+    with col2, st.container(border=True):
         st.subheader(config.kanban.T_LOCAL_IO_HEADER, anchor=False)
         uploaded = st.file_uploader(config.kanban.T_UPLOAD_LABEL, type=["json"], help=config.kanban.T_UPLOAD_HELP)
         if uploaded: handle_tasks_import(uploaded)
@@ -247,16 +319,9 @@ def display_main_controls():
         st.download_button(config.kanban.T_DOWNLOAD_BUTTON, get_export_data(), fname, "application/json",
                            help=config.kanban.T_DOWNLOAD_HELP, use_container_width=True,
                            disabled=not st.session_state.tasks)
-    with col3, st.container(border=True, height=300):
-        st.subheader(config.kanban.T_GITHUB_SYNC_HEADER, anchor=False)
-        st.caption(config.kanban.T_GITHUB_SYNC_CAPTION)
-        if st.button(config.kanban.T_GITHUB_PUSH_BUTTON, use_container_width=True,
-                     help=config.kanban.T_GITHUB_PUSH_HELP): sync_state()
-        if st.button(config.kanban.T_GITHUB_PULL_BUTTON, use_container_width=True,
-                     help=config.kanban.T_GITHUB_PULL_HELP):
-            st.session_state.tasks = load_tasks_from_github();
-            st.rerun()
-        st.info(config.kanban.T_GITHUB_SYNC_INFO)
+        # 手动同步按钮（主要用于云端模式）
+        if config.globals.RUN_MODE == "cloud":
+            st.button("⬆️ 手动同步到 GitHub", on_click=sync_state, use_container_width=True)
 
 
 def get_task_by_id(task_id):

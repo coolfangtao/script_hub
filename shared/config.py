@@ -3,12 +3,30 @@ import streamlit as st
 from datetime import timezone, timedelta
 import yaml
 from pathlib import Path
+import os
+
+# <<< 运行模式检测函数 >>>
+def get_run_mode():
+    """
+    直接从 secrets 读取运行环境配置。
+    默认为 'cloud'，以保证部署到云端时的安全性（不会尝试写本地文件）。
+    """
+    return st.secrets.get("RUN_ENVIRONMENT", "cloud")
 
 
 class GlobalConfig:
     """存储所有页面共享的全局配置，例如密钥、API等。"""
 
     def __init__(self):
+        # --- 运行模式 ---
+        self.RUN_MODE = get_run_mode()  # "local" or "cloud"
+
+        # --- 本地文件路径配置 (仅在 local 模式下有意义) ---
+        self.LOCAL_DATA_FILE_PATH = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'local_tasks_data.json')
+        )
+
+
         # 从 Streamlit secrets 加载密钥
         self.GITHUB_TOKEN = st.secrets.get("github_data_token")
         self.GITHUB_REPO = st.secrets.get("github_data_repo")
@@ -126,6 +144,18 @@ class KanbanPageConfig:
         self.T_ERROR_IMPORT_UNKNOWN = "导入时发生未知错误: {e}"
         self.T_SUCCESS_TASK_UPDATED = "任务 '{task_name}' 已更新!"
         self.T_SUCCESS_TASK_DELETED = "任务 '{task_name}' 已删除。"
+        self.T_LOCAL_MODE_INFO = "🚀 **本地开发模式**: 数据已自动从本地文件加载，所有更改将实时保存到本地并同步至 GitHub。"
+        self.T_CLOUD_MODE_INFO = "☁️ **云端模式**: 请连接到你的 GitHub 仓库以加载或保存任务。"
+        self.T_GITHUB_PRECONFIGURED_INFO = "✅ 已连接到预设的 GitHub 仓库: `{repo}`"
+        self.T_GITHUB_CONNECT_HEADER = "🔗 连接到 GitHub"
+        self.T_GITHUB_TOKEN_INPUT = "GitHub 个人访问令牌"
+        self.T_GITHUB_REPO_INPUT = "GitHub 仓库地址 (例如: 'user/repo')"
+        self.T_GITHUB_CONNECT_BUTTON = "连接并加载数据"
+        self.T_ERROR_GITHUB_CREDS_MISSING = "请输入完整的 GitHub 令牌和仓库地址。"
+        self.T_SUCCESS_LOCAL_SAVE = "✅ 任务已成功保存到本地文件！"
+        self.T_ERROR_LOCAL_SAVE = "保存到本地文件失败: {e}"
+        self.T_SUCCESS_LOCAL_LOAD = "✅ 已从本地文件成功加载任务！"
+        self.T_ERROR_LOCAL_LOAD = "从本地文件加载任务失败: {e}"
 
 class AppConfig:
     """
