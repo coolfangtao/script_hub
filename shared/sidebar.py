@@ -78,6 +78,10 @@ SCRIPTS_BY_GROUP = {
             "label": "基金盯盘",
             "path": r"pages/8_基金涨跌.py"
         },
+        {
+            "label": "测试页面",
+            "path": r"pages/8_测试页面.py"
+        },
     ],
 }
 

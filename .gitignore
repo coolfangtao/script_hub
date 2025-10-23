@@ -1,3 +1,6 @@
 venv1/
 test/
 .streamlit/
+.streamlit/secrets.toml
+test.py
+启动看板.sh
