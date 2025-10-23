@@ -1,4 +1,4 @@
-# app.py (版本 2 - 灵活搜索版)
+# app.py (版本 3 - 最终修正版)
 
 import streamlit as st
 from googleapiclient.discovery import build
@@ -30,36 +30,30 @@ def search_youtube_videos(api_key, query, max_results=5):
         return []
 
 
-# --- NEW: 更灵活的搜索逻辑 ---
 @st.cache_data(ttl=3600)
 def find_keywords_in_transcript(video_id, query):
     """在字幕中查找包含所有关键词的片段。"""
     try:
-        # 提取关键词 (小写，并移除简单词)
-        keywords = [word.lower() for word in query.split() if len(word) > 2]
+        # --- 核心修正：移除了 len(word) > 2 的过滤器 ---
+        keywords = [word.lower() for word in query.split()]
+
+        # 如果用户只输入了空格，关键词列表可能为空，直接返回
         if not keywords:
-            return None  # 如果没有有效的关键词，则无法搜索
+            return None
 
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['zh-CN', 'zh-Hans', 'zh', 'en'])
 
-        # 遍历字幕中的每一句话
         for i, segment in enumerate(transcript):
             segment_text_lower = segment['text'].lower()
 
-            # 检查这句话是否包含了所有关键词
             if all(keyword in segment_text_lower for keyword in keywords):
-
-                # 为了提供更丰富的上下文，我们可以向前看一句
                 context_start_index = max(0, i - 1)
                 context_end_index = min(len(transcript) - 1, i + 1)
-
                 full_context = " ".join(
                     [transcript[j]['text'] for j in range(context_start_index, context_end_index + 1)])
 
-                # 高亮显示关键词
                 highlighted_context = full_context
-                for keyword in keywords:
-                    # 使用正则表达式进行不区分大小写的高亮替换
+                for keyword in query.split():  # 使用原始query里的词来高亮，保持大小写
                     highlighted_context = re.sub(f"({re.escape(keyword)})", r"**\1**", highlighted_context,
                                                  flags=re.IGNORECASE)
 
@@ -67,7 +61,7 @@ def find_keywords_in_transcript(video_id, query):
                     "start_time": int(segment['start']),
                     "context": f"...{highlighted_context}..."
                 }
-        return None  # 遍历完所有字幕都没找到
+        return None
 
     except (TranscriptsDisabled, NoTranscriptFound):
         return "TranscriptsDisabled"
@@ -91,7 +85,7 @@ col1, col2 = st.columns([4, 1])
 with col1:
     search_query = st.text_input(
         "输入你想查找的文字或对话：",
-        "What is artificial intelligence",
+        "What is AI",
         label_visibility="collapsed",
         placeholder="建议使用英文核心关键词以提高成功率"
     )
@@ -100,7 +94,6 @@ with col2:
 
 if search_button and search_query:
     status_placeholder = st.empty()
-
     status_placeholder.info("第一步：正在 YouTube 上搜索相关视频...")
     videos = search_youtube_videos(API_KEY, search_query)
 
@@ -111,25 +104,20 @@ if search_button and search_query:
 
         found_match = False
         results_placeholder = st.container()
-
-        # --- NEW: 添加了更详细的状态更新 ---
         progress_bar = st.progress(0, text="分析进度")
 
         for i, video in enumerate(videos):
             video_id = video['id']['videoId']
             video_title = video['snippet']['title']
-
-            # 更新进度条和文本
             progress_text = f"分析中 ({i + 1}/{len(videos)}): {video_title}"
             progress_bar.progress((i + 1) / len(videos), text=progress_text)
 
             match_data = find_keywords_in_transcript(video_id, search_query)
 
             if match_data == "TranscriptsDisabled":
-                # 在结果区显示此视频字幕不可用，而不是静默跳过
                 with results_placeholder.expander(f"⚠️ **{video_title}** - 字幕不可用或受限"):
                     st.write("无法分析此视频，因为它关闭了字幕功能或不提供可访问的字幕。")
-                continue  # 继续检查下一个视频
+                continue
 
             if isinstance(match_data, dict):
                 found_match = True
@@ -138,16 +126,13 @@ if search_button and search_query:
                 with results_placeholder.container(border=True):
                     st.subheader(video_title)
                     st.caption(f"频道: {video['snippet']['channelTitle']}")
-
-                    # 使用 markdown 来渲染高亮效果
                     st.markdown(f"**找到的文本上下文：**\n\n{match_data['context']}")
-
                     start_seconds = match_data['start_time']
                     video_url = f"https://www.youtube.com/watch?v={video_id}&t={start_seconds}s"
                     st.video(video_url)
                     st.markdown(f"🔗 [在 YouTube 上打开]({video_url})")
 
-                progress_bar.empty()  # 找到后隐藏进度条
+                progress_bar.empty()
                 break
 
         if not found_match:
