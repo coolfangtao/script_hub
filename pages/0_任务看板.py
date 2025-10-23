@@ -316,48 +316,43 @@ def display_main_controls():
 
     st.markdown("---")
 
-    # <<< 修改：任务操作区现在由 is_connected 状态控制 >>>
+    # --- 任务操作区 ---
+    # <<< 修改：移除了对下方控件的 disabled 限制，使其在任何情况下都可用 >>>
     col1, col2 = st.columns(2)
     with col1, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_CREATE_TASK_HEADER, anchor=False)
         with st.form(key="new_task_form", clear_on_submit=True):
-            name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER,
-                                 disabled=not is_connected)
-            type = st.selectbox(config.kanban.T_TASK_TYPE_LABEL, config.kanban.TASK_TYPES, disabled=not is_connected)
+            # <<< 移除 disabled 参数 >>>
+            name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER)
+            # <<< 移除 disabled 参数 >>>
+            type = st.selectbox(config.kanban.T_TASK_TYPE_LABEL, config.kanban.TASK_TYPES)
 
-            # 只有在连接后，添加按钮才可用
-            if st.form_submit_button(config.kanban.T_ADD_TASK_BUTTON, use_container_width=True,
-                                     disabled=not is_connected):
+            if st.form_submit_button(config.kanban.T_ADD_TASK_BUTTON, use_container_width=True):
                 if name:
                     st.session_state.tasks.append(Task(task_name=name, task_type=type))
                     st.success(config.kanban.T_SUCCESS_TASK_ADDED.format(task_name=name))
+                    # sync_state() 在未连接时不会做任何事，这是安全的
                     sync_state()
                     st.rerun()
                 else:
                     st.warning(config.kanban.T_WARN_EMPTY_TASK_NAME)
 
-        if not is_connected and config.globals.RUN_MODE == "cloud":
-            st.warning("请先连接到 GitHub 仓库才能创建任务。")
-
     with col2, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_LOCAL_IO_HEADER, anchor=False)
 
-        # 只有在连接后，导入导出才可用
-        uploaded = st.file_uploader(config.kanban.T_UPLOAD_LABEL, type=["json"], help=config.kanban.T_UPLOAD_HELP,
-                                    disabled=not is_connected)
+        # <<< 移除 disabled 参数 >>>
+        uploaded = st.file_uploader(config.kanban.T_UPLOAD_LABEL, type=["json"], help=config.kanban.T_UPLOAD_HELP)
         if uploaded: handle_tasks_import(uploaded)
 
         fname = f"{config.kanban.T_EXPORT_FILE_PREFIX}{datetime.now(beijing_tz).strftime('%Y%m%d_%H%M%S')}.json"
+        # <<< 移除 is_connected 判断，只根据是否有任务来决定是否禁用 >>>
         st.download_button(config.kanban.T_DOWNLOAD_BUTTON, get_export_data(), fname, "application/json",
                            help=config.kanban.T_DOWNLOAD_HELP, use_container_width=True,
-                           disabled=not st.session_state.tasks or not is_connected)
+                           disabled=not st.session_state.tasks)
 
-        # 只有在云端模式且已连接后，手动同步按钮才可用
+        # <<< 核心：只有这个按钮需要根据连接状态来禁用 >>>
         if config.globals.RUN_MODE == "cloud":
             st.button("⬆️ 手动同步到 GitHub", on_click=sync_state, use_container_width=True, disabled=not is_connected)
-
-        if not is_connected and config.globals.RUN_MODE == "cloud":
-            st.warning("请先连接到 GitHub 仓库才能导入/导出任务。")
 
 
 def get_task_by_id(task_id):
@@ -370,7 +365,7 @@ def handle_progress_change(task_id):
 
 
 def handle_status_change(task, new_status):
-    task.set_status(new_status);
+    task.set_status(new_status)
     sync_state()
 
 
