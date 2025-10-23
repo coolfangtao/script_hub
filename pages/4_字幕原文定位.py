@@ -1,7 +1,7 @@
 import streamlit as st
 from googleapiclient.discovery import build
-# 我们现在需要导入 NoTranscriptFound 来辅助查找
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
+# --- 核心修正：直接导入 get_transcript 函数 ---
+from youtube_transcript_api import get_transcript, TranscriptsDisabled, NoTranscriptFound
 import re
 import sys
 
@@ -47,16 +47,12 @@ def find_keywords_in_transcript(video_id, query):
             print("[DEBUG] 关键词列表为空，已跳过。")
             return None
 
-        # --- 核心修正：使用 get_transcript 替换 list_transcripts ---
-        # 错误日志显示 'list_transcripts' 属性不存在，说明库版本较旧
-        # 我们改用更兼容的 get_transcript 方法
-        print("[DEBUG] 正在尝试直接获取中/英文字幕 (使用 get_transcript)...")
+        print("[DEBUG] 正在尝试直接获取中/英文字幕 (使用 get_transcript 函数)...")
         supported_languages = ['zh-CN', 'zh-Hans', 'zh', 'en', 'en-US']
 
-        # 步骤 1: 尝试直接获取字幕
-        # get_transcript 会自动按列表顺序查找，并包含自动生成的字幕
-        # 如果找不到这些语言的字幕，它会抛出 NoTranscriptFound
-        transcript_data = YouTubeTranscriptApi.get_transcript(video_id, languages=supported_languages)
+        # --- 核心修正：不再调用 YouTubeTranscriptApi.get_transcript ---
+        # 而是直接调用导入的 get_transcript 函数
+        transcript_data = get_transcript(video_id, languages=supported_languages)
         print(f"[DEBUG] 成功获取字幕内容，共 {len(transcript_data)} 段。")
         # --- 修正结束 ---
 
@@ -90,9 +86,6 @@ def find_keywords_in_transcript(video_id, query):
         print(f"[DEBUG] !!! 视频 {video_id} 的字幕已被禁用 (TranscriptsDisabled)。")
         return "TranscriptsDisabled"  # 这个是正确的
 
-    # --- 核心修正 2: 在通用 Exception 之前捕获 NoTranscriptFound ---
-    # 这现在会捕获 get_transcript(video_id, ...) 抛出的错误
-    # 意味着视频没有我们指定的语言的字幕
     except (NoTranscriptFound):
         print(f"[DEBUG] !!! 视频 {video_id} 没有任何可用的中/英文字幕 (NoTranscriptFound)。")
         return None  # 返回 None (无匹配)，而不是 "TranscriptsDisabled" (错误)
@@ -150,7 +143,7 @@ if search_button and search_query:
             for i, video in enumerate(videos):
                 video_id = video['id']['videoId']
                 video_title = video['snippet']['title']
-                video_url = f"https://www.youtube.com/watch?v={video_id}"
+                video_url = f"https.www.youtube.com/watch?v={video_id}"
                 st.markdown(f"{i + 1}. **{video_title}**\n   - 🔗 [在 YouTube 上打开]({video_url})")
 
         st.markdown("---")
@@ -193,7 +186,7 @@ if search_button and search_query:
                     st.caption(f"频道: {video['snippet']['channelTitle']}")
                     st.markdown(f"**找到的文本上下文：**\n\n{match_data['context']}")
                     start_seconds = match_data['start_time']
-                    video_url = f"https://www.youtube.com/watch?v={video_id}&t={start_seconds}s"
+                    video_url = f"https.www.youtube.com/watch?v={video_id}&t={start_seconds}s"
                     st.video(video_url)
                     st.markdown(f"🔗 [在 YouTube 上打开]({video_url})")
 
