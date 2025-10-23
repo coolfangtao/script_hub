@@ -25,7 +25,7 @@ def get_youtube_service():
         return None
 
 
-def search_videos(youtube_service, query, max_results=5):
+def search_videos(youtube_service, query, max_results=50):
     """
     根据查询词在YouTube上搜索视频。
     """
