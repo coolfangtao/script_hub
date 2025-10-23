@@ -505,7 +505,7 @@ def display_kanban_layout():
 
 
 # =========================================================================================
-# <<< 修复后的统计分析标签页函数 >>>
+# <<< 统计分析标签页函数 >>>
 # =========================================================================================
 def display_statistics_tab():
     st.header("任务统计分析 📊", divider="rainbow")
@@ -515,8 +515,7 @@ def display_statistics_tab():
         st.info("看板上还没有任务，快去创建一个吧！")
         return
 
-    # 1. <<< 核心修复：直接从Task对象构建DataFrame，避免不必要的类型转换 >>>
-    # 我们不再使用 [task.to_dict() for task in tasks] 的方式
+    # 1. <<< 直接从Task对象构建DataFrame，避免不必要的类型转换 >>>
     df = pd.DataFrame(
         [
             {
@@ -531,16 +530,11 @@ def display_statistics_tab():
         ]
     )
 
-    # 2. <<< 核心修复：删除下面这两行导致错误的代码 >>>
-    # 因为DataFrame在创建时已经使用了正确的datetime类型，所以不再需要转换
-    # df['creation_time'] = pd.to_datetime(df['creation_time']) # <--- 已删除
-    # df['completion_time'] = pd.to_datetime(df['completion_time']) # <--- 已删除
-
-    # 转换数据类型以便分析 (这两行仍然需要)
+    # 转换数据类型以便分析
     df['total_active_time_hours'] = df['total_active_time_seconds'] / 3600
     df['task_duration_hours'] = df['task_duration_seconds'] / 3600
 
-    # --- 后续的统计和绘图代码保持不变 ---
+    # --- 后续的统计和绘图代码 ---
 
     # 2. 显示关键指标 (KPIs)
     st.subheader("核心指标", anchor=False)
@@ -612,10 +606,10 @@ def display_statistics_tab():
 
 
 # =========================================================================================
-# <<< 修复后的日历视图函数 >>>
+# <<< 日历视图函数 >>>
 # =========================================================================================
 # =========================================================================================
-# <<< 修复后的日历视图函数 >>>
+# <<< 功能升级后的日历视图函数 >>>
 # =========================================================================================
 def display_timeline_tab():
     st.header("任务时间线视图 📅", divider="rainbow")
@@ -661,10 +655,10 @@ def display_timeline_tab():
         help="选择一个日期来查看当天，或选择一个范围来查看多天。"
     )
 
-    if isinstance(date_selection, tuple) and len(date_selection) == 2:
-        start_date, end_date = date_selection
-    else:
-        start_date = end_date = date_selection
+    if not (isinstance(date_selection, tuple) and len(date_selection) == 2):
+        st.stop()
+
+    start_date, end_date = date_selection
 
     start_date_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=beijing_tz)
     end_date_dt = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=beijing_tz)
@@ -683,16 +677,28 @@ def display_timeline_tab():
         return row['Task']
 
     filtered_df['Display Name'] = filtered_df.apply(get_display_name, axis=1)
-
     filtered_df['Display Name'] = filtered_df['Display Name'].astype(str)
     filtered_df['Task'] = filtered_df['Task'].astype(str)
 
     filtered_df['Clipped_Start'] = filtered_df['Start'].clip(lower=start_date_dt)
     filtered_df['Clipped_Finish'] = filtered_df['Finish'].clip(upper=end_date_dt)
 
+    # <<< 新增：创建一个函数来生成条形图上的标签文本 >>>
+    def create_bar_label(row):
+        duration = row['Clipped_Finish'] - row['Clipped_Start']
+        duration_str = format_timedelta_to_str(duration)
+        # 如果时长太短，只显示总时长，避免文字重叠
+        if duration.total_seconds() < 1800: # 小于30分钟
+            return f"<b>{duration_str}</b>"
+        start_str = row['Clipped_Start'].strftime('%H:%M')
+        end_str = row['Clipped_Finish'].strftime('%H:%M')
+        return f"<b>{start_str} → {end_str} ({duration_str})</b>"
+
+    # <<< 新增：应用该函数，创建新的文本列 >>>
+    filtered_df['bar_text'] = filtered_df.apply(create_bar_label, axis=1)
+
     st.subheader("任务活动时间线", anchor=False)
 
-    # <<< 主要修改在这里 >>>
     fig = px.timeline(
         filtered_df,
         x_start="Clipped_Start",
@@ -707,10 +713,36 @@ def display_timeline_tab():
             "Finish": "|%Y-%m-%d %H:%M:%S",
             "Task": False
         },
-        height=400  # <<< 新增：设置图表高度，可以根据任务数量调整
+        text="bar_text", # <<< 新增：告诉图表使用我们新创建的列作为文本标签 >>>
+        height=600
     )
-    # 通过 update_traces 调整条形宽度，使其更“胖”
-    fig.update_traces(width=0.8)  # <<< 新增：设置条形的宽度比例 (0.1到1之间)
+    fig.update_traces(
+        width=0.7,
+        textposition='inside',      # <<< 新增：让文字显示在条形内部
+        textfont_color='white',     # <<< 新增：设置文字颜色为白色以保证清晰
+        insidetextanchor='middle'   # <<< 新增：让文字在条形内部居中
+    )
+
+    # <<< 新增：循环添加日期和中午的分割线 >>>
+    # 生成需要标记的所有日期
+    all_dates = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
+    for day in all_dates:
+        # 添加日期分割线 (零点)
+        midnight_ts = datetime.combine(day, datetime.min.time()).replace(tzinfo=beijing_tz)
+        fig.add_vline(
+            x=midnight_ts,
+            line_dash="solid",
+            line_color="grey",
+            annotation_text=day.strftime("%m-%d"),
+            annotation_position="top left"
+        )
+        # 添加中午分割线 (12点)
+        noon_ts = datetime.combine(day, datetime.time(12, 0)).replace(tzinfo=beijing_tz)
+        fig.add_vline(
+            x=noon_ts,
+            line_dash="dash",
+            line_color="lightgrey"
+        )
 
     fig.update_layout(
         xaxis_title="时间",
