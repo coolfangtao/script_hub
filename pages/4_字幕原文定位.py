@@ -50,7 +50,7 @@ def find_subtitle_in_transcript(video_id, subtitle_text):
     found_segments = []
     try:
         # 尝试获取多种常用语言的字幕
-        transcript_list = YouTubeTranscriptApi.fetch(video_id, languages=['zh-CN', 'zh-TW', 'en', 'ja', 'ko'])
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['zh-CN', 'zh-TW', 'en', 'ja', 'ko'])
 
         for item in transcript_list:
             # 不区分大小写进行匹配
