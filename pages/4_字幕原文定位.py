@@ -1,7 +1,8 @@
-# app.py (版本 3 - 最终修正版 + 调试打印)
+# app.py (版本 4 - 库兼容版)
 
 import streamlit as st
 from googleapiclient.discovery import build
+# 我们现在需要导入 NoTranscriptFound 来辅助查找
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 import re
 import sys
@@ -12,8 +13,8 @@ st.set_page_config(layout="wide", page_title="视频片段定位器", page_icon=
 
 # ------------------- 核心功能函数 (带缓存) -------------------
 
-# 注意：为了调试，我们暂时禁用缓存，以便每次都能看到 API 的真实响应
-# @st.cache_data(ttl=3600)
+# 我们把缓存加回来，因为网络已经通了
+@st.cache_data(ttl=3600)
 def search_youtube_videos(api_key, query, max_results=5):
     """使用 YouTube API 搜索与查询相关的、带字幕的视频。"""
     print(f"\n[DEBUG] 正在调用 search_youtube_videos 函数...")
@@ -38,7 +39,7 @@ def search_youtube_videos(api_key, query, max_results=5):
         return []
 
 
-# @st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600)
 def find_keywords_in_transcript(video_id, query):
     """在字幕中查找包含所有关键词的片段。"""
     print(f"\n[DEBUG] ---- 正在调用 find_keywords_in_transcript ----")
@@ -46,34 +47,53 @@ def find_keywords_in_transcript(video_id, query):
     print(f"[DEBUG] 搜索词: {query}")
     try:
         keywords = [word.lower() for word in query.split()]
-        print(f"[DEBUG] 生成的关键词列表: {keywords}")
-
         if not keywords:
             print("[DEBUG] 关键词列表为空，已跳过。")
             return None
 
-        print("[DEBUG] 正在尝试获取字幕...")
-        transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['zh-CN', 'zh-Hans', 'zh', 'en'])
-        print(f"[DEBUG] 成功获取字幕，共 {len(transcript)} 段。")
+        # --- 核心修正：使用兼容旧版本的方法 ---
+        print("[DEBUG] 正在尝试获取字幕 (使用 list_transcripts 兼容模式)...")
 
-        for i, segment in enumerate(transcript):
+        # 步骤 1: 列出所有可用的字幕
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+
+        # 步骤 2: 尝试找到一个我们支持的语言（中文优先，其次英文）
+        transcript_to_fetch = None
+        try:
+            # 优先查找用户手动上传的、准确的字幕
+            transcript_to_fetch = transcript_list.find_transcript(['zh-CN', 'zh-Hans', 'zh', 'en'])
+        except NoTranscriptFound:
+            print("[DEBUG] 未找到手动上传的中/英文字幕，尝试查找自动生成字幕...")
+            # 如果没有，再尝试查找自动生成的
+            for tr in transcript_list:
+                if tr.is_generated and tr.language_code in ['zh-CN', 'zh-Hans', 'zh', 'en']:
+                    transcript_to_fetch = tr
+                    break
+
+        # 如果连自动生成的都找不到
+        if not transcript_to_fetch:
+            print("[DEBUG] 找到了字幕列表，但没有可用的中/英文字幕。")
+            return None  # 无法分析
+
+        print(f"[DEBUG] 成功找到字幕，语言: {transcript_to_fetch.language_code}")
+
+        # 步骤 3: 获取该字幕的实际内容
+        transcript_data = transcript_to_fetch.fetch()
+        print(f"[DEBUG] 成功获取字幕内容，共 {len(transcript_data)} 段。")
+
+        # 步骤 4: 循环遍历获取到的字幕数据
+        for i, segment in enumerate(transcript_data):
             segment_text_lower = segment['text'].lower()
 
-            # 检查所有关键词是否都在这段字幕中
-            all_keywords_found = all(keyword in segment_text_lower for keyword in keywords)
-
-            # (可选) 如果想看详细的字幕搜索过程，可以取消下面这行的注释
-            # print(f"[DEBUG] 检查片段 {i}: '{segment_text_lower}'. 结果: {all_keywords_found}")
-
-            if all_keywords_found:
+            if all(keyword in segment_text_lower for keyword in keywords):
                 print(f"[DEBUG] 找到匹配！在片段 {i} 中。")
                 context_start_index = max(0, i - 1)
-                context_end_index = min(len(transcript) - 1, i + 1)
+                context_end_index = min(len(transcript_data) - 1, i + 1)
                 full_context = " ".join(
-                    [transcript[j]['text'] for j in range(context_start_index, context_end_index + 1)])
+                    [transcript_data[j]['text'] for j in range(context_start_index, context_end_index + 1)])
 
                 highlighted_context = full_context
-                for keyword in query.split():  # 使用原始query里的词来高亮，保持大小写
+                for keyword in query.split():
                     highlighted_context = re.sub(f"({re.escape(keyword)})", r"**\1**", highlighted_context,
                                                  flags=re.IGNORECASE)
 
@@ -87,12 +107,13 @@ def find_keywords_in_transcript(video_id, query):
         print(f"[DEBUG] 遍历完所有字幕，未找到匹配项。")
         return None
 
-    except (TranscriptsDisabled, NoTranscriptFound):
-        print(f"[DEBUG] !!! 字幕不可用 (TranscriptsDisabled 或 NoTranscriptFound)")
+    except (TranscriptsDisabled):
+        print(f"[DEBUG] !!! 视频 {video_id} 的字幕已被禁用。")
         return "TranscriptsDisabled"
     except Exception as e:
+        # 捕获其他可能的错误，例如 NoTranscriptFound (如果 list_transcripts 返回空)
         print(f"[DEBUG] !!! 获取字幕时发生未知错误: {e}", file=sys.stderr)
-        return None
+        return "TranscriptsDisabled"  # 统一归为字幕不可用
 
 
 # ------------------- Streamlit 界面布局 -------------------
@@ -106,7 +127,6 @@ print("\n[DEBUG] Streamlit 脚本开始执行。")
 try:
     API_KEY = st.secrets["youtube_key"]
     print(f"[DEBUG] 成功从 Streamlit Secrets 加载 API 密钥。")
-    # 为了安全，只打印密钥的最后4位
     print(f"[DEBUG] 密钥尾号: ...{API_KEY[-4:]}")
 except (KeyError, FileNotFoundError):
     print("[DEBUG] !!! 严重错误：未在 Streamlit Secrets 中找到 'youtube_key'。", file=sys.stderr)
@@ -146,9 +166,10 @@ if search_button and search_query:
         for i, video in enumerate(videos):
             video_id = video['id']['videoId']
             video_title = video['snippet']['title']
-            print(f"\n[DEBUG] --- 正在处理视频 {i + 1}/{len(videos)} ---")
-            print(f"[DEBUG] 视频标题: {video_title}")
-            print(f"[DEBUG] 视频 ID: {video_id}")
+            print(f"\n[DEBUG] --- ---------------------- ---")
+            print(f"[DEBUG] --- 正在处理视频 {i + 1}/{len(videos)} ---")
+            print(f"[DEBUG] --- 视频标题: {video_title}")
+            print(f"[DEBUG] --- 视频 ID: {video_id}")
 
             progress_text = f"分析中 ({i + 1}/{len(videos)}): {video_title}"
             progress_bar.progress((i + 1) / len(videos), text=progress_text)
@@ -185,3 +206,4 @@ if search_button and search_query:
 
 elif search_button and not search_query:
     st.warning("请输入你要搜索的内容。")
+
