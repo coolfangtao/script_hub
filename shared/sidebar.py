@@ -39,6 +39,10 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/4_提取B站标题.py"
         },
         {
+            "label": "字幕原文定位",
+            "path": r"pages/4_字幕原文定位.py"
+        },
+        {
             "label": "读书笔记整理",
             "path": r"pages/4_读书笔记转markdown文档.py"
         },
