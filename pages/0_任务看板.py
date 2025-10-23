@@ -295,18 +295,9 @@ def display_main_controls():
 
     st.markdown("---")
 
-    st_equal_container_height = """
-    <style>
-        div[data-testid="stVerticalBlockBorderWrapper"] {
-            height: 100%;
-        }
-    </style>
-    """
-    st.markdown(st_equal_container_height, unsafe_allow_html=True)
-
     # 创建任务 和 本地导入/导出 功能区
     col1, col2 = st.columns(2)
-    with col1, st.container(border=True):
+    with col1, st.container(border=, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_CREATE_TASK_HEADER, anchor=False)
         with st.form(key="new_task_form", clear_on_submit=True):
             name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER)
@@ -320,7 +311,7 @@ def display_main_controls():
                 else:
                     st.warning(config.kanban.T_WARN_EMPTY_TASK_NAME)
 
-    with col2, st.container(border=True):
+    with col2, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_LOCAL_IO_HEADER, anchor=False)
         uploaded = st.file_uploader(config.kanban.T_UPLOAD_LABEL, type=["json"], help=config.kanban.T_UPLOAD_HELP)
         if uploaded: handle_tasks_import(uploaded)

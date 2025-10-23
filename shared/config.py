@@ -64,6 +64,8 @@ class KanbanPageConfig:
         self.T_MAIN_TITLE = f"{self.PAGE_ICON} {self.PAGE_TITLE}"
         self.T_CONTROL_PANEL_HEADER = "控制面板"
 
+        self.UI_CONTROL_PANEL_HEIGHT = 360  # 控制面板容器的固定高度（像素）
+
         # 控制区：创建任务
         self.T_CREATE_TASK_HEADER = "🚀 创建新任务"
         self.T_TASK_NAME_LABEL = "任务名称"
