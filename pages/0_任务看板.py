@@ -279,6 +279,9 @@ def get_export_data():
     return json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2) if st.session_state.tasks else "{}"
 
 
+# =========================================================================================
+# <<< 升级后的“创建新任务”函数 >>>
+# =========================================================================================
 def display_main_controls():
     st.header(config.kanban.T_CONTROL_PANEL_HEADER, divider="rainbow")
 
@@ -296,8 +299,6 @@ def display_main_controls():
             if not is_connected:
                 st.info(config.kanban.T_CLOUD_MODE_INFO)
 
-                # <<< 核心修改：增加安全警告 >>>
-                # 如果当前会话中已经有任务，就警告用户连接会覆盖它们
                 if st.session_state.tasks:
                     st.warning(
                         "**注意：** 您当前页面上有未同步的任务。连接到 GitHub 将会丢弃这些任务，并从您的仓库加载数据。"
@@ -309,15 +310,9 @@ def display_main_controls():
 
                 if st.button(config.kanban.T_GITHUB_CONNECT_BUTTON, use_container_width=True):
                     if g_token and g_repo:
-                        # 1. 设置连接凭证
                         st.session_state.github_token = g_token
                         st.session_state.github_repo = g_repo
-
-                        # 2. 从 GitHub 加载数据
                         tasks = load_tasks_from_github(g_token, g_repo)
-
-                        # 3. 无论加载结果如何（即使是空列表），都用它来覆盖当前会话
-                        # 这是确保数据流单向性的关键
                         if tasks is not None:
                             st.session_state.tasks = tasks
                             st.rerun()
@@ -329,22 +324,61 @@ def display_main_controls():
 
     st.markdown("---")
 
-    # 创建任务 和 本地导入/导出 功能区 (此部分代码无需修改，保持原样)
     col1, col2 = st.columns(2)
     with col1, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_CREATE_TASK_HEADER, anchor=False)
         with st.form(key="new_task_form", clear_on_submit=True):
             name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER)
-            type = st.selectbox(config.kanban.T_TASK_TYPE_LABEL, config.kanban.TASK_TYPES)
+
+            # --- 核心修改从这里开始 ---
+
+            # 1. 动态获取所有已存在的任务类型
+            default_types = config.kanban.TASK_TYPES
+            existing_types = []
+            if 'tasks' in st.session_state and st.session_state.tasks:
+                existing_types = sorted(list(set(t.task_type for t in st.session_state.tasks)))
+
+            # 合并默认类型和现有类型，并去重
+            combined_types = sorted(list(set(default_types + existing_types)))
+
+            # 2. 创建一个特殊的选项用于添加新类型
+            ADD_NEW_OPTION = "➕ 添加新类型..."
+            options = combined_types + [ADD_NEW_OPTION]
+
+            selected_option = st.selectbox(
+                label=config.kanban.T_TASK_TYPE_LABEL,
+                options=options,
+                key="task_type_selector"  # 使用 key 来帮助 Streamlit 跟踪组件状态
+            )
+
+            new_type_name = ""
+            # 3. 如果用户选择“添加新类型”，则显示一个文本输入框
+            if selected_option == ADD_NEW_OPTION:
+                new_type_name = st.text_input(
+                    "请输入新的类型名称:",
+                    placeholder="例如：会议、调研、紧急修复"
+                )
 
             if st.form_submit_button(config.kanban.T_ADD_TASK_BUTTON, use_container_width=True):
                 if name:
-                    st.session_state.tasks.append(Task(task_name=name, task_type=type))
+                    final_task_type = ""
+                    # 4. 在提交时，判断最终的任务类型是什么
+                    if selected_option == ADD_NEW_OPTION:
+                        if new_type_name:
+                            final_task_type = new_type_name
+                        else:
+                            st.warning("您选择了添加新类型，但未输入类型名称。")
+                            st.stop()  # 阻止表单提交
+                    else:
+                        final_task_type = selected_option
+
+                    st.session_state.tasks.append(Task(task_name=name, task_type=final_task_type))
                     st.success(config.kanban.T_SUCCESS_TASK_ADDED.format(task_name=name))
                     sync_state()
                     st.rerun()
                 else:
                     st.warning(config.kanban.T_WARN_EMPTY_TASK_NAME)
+            # --- 核心修改在这里结束 ---
 
     with col2, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_LOCAL_IO_HEADER, anchor=False)
