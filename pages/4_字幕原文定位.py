@@ -62,26 +62,29 @@ def find_keywords_in_transcript(video_id, query):
 
         # 步骤 4: 循环遍历获取到的字幕数据
         for i, segment in enumerate(transcript_data):
-            # 注意：根据你的截图，返回的字典键是 'text', 'start', 'duration'
-            # 我们之前的代码 segment['text'] 和 segment['start'] 是正确的
-            segment_text_lower = segment['text'].lower()
+
+            # --- 核心修正：使用 .text 和 .start 访问对象属性 ---
+            segment_text_lower = segment.text.lower()
 
             if all(keyword in segment_text_lower for keyword in keywords):
                 print(f"[DEBUG] 找到匹配！在片段 {i} 中。")
                 context_start_index = max(0, i - 1)
                 context_end_index = min(len(transcript_data) - 1, i + 1)
                 full_context = " ".join(
-                    [transcript_data[j]['text'] for j in range(context_start_index, context_end_index + 1)])
+                    [transcript_data[j].text for j in range(context_start_index, context_end_index + 1)])
+                # --- 修正结束 ---
 
                 highlighted_context = full_context
                 for keyword in query.split():
                     highlighted_context = re.sub(f"({re.escape(keyword)})", r"**\1**", highlighted_context,
                                                  flags=re.IGNORECASE)
 
+                # --- 核心修正：使用 .start 访问对象属性 ---
                 match_data = {
-                    "start_time": int(segment['start']),
+                    "start_time": int(segment.start),
                     "context": f"...{highlighted_context}..."
                 }
+                # --- 修正结束 ---
                 print(f"[DEBUG] 构造的返回数据: {match_data}")
                 return match_data
 
@@ -97,6 +100,13 @@ def find_keywords_in_transcript(video_id, query):
         return None  # 返回 None (无匹配)，而不是 "TranscriptsDisabled" (错误)
 
     except Exception as e:
+        # --- 核心修正：捕获 IP 封锁错误 ---
+        error_message = str(e).lower()
+        if "youtube is blocking requests" in error_message or "ip has been blocked" in error_message:
+            print(f"[DEBUG] !!! 严重错误：IP 已被 YouTube 封锁。错误: {e}")
+            return "IPBlocked"  # 返回一个新的状态码
+        # --- 修正结束 ---
+
         # 捕获其他可能的错误
         print(f"[DEBUG] !!! 获取字幕时发生未知错误: {e}", file=sys.stderr)
         return "TranscriptsDisabled"  # 统一归为字幕不可用
@@ -149,7 +159,7 @@ if search_button and search_query:
             for i, video in enumerate(videos):
                 video_id = video['id']['videoId']
                 video_title = video['snippet']['title']
-                video_url = f"https://www.youtube.com/watch?v={video_id}"
+                video_url = f"https.www.youtube.com/watch?v={video_id}"
                 st.markdown(f"{i + 1}. **{video_title}**\n   - 🔗 [在 YouTube 上打开]({video_url})")
 
         st.markdown("---")
@@ -178,11 +188,26 @@ if search_button and search_query:
                     st.write("无法分析此视频，因为它关闭了字幕功能或不提供可访问的字幕。")
                 continue
 
-            if match_data is None:
+            # --- 核心修正：处理 IP 封锁 ---
+            elif match_data == "IPBlocked":
+                print("[DEBUG] === IP 被封锁，停止所有分析。 ===")
+                status_placeholder.error(
+                    "❌ 分析失败：YouTube 暂时阻止了此应用服务器的IP地址。"
+                )
+                with results_placeholder.expander(f"⚠️ **{video_title}** - 分析失败"):
+                    st.warning(
+                        "无法连接到 YouTube 字幕服务器。这通常是因为应用（服务器）的IP地址被 YouTube 暂时封锁了，这在共享主机（如 Streamlit Cloud）上很常见。\n\n"
+                        "**建议：** 你可以稍后再试，或者在本地计算机上运行此应用。"
+                    )
+                progress_bar.empty()
+                break  # 立即停止循环
+            # --- 修正结束 ---
+
+            elif match_data is None:
                 print("[DEBUG] 无可用字幕或未找到关键词，跳过此视频。")
                 continue
 
-            if isinstance(match_data, dict):
+            elif isinstance(match_data, dict):
                 found_match = True
                 print(f"[DEBUG] === 匹配成功！已找到结果！===")
                 status_placeholder.success("🎉 找到了！已定位到匹配的视频片段。")
@@ -192,7 +217,7 @@ if search_button and search_query:
                     st.caption(f"频道: {video['snippet']['channelTitle']}")
                     st.markdown(f"**找到的文本上下文：**\n\n{match_data['context']}")
                     start_seconds = match_data['start_time']
-                    video_url = f"https://www.youtube.com/watch?v={video_id}&t={start_seconds}s"
+                    video_url = f"https.www.youtube.com/watch?v={video_id}&t={start_seconds}s"
                     st.video(video_url)
                     st.markdown(f"🔗 [在 YouTube 上打开]({video_url})")
 
