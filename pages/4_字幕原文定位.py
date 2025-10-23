@@ -1,7 +1,7 @@
 import streamlit as st
 from googleapiclient.discovery import build
-# --- 核心修正：直接导入 get_transcript 函数 ---
-from youtube_transcript_api import get_transcript, TranscriptsDisabled, NoTranscriptFound
+# --- 核心修正：导回 YouTubeTranscriptApi 类 ---
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 import re
 import sys
 
@@ -47,14 +47,44 @@ def find_keywords_in_transcript(video_id, query):
             print("[DEBUG] 关键词列表为空，已跳过。")
             return None
 
-        print("[DEBUG] 正在尝试直接获取中/英文字幕 (使用 get_transcript 函数)...")
+        # --- 核心修正：实例化 YouTubeTranscriptApi 类 ---
+        # 既然静态方法和顶层函数都失败了，尝试将其作为实例方法调用
+        print("[DEBUG] 正在尝试实例化 YouTubeTranscriptApi...")
+        api_instance = YouTubeTranscriptApi()
+        print("[DEBUG] 实例化成功，尝试调用 list_transcripts...")
+
+        # 步骤 1: 尝试调用实例的 list_transcripts
+        transcript_list = api_instance.list_transcripts(video_id)
+        print(f"[DEBUG] 成功 list_transcripts，找到 {len(transcript_list)} 个字幕条目。")
+        # --- 修正结束 ---
+
+        # 步骤 2: 尝试找到一个我们支持的语言（中文优先，其次英文）
+        transcript_to_fetch = None
         supported_languages = ['zh-CN', 'zh-Hans', 'zh', 'en', 'en-US']
 
-        # --- 核心修正：不再调用 YouTubeTranscriptApi.get_transcript ---
-        # 而是直接调用导入的 get_transcript 函数
-        transcript_data = get_transcript(video_id, languages=supported_languages)
+        try:
+            # 优先查找用户手动上传的、准确的字幕
+            transcript_to_fetch = transcript_list.find_transcript(supported_languages)
+            print(f"[DEBUG] 找到了手动字幕: {transcript_to_fetch.language_code}")
+        except NoTranscriptFound:
+            print("[DEBUG] 未找到手动上传的中/英文字幕，尝试查找自动生成字幕...")
+            # 如果没有，再尝试查找自动生成的
+            for tr in transcript_list:
+                if tr.is_generated and tr.language_code in supported_languages:
+                    transcript_to_fetch = tr
+                    print(f"[DEBUG] 找到了自动字幕: {transcript_to_fetch.language_code}")
+                    break
+
+        # 如果连自动生成的都找不到
+        if not transcript_to_fetch:
+            print("[DEBUG] 找到了字幕列表，但没有可用的中/英文字幕。")
+            return None  # 无法分析，返回 None
+
+        print(f"[DEBUG] 最终选择字幕，语言: {transcript_to_fetch.language_code}")
+
+        # 步骤 3: 获取该字幕的实际内容
+        transcript_data = transcript_to_fetch.fetch()
         print(f"[DEBUG] 成功获取字幕内容，共 {len(transcript_data)} 段。")
-        # --- 修正结束 ---
 
         # 步骤 4: 循环遍历获取到的字幕数据
         for i, segment in enumerate(transcript_data):
@@ -143,7 +173,7 @@ if search_button and search_query:
             for i, video in enumerate(videos):
                 video_id = video['id']['videoId']
                 video_title = video['snippet']['title']
-                video_url = f"https.www.youtube.com/watch?v={video_id}"
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
                 st.markdown(f"{i + 1}. **{video_title}**\n   - 🔗 [在 YouTube 上打开]({video_url})")
 
         st.markdown("---")
@@ -186,7 +216,7 @@ if search_button and search_query:
                     st.caption(f"频道: {video['snippet']['channelTitle']}")
                     st.markdown(f"**找到的文本上下文：**\n\n{match_data['context']}")
                     start_seconds = match_data['start_time']
-                    video_url = f"https.www.youtube.com/watch?v={video_id}&t={start_seconds}s"
+                    video_url = f"https://www.youtube.com/watch?v={video_id}&t={start_seconds}s"
                     st.video(video_url)
                     st.markdown(f"🔗 [在 YouTube 上打开]({video_url})")
 
