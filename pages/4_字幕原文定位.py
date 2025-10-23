@@ -4,11 +4,12 @@ import streamlit as st
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 import re
+from shared.sidebar import create_common_sidebar
 
 # ------------------- 页面配置 -------------------
 # 使用 wide 布局让界面更舒展
 st.set_page_config(layout="wide", page_title="视频片段定位器", page_icon="🎬")
-
+create_common_sidebar()
 
 # ------------------- 核心功能函数 (带缓存) -------------------
 
