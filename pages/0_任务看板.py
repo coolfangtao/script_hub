@@ -2,6 +2,8 @@
 import streamlit as st
 import json
 import os
+import pandas as pd
+import plotly.express as px
 from itertools import groupby
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
@@ -502,10 +504,106 @@ def display_kanban_layout():
         for task in tasks_done: display_task_card(task)
 
 
+# =========================================================================================
+# <<< 新增：统计分析标签页函数 >>>
+# =========================================================================================
+def display_statistics_tab():
+    st.header("任务统计分析 📊", divider="rainbow")
+
+    tasks = st.session_state.get('tasks', [])
+    if not tasks:
+        st.info("看板上还没有任务，快去创建一个吧！")
+        return
+
+    # 1. 数据准备：将任务对象列表转换为Pandas DataFrame
+    task_data = [task.to_dict() for task in tasks]
+    df = pd.DataFrame(task_data)
+
+    # 转换数据类型以便分析
+    df['creation_time'] = pd.to_datetime(df['creation_time'])
+    df['completion_time'] = pd.to_datetime(df['completion_time'])
+    df['total_active_time_hours'] = df['total_active_time_seconds'] / 3600
+    df['task_duration_hours'] = df['task_duration_seconds'] / 3600
+
+    # 2. 显示关键指标 (KPIs)
+    st.subheader("核心指标", anchor=False)
+    total_tasks = len(df)
+    completed_tasks = df[df['status'] == config.kanban.STATUS_DONE].shape[0]
+    completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+    avg_active_time_sec = df[df['status'] == config.kanban.STATUS_DONE]['total_active_time_seconds'].mean()
+    avg_lifespan_sec = df[df['status'] == config.kanban.STATUS_DONE]['task_duration_seconds'].mean()
+
+    kpi_cols = st.columns(4)
+    kpi_cols[0].metric("总任务数", f"{total_tasks} 个")
+    kpi_cols[1].metric("完成率", f"{completion_rate:.1f}%")
+    kpi_cols[2].metric("平均活跃时长", format_timedelta_to_str(timedelta(seconds=avg_active_time_sec)) if pd.notna(
+        avg_active_time_sec) else "N/A")
+    kpi_cols[3].metric("平均生命周期", format_timedelta_to_str(timedelta(seconds=avg_lifespan_sec)) if pd.notna(
+        avg_lifespan_sec) else "N/A")
+
+    st.markdown("---")
+
+    # 3. 任务分布图表
+    st.subheader("任务分布", anchor=False)
+    col1, col2 = st.columns(2)
+    with col1:
+        status_counts = df['status'].value_counts()
+        fig_status = px.pie(status_counts, values=status_counts.values, names=status_counts.index,
+                            title="任务状态分布", hole=0.3)
+        st.plotly_chart(fig_status, use_container_width=True)
+    with col2:
+        type_counts = df['task_type'].value_counts()
+        fig_type = px.pie(type_counts, values=type_counts.values, names=type_counts.index,
+                          title="任务类型分布", hole=0.3)
+        st.plotly_chart(fig_type, use_container_width=True)
+
+    st.markdown("---")
+
+    # 4. 任务时间趋势
+    st.subheader("任务时间趋势", anchor=False)
+    df['creation_date'] = df['creation_time'].dt.date
+    tasks_per_day = df.groupby('creation_date').size().reset_index(name='count')
+    fig_trend = px.bar(tasks_per_day, x='creation_date', y='count', title="每日创建任务数",
+                       labels={'creation_date': '日期', 'count': '任务数量'})
+    fig_trend.update_layout(xaxis_title="创建日期", yaxis_title="任务数")
+    st.plotly_chart(fig_trend, use_container_width=True)
+
+    st.markdown("---")
+
+    # 5. 任务耗时分析
+    st.subheader("任务耗时分析 (仅限已完成任务)", anchor=False)
+    completed_df = df[df['status'] == config.kanban.STATUS_DONE].copy()
+    if not completed_df.empty:
+        # 按类型分析平均耗时
+        avg_time_by_type = completed_df.groupby('task_type')[
+            ['total_active_time_hours', 'task_duration_hours']].mean().reset_index()
+        avg_time_by_type = avg_time_by_type.rename(columns={
+            'total_active_time_hours': '平均活跃时长 (小时)',
+            'task_duration_hours': '平均生命周期 (小时)'
+        })
+
+        fig_avg_time = px.bar(avg_time_by_type, x='task_type', y=['平均活跃时长 (小时)', '平均生命周期 (小时)'],
+                              barmode='group', title='各类型任务平均耗时对比')
+        fig_avg_time.update_layout(xaxis_title="任务类型", yaxis_title="平均小时数")
+        st.plotly_chart(fig_avg_time, use_container_width=True)
+    else:
+        st.info("暂无已完成的任务可供分析耗时。")
+
+
 def main():
     initialize_app()
-    display_main_controls()
-    display_kanban_layout()
+
+    # 创建两个标签页
+    tab1, tab2 = st.tabs(["📌 任务看板", "📊 统计分析"])
+
+    with tab1:
+        # 第一个标签页的内容：原有的看板
+        display_main_controls()
+        display_kanban_layout()
+
+    with tab2:
+        # 第二个标签页的内容：新的统计页面
+        display_statistics_tab()
 
 
 if __name__ == "__main__":

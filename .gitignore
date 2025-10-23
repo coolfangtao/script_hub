@@ -4,3 +4,4 @@ test/
 .streamlit/secrets.toml
 test.py
 启动看板.sh
+local_tasks_data.json
