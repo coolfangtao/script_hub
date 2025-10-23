@@ -87,9 +87,9 @@ col1, col2 = st.columns([4, 1])
 with col1:
     search_query = st.text_input(
         "输入你想查找的文字或对话：",
-        "什么是人工智能",
+        "The future of renewable energy",
         label_visibility="collapsed",
-        placeholder="例如：什么是人工智能"
+        placeholder="例如：The future of renewable energy"
     )
 with col2:
     search_button = st.button("🔍 开始搜索", use_container_width=True, type="primary")
