@@ -149,7 +149,7 @@ def main():
                     inpainted_image_cv = remove_original_text(original_image_cv, translation_results)
 
                     final_image_pil = draw_translated_text(inpainted_image_cv, translation_results,
-                                                           font_path='Arial.ttf')
+                                                           font_path='../assets/Arial.ttf')
 
                     st.subheader(f"处理结果: {uploaded_file.name}")
                     col1, col2 = st.columns(2)

@@ -1,780 +1,406 @@
+# 0_任务看板.py
 import streamlit as st
 import json
 from itertools import groupby
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 from shared.sidebar import create_common_sidebar
+from shared.config import config  # <<< 导入全局配置实例
 from github import Github, UnknownObjectException
 
-DATA_FILE_NAME = "tasks_data.json"
-
-# 自动刷新，每分钟一次，用于更新时间显示
-st_autorefresh(interval=1000 * 60, key="clock_refresher")
+# --- 初始化和页面设置 ---
+st_autorefresh(interval=config.kanban.AUTO_REFRESH_INTERVAL_MS, key="clock_refresher")
 create_common_sidebar()
-
-# 定义北京时间 (UTC+8)
-beijing_tz = timezone(timedelta(hours=8))
+beijing_tz = config.globals.APP_TIMEZONE
 
 
 # 1. 任务类定义 (Task Class Definition)
 class Task:
-    """
-    一个类，用于表示和管理单个任务。
-    (已更新时间跟踪逻辑 和 独立的状态管理、以及导入导出功能)
-    """
-
     def __init__(self, task_name, task_type):
-        """
-        初始化一个新任务。
-        """
         self.task_name = task_name
         self.task_type = task_type
         self.creation_time = datetime.now(beijing_tz)
         self.task_id = f"task_{self.creation_time.timestamp()}"
-
-        self.task_progress = 0  # 0 到 100
-        # 独立的状态，决定任务所在的列
-        self.status = "未开始"
-
-        self.completion_time = None  # 任务完成的时间点
-        self.task_duration = None  # 任务的【总生命周期】 (创建 -> 完成)
-
+        self.task_progress = 0
+        self.status = config.kanban.STATUS_TODO  # 使用配置
+        self.completion_time = None
+        self.task_duration = None
         self.task_comments = []
-
-        # (时间跟踪属性)
-        self.total_active_time = timedelta(0)  # 仅存储已完成的总时长
-        self.last_start_active_time = None  # 当前活动时段的开始时间
-
-        # 详细记录每一次“进行中”的时间段
-        # 列表，存储格式为:
-        # { 'start_time': datetime, 'end_time': datetime, 'duration': timedelta, 'stopped_as': str }
+        self.total_active_time = timedelta(0)
+        self.last_start_active_time = None
         self.active_time_segments = []
 
-    # --- [!! 序列化与反序列化 !!] ---
     def to_dict(self):
-        """将 Task 对象转换为可序列化为 JSON 的字典。"""
         return {
             "task_name": self.task_name,
             "task_type": self.task_type,
-            # 将 datetime 对象转换为 ISO 8601 格式的字符串
             "creation_time": self.creation_time.isoformat() if self.creation_time else None,
             "task_id": self.task_id,
             "task_progress": self.task_progress,
             "status": self.status,
             "completion_time": self.completion_time.isoformat() if self.completion_time else None,
-            # 将 timedelta 对象转换为总秒数 (浮点数)
             "task_duration_seconds": self.task_duration.total_seconds() if self.task_duration else None,
-            "task_comments": [
-                {
-                    "content": c["content"],
-                    "type": c["type"],
-                    "time": c["time"].isoformat()
-                } for c in self.task_comments
-            ],
+            "task_comments": [{"content": c["content"], "type": c["type"], "time": c["time"].isoformat()} for c in
+                              self.task_comments],
             "total_active_time_seconds": self.total_active_time.total_seconds(),
             "last_start_active_time": self.last_start_active_time.isoformat() if self.last_start_active_time else None,
-            "active_time_segments": [
-                {
-                    "start_time": s["start_time"].isoformat(),
-                    "end_time": s["end_time"].isoformat(),
-                    "duration_seconds": s["duration"].total_seconds(),
-                    "stopped_as": s["stopped_as"]
-                } for s in self.active_time_segments
-            ]
+            "active_time_segments": [{"start_time": s["start_time"].isoformat(), "end_time": s["end_time"].isoformat(),
+                                      "duration_seconds": s["duration"].total_seconds(), "stopped_as": s["stopped_as"]}
+                                     for s in self.active_time_segments]
         }
 
     @classmethod
     def from_dict(cls, data):
-        """从字典创建 Task 对象。"""
-        # 先创建一个基础的 Task 对象
         task = cls(data["task_name"], data["task_type"])
-
-        # 逐个恢复属性
         task.creation_time = datetime.fromisoformat(data["creation_time"]) if data.get("creation_time") else None
-        task.task_id = data.get("task_id", f"task_{task.creation_time.timestamp()}")  # 兼容旧数据
+        task.task_id = data.get("task_id", f"task_{task.creation_time.timestamp()}")
         task.task_progress = data["task_progress"]
         task.status = data["status"]
         task.completion_time = datetime.fromisoformat(data["completion_time"]) if data.get("completion_time") else None
-
         if data.get("task_duration_seconds") is not None:
             task.task_duration = timedelta(seconds=data["task_duration_seconds"])
-
-        task.task_comments = [
-            {
-                "content": c["content"],
-                "type": c["type"],
-                "time": datetime.fromisoformat(c["time"])
-            } for c in data.get("task_comments", [])
-        ]
-
+        task.task_comments = [{"content": c["content"], "type": c["type"], "time": datetime.fromisoformat(c["time"])}
+                              for c in data.get("task_comments", [])]
         task.total_active_time = timedelta(seconds=data.get("total_active_time_seconds", 0))
-
         if data.get("last_start_active_time"):
             task.last_start_active_time = datetime.fromisoformat(data["last_start_active_time"])
-
         task.active_time_segments = [
-            {
-                "start_time": datetime.fromisoformat(s["start_time"]),
-                "end_time": datetime.fromisoformat(s["end_time"]),
-                "duration": timedelta(seconds=s["duration_seconds"]),
-                "stopped_as": s["stopped_as"]
-            } for s in data.get("active_time_segments", [])
-        ]
+            {"start_time": datetime.fromisoformat(s["start_time"]), "end_time": datetime.fromisoformat(s["end_time"]),
+             "duration": timedelta(seconds=s["duration_seconds"]), "stopped_as": s["stopped_as"]} for s in
+            data.get("active_time_segments", [])]
         return task
 
     def add_comment(self, content, comment_type):
-        """
-        为任务添加评论。
-        """
-        comment = {
-            "content": content,
-            "type": comment_type,
-            "time": datetime.now(beijing_tz)
-        }
+        comment = {"content": content, "type": comment_type, "time": datetime.now(beijing_tz)}
         self.task_comments.append(comment)
-        st.toast(f"任务 '{self.task_name}' 添加了新评论！", icon="💬")
+        st.toast(config.kanban.T_TOAST_COMMENT_ADDED.format(task_name=self.task_name), icon="💬")
 
     def set_status(self, new_status):
-        """
-        显式设置任务状态 (列)，并处理时间跟踪和进度。
-        由按钮点击调用。
-        """
-        if self.status == new_status:
-            return
+        if self.status == new_status: return
+        old_status, self.status, now = self.status, new_status, datetime.now(beijing_tz)
 
-        old_status = self.status
-        self.status = new_status
-        now = datetime.now(beijing_tz)
-
-        # 状态机：处理有效时长的累积
-
-        # 1. 刚进入“进行中”状态
-        if new_status == "进行中" and old_status != "进行中":
+        if new_status == config.kanban.STATUS_DOING and old_status != config.kanban.STATUS_DOING:
             self.last_start_active_time = now
-            st.toast("计时开始 ⏱️")
-
-        # 2. 刚离开“进行中”状态 (例如变为“未开始”或“已完成”)
-        elif new_status != "进行中" and old_status == "进行中":
+            st.toast(config.kanban.T_TOAST_TIMER_STARTED)
+        elif new_status != config.kanban.STATUS_DOING and old_status == config.kanban.STATUS_DOING:
             if self.last_start_active_time:
-                active_segment_duration = now - self.last_start_active_time
-                self.total_active_time += active_segment_duration
-
-                # --- [!! 记录时间段 !!] ---
-                new_segment = {
-                    "start_time": self.last_start_active_time,
-                    "end_time": now,
-                    "duration": active_segment_duration,
-                    # 记录是因何而停止 (挂起 还是 完成)
-                    "stopped_as": new_status
-                }
-                self.active_time_segments.append(new_segment)
-                # --- [!! 结束 !!] ---
-
+                duration = now - self.last_start_active_time
+                self.total_active_time += duration
+                self.active_time_segments.append(
+                    {"start_time": self.last_start_active_time, "end_time": now, "duration": duration,
+                     "stopped_as": new_status})
                 self.last_start_active_time = None
-                st.toast(f"本段计时结束...")
+                st.toast(config.kanban.T_TOAST_TIMER_STOPPED)
 
-        # --- 自动更新进度的逻辑 ---
-        if new_status == "已完成":
-            if old_status != "已完成":
+        if new_status == config.kanban.STATUS_DONE:
+            if old_status != config.kanban.STATUS_DONE:
                 self.completion_time = now
                 self.task_duration = self.completion_time - self.creation_time
-                # 自动将进度设为100%
-                if self.task_progress != 100:
-                    self.task_progress = 100
+                if self.task_progress != 100: self.task_progress = 100
                 st.balloons()
-
-        # 如果从“已完成”状态改回“未完成”
-        elif old_status == "已完成" and new_status != "已完成":
-            self.completion_time = None
-            self.task_duration = None
-            # 如果重新打开，且进度是100%，设为90%，以便用户可以调整
-            if self.task_progress == 100:
-                self.task_progress = 90
-
-        # 如果设为 "未开始" (例如 "挂起")
-        elif new_status == "未开始":
-            self.completion_time = None
-            self.task_duration = None
-            # (离开“进行中”的逻辑已在上面处理)
+        elif old_status == config.kanban.STATUS_DONE and new_status != config.kanban.STATUS_DONE:
+            self.completion_time, self.task_duration = None, None
+            if self.task_progress == 100: self.task_progress = 90
+        elif new_status == config.kanban.STATUS_TODO:
+            self.completion_time, self.task_duration = None, None
 
     def update_progress(self, new_progress):
-        """
-        由滑块调用：仅更新任务进度百分比。
-        会自动触发状态变更(如果需要)。
-        """
-        if self.task_progress == new_progress:
-            return
-
+        if self.task_progress == new_progress: return
         self.task_progress = new_progress
-
-        # 自动状态变更
-        if new_progress == 100 and self.status != "已完成":
-            self.set_status("已完成")
-        elif new_progress < 100 and self.status == "已完成":
-            # 如果用户从100%拖回，重新打开
-            self.set_status("进行中")
-        elif new_progress > 0 and self.status == "未开始":
-            # 如果用户从0%拖起，自动开始
-            self.set_status("进行中")
-        elif new_progress == 0 and self.status != "未开始":
-            # 如果用户拖到0%，自动设为未开始
-            self.set_status("未开始")
-
-    # --- (时间获取函数) ---
+        if new_progress == 100 and self.status != config.kanban.STATUS_DONE:
+            self.set_status(config.kanban.STATUS_DONE)
+        elif new_progress < 100 and self.status == config.kanban.STATUS_DONE:
+            self.set_status(config.kanban.STATUS_DOING)
+        elif new_progress > 0 and self.status == config.kanban.STATUS_TODO:
+            self.set_status(config.kanban.STATUS_DOING)
+        elif new_progress == 0 and self.status != config.kanban.STATUS_TODO:
+            self.set_status(config.kanban.STATUS_TODO)
 
     def get_total_lifespan_duration(self):
-        """返回任务的【总生命周期】 (从创建到现在，或到完成)"""
-        if self.completion_time:
-            return self.task_duration
-        else:
-            return datetime.now(beijing_tz) - self.creation_time
+        return self.task_duration if self.completion_time else datetime.now(beijing_tz) - self.creation_time
 
     def get_total_active_duration(self):
-        """返回任务的【总有效工作时长】"""
-        current_active_duration = timedelta(0)
-
-        # 加上当前正在进行的活动时间
-        if self.status == "进行中" and self.last_start_active_time:
-            current_active_duration = datetime.now(beijing_tz) - self.last_start_active_time
-
-        # 总时长 = 已完成的总时长 + 当前进行中的时长
-        return self.total_active_time + current_active_duration
+        current_active = datetime.now(
+            beijing_tz) - self.last_start_active_time if self.status == config.kanban.STATUS_DOING and self.last_start_active_time else timedelta(
+            0)
+        return self.total_active_time + current_active
 
 
 def format_timedelta_to_str(duration):
-    """
-    将 timedelta 对象格式化为 "X天 X小时 X分钟 X秒" 的字符串
-    """
-    if not isinstance(duration, timedelta) or duration.total_seconds() <= 0:
-        return "0秒"
-
+    if not isinstance(duration, timedelta) or duration.total_seconds() <= 0: return "0秒"
     total_seconds = int(duration.total_seconds())
-    days, remainder = divmod(total_seconds, 86400)
-    hours, remainder = divmod(remainder, 3600)
-    minutes, seconds = divmod(remainder, 60)
-
+    days, rem = divmod(total_seconds, 86400);
+    hours, rem = divmod(rem, 3600);
+    minutes, seconds = divmod(rem, 60)
     parts = []
-    if days > 0:
-        parts.append(f"{days}天")
-    if hours > 0:
-        parts.append(f"{hours}小时")
-    if minutes > 0:
-        parts.append(f"{minutes}分钟")
-    # 仅当总时长小于1分钟时才显示秒
-    if seconds > 0 and total_seconds < 60:
-        parts.append(f"{seconds}秒")
-    elif total_seconds >= 60 and seconds > 0:
-        # 如果有分钟，秒数会显得累赘，可以注释掉下面这行
-        # parts.append(f"{seconds}秒")
-        pass
+    if days > 0: parts.append(f"{days}天")
+    if hours > 0: parts.append(f"{hours}小时")
+    if minutes > 0: parts.append(f"{minutes}分钟")
+    if seconds > 0 and total_seconds < 60: parts.append(f"{seconds}秒")
+    return "".join(parts) if parts else "0秒"
 
-    if not parts:
-        return "0秒"
-
-    # 优化显示，例如 "X天X时X分"
-    return "".join(parts)
-
-### --- GitHub 同步功能 --- ###
 
 @st.cache_resource
 def get_github_repo():
-    """使用缓存连接到 GitHub 仓库，避免每次重载都重新认证。"""
     try:
-        g = Github(st.secrets["github_data_token"])
-        repo = g.get_repo(st.secrets["github_data_repo"])
-        return repo
+        g = Github(config.globals.GITHUB_TOKEN)
+        return g.get_repo(config.globals.GITHUB_REPO)
     except Exception as e:
-        st.error(f"连接到 GitHub 仓库失败: {e}。请检查你的 secrets.toml 文件配置。")
+        st.error(config.kanban.T_ERROR_GITHUB_CONNECTION.format(e=e))
         return None
 
 
 def load_tasks_from_github():
-    """从 GitHub 加载任务数据。"""
     repo = get_github_repo()
-    if repo is None:
-        return []
-
+    if repo is None: return []
     try:
-        content_file = repo.get_contents(DATA_FILE_NAME)
-        content = content_file.decoded_content.decode("utf-8")
-        tasks_data = json.loads(content)
-        tasks = [Task.from_dict(task_data) for task_data in tasks_data]
-        st.toast("✅ 已从 GitHub 成功加载任务！", icon="🎉")
-        return tasks
-
-    # 当仓库存在但文件不存在时，会触发这个特定的异常
+        content = repo.get_contents(config.kanban.DATA_FILE_NAME).decoded_content.decode("utf-8")
+        st.toast(config.kanban.T_SUCCESS_GITHUB_LOAD, icon="🎉")
+        return [Task.from_dict(task_data) for task_data in json.loads(content)]
     except UnknownObjectException:
-        st.info("在仓库中未找到任务文件。当你第一次推送时，将自动创建。")
+        st.info(config.kanban.T_INFO_GITHUB_FILE_NOT_FOUND)
+        return []
+    except Exception as e:
+        if "This repository is empty" in str(e):
+            st.info(config.kanban.T_INFO_GITHUB_REPO_EMPTY)
+        else:
+            st.error(config.kanban.T_ERROR_GITHUB_LOAD_UNKNOWN.format(e=e))
         return []
 
-    # 捕获其他所有异常
-    except Exception as e:
-        # 专门检查“仓库为空”的这个特定错误信息
-        if "This repository is empty" in str(e):
-            st.info("检测到 GitHub 数据仓库为空。当你第一次推送任务时，将自动创建数据文件。")
-            return []
-        # 如果是其他未知错误（如网络问题、Token失效等），则显示错误
-        else:
-            st.error(f"从 GitHub 加载任务时发生未知错误: {e}")
-            return []
 
 def save_tasks_to_github():
-    """将当前任务数据保存到 GitHub。"""
     repo = get_github_repo()
     if repo is None:
-        st.error("无法保存，因为未能连接到 GitHub 仓库。")
+        st.error(config.kanban.T_ERROR_GITHUB_SAVE_FAILED);
         return
-
-    # 准备要上传的数据
-    tasks_as_dicts = [task.to_dict() for task in st.session_state.tasks]
-    content = json.dumps(tasks_as_dicts, indent=2)
+    content = json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2)
     commit_message = f"Tasks updated at {datetime.now(beijing_tz).strftime('%Y-%m-%d %H:%M:%S')}"
-
     try:
-        # 检查文件是否存在
         try:
-            file = repo.get_contents(DATA_FILE_NAME)
-            # 如果存在，则更新
-            repo.update_file(
-                path=file.path,
-                message=commit_message,
-                content=content,
-                sha=file.sha
-            )
-            st.toast("✅ 任务已成功同步到 GitHub！", icon="⬆️")
+            file = repo.get_contents(config.kanban.DATA_FILE_NAME)
+            repo.update_file(file.path, commit_message, content, file.sha)
+            st.toast(config.kanban.T_SUCCESS_GITHUB_UPDATED, icon="⬆️")
         except UnknownObjectException:
-            # 如果不存在，则创建
-            repo.create_file(
-                path=DATA_FILE_NAME,
-                message=commit_message,
-                content=content
-            )
-            st.toast("✅ 在 GitHub 上创建了新的任务文件并已同步！", icon="☁️")
+            repo.create_file(config.kanban.DATA_FILE_NAME, commit_message, content)
+            st.toast(config.kanban.T_SUCCESS_GITHUB_CREATED, icon="☁️")
     except Exception as e:
-        st.error(f"同步到 GitHub 失败: {e}")
+        st.error(config.kanban.T_ERROR_GITHUB_SYNC_FAILED.format(e=e))
 
-# <<< 创建一个中央同步函数
+
 def sync_state():
-    """一个集中的函数，用于在任何数据更改后触发向 GitHub 的保存。"""
     save_tasks_to_github()
 
-# --- [!! 初始化应用 !!] ---
-def initialize_app():
-    """
-    设置页面配置、标题和初始化 session_state。
-    (新增：在首次加载时从 GitHub 拉取数据)
-    """
-    st.set_page_config(
-        page_title="每日任务看板",
-        page_icon="📋",
-        layout="wide"
-    )
-    st.title("📋 每日任务看板")
-    st.markdown("---")
 
-    # 仅在 session_state 中没有 'tasks' 时才加载
+def initialize_app():
+    st.set_page_config(page_title=config.kanban.PAGE_TITLE, page_icon=config.kanban.PAGE_ICON, layout="wide")
+    st.title(config.kanban.T_MAIN_TITLE);
+    st.markdown("---")
     if 'tasks' not in st.session_state:
-        # 首次运行时从 GitHub 加载
         st.session_state.tasks = load_tasks_from_github()
 
 
-# --- [!! 处理任务导入 !!] ---
 def handle_tasks_import(uploaded_file):
-    """
-    处理上传的 JSON 文件，将其中的任务加载到 session_state。
-    """
-    if uploaded_file is None:
-        return
+    if uploaded_file is None: return
     try:
-        # 使用 .read() 来获取文件内容
         tasks_data = json.load(uploaded_file)
-
-        # 为了避免重复导入，我们可以基于 task_id 进行检查
-        existing_task_ids = {task.task_id for task in st.session_state.tasks}
-        new_tasks_added = 0
-
-        for task_dict in tasks_data:
-            if task_dict.get("task_id") not in existing_task_ids:
-                task = Task.from_dict(task_dict)
-                st.session_state.tasks.append(task)
-                new_tasks_added += 1
-
-        if new_tasks_added > 0:
-            st.success(f"成功导入 {new_tasks_added} 个新任务！")
+        existing_ids = {task.task_id for task in st.session_state.tasks}
+        new_tasks = [Task.from_dict(td) for td in tasks_data if td.get("task_id") not in existing_ids]
+        if new_tasks:
+            st.session_state.tasks.extend(new_tasks)
+            st.success(config.kanban.T_SUCCESS_IMPORT.format(count=len(new_tasks)));
             st.rerun()
         else:
-            st.info("文件中没有发现新任务。")
+            st.info(config.kanban.T_INFO_NO_NEW_TASKS_IMPORTED)
     except json.JSONDecodeError:
-        st.error("导入失败：文件格式不是有效的 JSON。")
+        st.error(config.kanban.T_ERROR_JSON_DECODE)
     except Exception as e:
-        st.error(f"导入时发生未知错误: {e}")
+        st.error(config.kanban.T_ERROR_IMPORT_UNKNOWN.format(e=e))
 
 
-# --- [!! 获取导出数据 !!] ---
 def get_export_data():
-    """
-    将 session_state 中的所有任务转换为 JSON 字符串。
-    """
-    if not st.session_state.tasks:
-        return "{}"  # 返回一个空的 JSON 对象
-
-    tasks_as_dicts = [task.to_dict() for task in st.session_state.tasks]
-    # indent=2 使得 JSON 文件更具可读性
-    return json.dumps(tasks_as_dicts, indent=2)
+    return json.dumps([task.to_dict() for task in st.session_state.tasks], indent=2) if st.session_state.tasks else "{}"
 
 
-# --- [!! 显示主控制区 !!]
 def display_main_controls():
-    """
-    显示三栏布局的顶部控制区域：创建、导入/导出、GitHub同步。
-    """
-    st.header("控制面板", divider="rainbow")
+    st.header(config.kanban.T_CONTROL_PANEL_HEADER, divider="rainbow")
     col1, col2, col3 = st.columns(3)
-    container_height = 300  # 调整统一高度
-
-    # --- 第1栏：创建新任务 --- (保持不变)
-    with col1:
-        with st.container(border=True, height=container_height):
-            st.subheader("🚀 创建新任务", anchor=False)
-            with st.form(key="new_task_form", clear_on_submit=True):
-                new_task_name = st.text_input("任务名称", placeholder="例如：完成项目报告")
-                new_task_type = st.selectbox("任务标签", ["主线任务", "副线任务"])
-                if st.form_submit_button("添加任务", use_container_width=True):
-                    if new_task_name:
-                        new_task = Task(task_name=new_task_name, task_type=new_task_type)
-                        st.session_state.tasks.append(new_task)
-                        st.success(f"任务 '{new_task_name}' 已添加！")
-                        sync_state()  # <<< 创建任务后自动同步
-                        st.rerun()
-                    else:
-                        st.warning("任务名称不能为空！")
-
-    # --- 第2栏：本地导入/导出 --- (保持不变)
-    with col2:
-        with st.container(border=True, height=container_height):
-            st.subheader("📥 本地导入/导出", anchor=False)
-            uploaded_file = st.file_uploader(
-                "选择一个 .json 任务文件", type=["json"], help="从本地文件恢复任务。"
-            )
-            if uploaded_file is not None:
-                handle_tasks_import(uploaded_file)
-
-            json_data = get_export_data()
-            timestamp = datetime.now(beijing_tz).strftime("%Y%m%d_%H%M%S")
-            file_name = f"tasks_export_{timestamp}.json"
-            st.download_button(
-                label="📥 下载任务到本地",
-                data=json_data,
-                file_name=file_name,
-                mime="application/json",
-                help="将当前看板上的所有任务保存为一个 JSON 文件。",
-                use_container_width=True,
-                disabled=not st.session_state.tasks
-            )
-
-    # --- 第3栏：GitHub 同步 ---
-    with col3:
-        with st.container(border=True, height=container_height):
-            st.subheader("☁️ GitHub 云同步", anchor=False)
-            st.caption("数据在每次更改后会自动同步。这里提供手动操作以备不时之需。")
-
-            if st.button("⬆️ 推送到 GitHub", use_container_width=True, help="将当前看板数据保存到云端。"):
-                save_tasks_to_github()
-
-            if st.button("⬇️ 从 GitHub 拉取", use_container_width=True, help="从云端获取最新数据，会覆盖当前看板！"):
-                st.session_state.tasks = load_tasks_from_github()
-                st.rerun()
-
-            st.info("数据同步基于你的 `secrets.toml` 配置文件。")
-
+    with col1, st.container(border=True, height=300):
+        st.subheader(config.kanban.T_CREATE_TASK_HEADER, anchor=False)
+        with st.form(key="new_task_form", clear_on_submit=True):
+            name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER)
+            type = st.selectbox(config.kanban.T_TASK_TYPE_LABEL, config.kanban.TASK_TYPES)
+            if st.form_submit_button(config.kanban.T_ADD_TASK_BUTTON, use_container_width=True):
+                if name:
+                    st.session_state.tasks.append(Task(task_name=name, task_type=type))
+                    st.success(config.kanban.T_SUCCESS_TASK_ADDED.format(task_name=name));
+                    sync_state();
+                    st.rerun()
+                else:
+                    st.warning(config.kanban.T_WARN_EMPTY_TASK_NAME)
+    with col2, st.container(border=True, height=300):
+        st.subheader(config.kanban.T_LOCAL_IO_HEADER, anchor=False)
+        uploaded = st.file_uploader(config.kanban.T_UPLOAD_LABEL, type=["json"], help=config.kanban.T_UPLOAD_HELP)
+        if uploaded: handle_tasks_import(uploaded)
+        fname = f"{config.kanban.T_EXPORT_FILE_PREFIX}{datetime.now(beijing_tz).strftime('%Y%m%d_%H%M%S')}.json"
+        st.download_button(config.kanban.T_DOWNLOAD_BUTTON, get_export_data(), fname, "application/json",
+                           help=config.kanban.T_DOWNLOAD_HELP, use_container_width=True,
+                           disabled=not st.session_state.tasks)
+    with col3, st.container(border=True, height=300):
+        st.subheader(config.kanban.T_GITHUB_SYNC_HEADER, anchor=False)
+        st.caption(config.kanban.T_GITHUB_SYNC_CAPTION)
+        if st.button(config.kanban.T_GITHUB_PUSH_BUTTON, use_container_width=True,
+                     help=config.kanban.T_GITHUB_PUSH_HELP): sync_state()
+        if st.button(config.kanban.T_GITHUB_PULL_BUTTON, use_container_width=True,
+                     help=config.kanban.T_GITHUB_PULL_HELP):
+            st.session_state.tasks = load_tasks_from_github();
+            st.rerun()
+        st.info(config.kanban.T_GITHUB_SYNC_INFO)
 
 
 def get_task_by_id(task_id):
-    for task in st.session_state.tasks:
-        if task.task_id == task_id:
-            return task
-    return None
+    return next((task for task in st.session_state.tasks if task.task_id == task_id), None)
 
 
 def handle_progress_change(task_id):
-    """
-    回调函数：当进度 slider 发生变化时调用。
-    """
     task = get_task_by_id(task_id)
-    if not task:
-        return
+    if task: task.update_progress(st.session_state[f"progress_{task_id}"]); sync_state()
 
-    new_progress = st.session_state[f"progress_{task_id}"]
-    task.update_progress(new_progress)
-    sync_state()  # <<< 进度更新后自动同步
 
-# <<< 为状态按钮创建的回调函数
 def handle_status_change(task, new_status):
-    """在更改任务状态后触发同步。"""
-    task.set_status(new_status)
+    task.set_status(new_status);
     sync_state()
 
 
-# --- [!! 显示状态控制按钮 !!] ---
 def display_task_controls(task):
-    """
-    显示任务的状态控制按钮 (开始、挂起、完成、重新打开)。
-    """
     cols = st.columns(4)
-    with cols[0]:
-        if task.status == "未开始":
-            st.button("▶️ 开始", key=f"start_{task.task_id}", on_click=handle_status_change, args=(task, "进行中"),
-                      use_container_width=True)
-    with cols[1]:
-        if task.status == "进行中":
-            st.button("⏸️ 挂起", key=f"pause_{task.task_id}", on_click=handle_status_change, args=(task, "未开始"),
-                      help="将任务移回“未开始”并暂停计时，不改变当前进度。", use_container_width=True)
-    with cols[2]:
-        # "完成"按钮现在只在“进行中”时显示
-        if task.status == "进行中":
-            st.button("✅ 完成", key=f"done_{task.task_id}", on_click=handle_status_change, args=(task, "已完成"),
-                      use_container_width=True)
-    with cols[3]:
-        if task.status == "已完成":
-            st.button("🔄 重新打开", key=f"reopen_{task.task_id}", on_click=handle_status_change, args=(task, "进行中"),
-                      use_container_width=True)
-
-    st.write("")  # 增加一点间距
+    if task.status == config.kanban.STATUS_TODO:
+        cols[0].button(config.kanban.T_BUTTON_START, key=f"start_{task.task_id}", on_click=handle_status_change,
+                       args=(task, config.kanban.STATUS_DOING), use_container_width=True)
+    if task.status == config.kanban.STATUS_DOING:
+        cols[1].button(config.kanban.T_BUTTON_PAUSE, key=f"pause_{task.task_id}", on_click=handle_status_change,
+                       args=(task, config.kanban.STATUS_TODO), help=config.kanban.T_BUTTON_PAUSE_HELP,
+                       use_container_width=True)
+        cols[2].button(config.kanban.T_BUTTON_DONE, key=f"done_{task.task_id}", on_click=handle_status_change,
+                       args=(task, config.kanban.STATUS_DONE), use_container_width=True)
+    if task.status == config.kanban.STATUS_DONE:
+        cols[3].button(config.kanban.T_BUTTON_REOPEN, key=f"reopen_{task.task_id}", on_click=handle_status_change,
+                       args=(task, config.kanban.STATUS_DOING), use_container_width=True)
+    st.write("")
 
 
-# --- [!! 显示评论区 !!] ---
 def display_task_comments(task):
-    """
-    显示单个任务的评论区域 (评论列表在固定高度容器内滚动)。
-    """
-    st.subheader("任务评论", divider='rainbow')
-
-    # --- 评论创建区域 ---
-    with st.popover("💬 创建评论"):
+    st.subheader(config.kanban.T_CARD_COMMENTS_HEADER, divider='rainbow')
+    with st.popover(config.kanban.T_POPOVER_CREATE_COMMENT):
         with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
-            comment_type = st.selectbox("评论类型", ["备注", "问题", "新的"], key=f"ctype_{task.task_id}")
-            comment_content = st.text_area("评论内容...", key=f"ctext_{task.task_id}", height=100)
-
-            if st.form_submit_button("提交"):
-                if comment_content:
-                    st.success("评论已添加！")
-                    task.add_comment(comment_content, comment_type)
-                    sync_state()  # <<< 添加评论后自动同步
-                    st.rerun()
+            ctype = st.selectbox(config.kanban.T_COMMENT_TYPE_LABEL, config.kanban.COMMENT_TYPES,
+                                 key=f"ctype_{task.task_id}")
+            content = st.text_area(config.kanban.T_COMMENT_CONTENT_LABEL, key=f"ctext_{task.task_id}", height=100)
+            if st.form_submit_button(config.kanban.T_COMMENT_SUBMIT_BUTTON):
+                if content:
+                    task.add_comment(content, ctype); sync_state(); st.rerun()
                 else:
-                    st.warning("评论内容不能为空")
-
-    # --- 将评论列表放入一个固定高度的 Container ---
-    if not task.task_comments:
-        # st.info("暂无评论，点击上方“💬 创建评论”来添加第一条吧！")
-        pass
-    else:
-        # 你可以根据需要调整 height 的值
+                    st.warning(config.kanban.T_WARN_EMPTY_COMMENT)
+    if task.task_comments:
         with st.container(height=250):
-            for comment in reversed(task.task_comments):
-                icon_map = {"心得": "💡", "问题": "❓", "备注": "📌"}
-                color_map = {"心得": "green", "问题": "red", "备注": "blue"}
-
-                comment_icon = icon_map.get(comment['type'], "💬")
-                content_color = color_map.get(comment['type'], "gray")
-
-                with st.chat_message(name=comment['type'], avatar=comment_icon):
-                    st.markdown(f":{content_color}[{comment['content']}]")
-                    st.caption(f"_{comment['time'].strftime('%Y-%m-%d %H:%M')}_")
+            for c in reversed(task.task_comments):
+                icon = config.kanban.COMMENT_ICON_MAP.get(c['type'], "💬")
+                color = config.kanban.COMMENT_COLOR_MAP.get(c['type'], "gray")
+                with st.chat_message(name=c['type'], avatar=icon):
+                    st.markdown(f":{color}[{c['content']}]");
+                    st.caption(f"_{c['time'].strftime('%Y-%m-%d %H:%M')}_")
 
 
-# --- [!! 显示工时记录 !!] ---
 def display_task_time_logs(task):
-    """
-    方案三：按日期对历史记录进行分组折叠，体验最佳。
-    """
-    st.subheader("工时记录", divider='rainbow')
-
-    # 1. 当前计时部分保持不变
-    if task.status == "进行中" and task.last_start_active_time:
+    st.subheader(config.kanban.T_CARD_TIME_LOGS_HEADER, divider='rainbow')
+    if task.status == config.kanban.STATUS_DOING and task.last_start_active_time:
         start_str = task.last_start_active_time.strftime('%Y-%m-%d %H:%M:%S')
-        current_duration = datetime.now(beijing_tz) - task.last_start_active_time
-        current_duration_str = format_timedelta_to_str(current_duration)
-        st.success(f"**当前:** 正在计时... ({current_duration_str})\n"
-                   f"开始于: {start_str}")
-
-    # 2. 按日期对历史记录进行分组
-    if not task.active_time_segments:
-        if task.status != "进行中":
-            st.caption("暂无完整的工时记录。")
+        duration_str = format_timedelta_to_str(datetime.now(beijing_tz) - task.last_start_active_time)
+        st.success(f"**当前:** 正在计时... ({duration_str})\n开始于: {start_str}")
+    if not task.active_time_segments and task.status != config.kanban.STATUS_DOING:
+        st.caption(config.kanban.T_INFO_NO_TIME_LOGS)
     else:
-        # vvvvvvvvvvvv 这是核心改动 vvvvvvvvvvvv
-        # 使用 groupby 需要先排序，这里我们按倒序排，让最新的日期在最前面
         sorted_segments = sorted(task.active_time_segments, key=lambda s: s['start_time'], reverse=True)
-
-        # 按日期（date）进行分组
         for date, group in groupby(sorted_segments, key=lambda s: s['start_time'].date()):
             group_list = list(group)
-            # 计算当天的总时长
-            total_duration_today = sum((s['duration'] for s in group_list), timedelta())
-            total_duration_str = format_timedelta_to_str(total_duration_today)
+            total_duration_str = format_timedelta_to_str(sum((s['duration'] for s in group_list), timedelta()))
             date_str = date.strftime('%Y-%m-%d')
-
-            # 为每一天创建一个 Expander
             with st.expander(f"**{date_str}** - 总计: **{total_duration_str}** ({len(group_list)} 条记录)"):
-                for segment in group_list:  # 组内已经是倒序的
-                    start_str = segment['start_time'].strftime('%H:%M:%S')
-                    end_str = segment['end_time'].strftime('%H:%M:%S')
-                    duration_str = format_timedelta_to_str(segment['duration'])
-                    status_icon = "⏸️" if segment['stopped_as'] == '未开始' else "✅"
-                    st.info(f"**{duration_str}** (从 {start_str} 到 {end_str}) {status_icon}")
-        # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                for s in group_list:
+                    duration, start, end = format_timedelta_to_str(s['duration']), s['start_time'].strftime('%H:%M:%S'), \
+                                           s['end_time'].strftime('%H:%M:%S')
+                    icon = "⏸️" if s['stopped_as'] == config.kanban.STATUS_TODO else "✅"
+                    st.info(f"**{duration}** (从 {start} 到 {end}) {icon}")
 
 
-# --- [!! 显示任务管理区域 !!] ---
 def display_task_management(task):
-    """
-    显示任务管理操作：编辑、删除等。
-    """
     st.divider()
     col_info, col_manage = st.columns([3, 1])
-
     with col_info:
-        st.caption(f"ID: {task.task_id}")
+        st.caption(f"ID: {task.task_id}");
         st.caption(f"创建于: {task.creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
-
-    with col_manage:
-        with st.popover("⚙️ 管理"):
-            # --- 1. 编辑表单 ---
-            with st.form(key=f"edit_form_{task.task_id}"):
-                st.subheader("编辑任务", anchor=False)
-                edited_task_name = st.text_input("任务名称", value=task.task_name)
-
-                # 获取当前 task_type 的索引，以便正确设置 selectbox 的默认值
-                type_options = ["主线任务", "副线任务"]
-                try:
-                    current_type_index = type_options.index(task.task_type)
-                except ValueError:
-                    current_type_index = 0  # 如果找不到，默认为第一个
-
-                edited_task_type = st.selectbox(
-                    "任务标签",
-                    options=type_options,
-                    index=current_type_index,
-                    key=f"task_type_{task.task_id}"
-                )
-
-                if st.form_submit_button("💾 保存更改", use_container_width=True):
-                    task.task_name = edited_task_name
-                    task.task_type = edited_task_type
-                    st.toast(f"任务 '{task.task_name}' 已更新!", icon="✅")
-                    sync_state()  # <<< 编辑后自动同步
-                    st.rerun()
-
-            # --- 2. 删除按钮 ---
-            st.divider()
-            if st.button("🗑️ 删除任务",
-                         type="primary",
-                         use_container_width=True,
-                         help="此操作不可撤销！",
-                         key=f"delete_btn_{task.task_id}"):  # 关键：为每个按钮添加唯一标识
-                st.session_state.tasks = [t for t in st.session_state.tasks if t.task_id != task.task_id]
-                st.toast(f"任务 '{task.task_name}' 已删除。", icon="🗑️")
-                sync_state()  # <<< 删除后自动同步
+    with col_manage, st.popover(config.kanban.T_CARD_MANAGE_POPOVER):
+        with st.form(key=f"edit_form_{task.task_id}"):
+            st.subheader(config.kanban.T_CARD_EDIT_HEADER, anchor=False)
+            edited_name = st.text_input(config.kanban.T_TASK_NAME_LABEL, value=task.task_name)
+            type_options = config.kanban.TASK_TYPES
+            index = type_options.index(task.task_type) if task.task_type in type_options else 0
+            edited_type = st.selectbox(config.kanban.T_TASK_TYPE_LABEL, options=type_options, index=index,
+                                       key=f"task_type_{task.task_id}")
+            if st.form_submit_button(config.kanban.T_CARD_SAVE_BUTTON, use_container_width=True):
+                task.task_name, task.task_type = edited_name, edited_type
+                st.toast(config.kanban.T_SUCCESS_TASK_UPDATED.format(task_name=task.task_name), icon="✅");
+                sync_state();
                 st.rerun()
+        st.divider()
+        if st.button(config.kanban.T_CARD_DELETE_BUTTON, type="primary", use_container_width=True,
+                     help=config.kanban.T_CARD_DELETE_HELP, key=f"delete_btn_{task.task_id}"):
+            st.session_state.tasks = [t for t in st.session_state.tasks if t.task_id != task.task_id]
+            st.toast(config.kanban.T_SUCCESS_TASK_DELETED.format(task_name=task.task_name), icon="🗑️");
+            sync_state();
+            st.rerun()
 
 
-# --- 任务卡片显示函数 (Task Card Display Function) ---
 def display_task_card(task):
-    """
-    在UI上显示一个任务卡片。
-    """
-
     with st.expander(f"{task.task_name}", expanded=True):
-
         st.subheader(task.task_name, divider="rainbow")
-
-        # (时间显示不变)
-        lifespan_duration = task.get_total_lifespan_duration()
-        lifespan_str = format_timedelta_to_str(lifespan_duration)
-        active_duration = task.get_total_active_duration()
-        active_str = format_timedelta_to_str(active_duration)
-
         col_time1, col_time2 = st.columns(2)
-        with col_time1:
-            st.metric(
-                label="⏱️ 任务总耗时 (有效工作)",
-                value=active_str,
-                help="这是任务在“进行中”状态下所花费的实际时间总和。每分钟刷新。"
-            )
-        with col_time2:
-            st.metric(
-                label="🗓️ 任务生命周期 (自创建)",
-                value=lifespan_str,
-                help="这是从任务创建开始的总时长。如果任务已完成，则为创建到完成的总时长。每分钟刷新。"
-            )
-
-        # --- 状态控制按钮 ---
+        col_time1.metric(config.kanban.T_CARD_METRIC_ACTIVE_TIME,
+                         format_timedelta_to_str(task.get_total_active_duration()),
+                         help=config.kanban.T_CARD_METRIC_ACTIVE_TIME_HELP)
+        col_time2.metric(config.kanban.T_CARD_METRIC_LIFESPAN,
+                         format_timedelta_to_str(task.get_total_lifespan_duration()),
+                         help=config.kanban.T_CARD_METRIC_LIFESPAN_HELP)
         display_task_controls(task)
-
-        # 进度条
-        st.slider(
-            "当前进度（0-100%）",
-            min_value=0,
-            max_value=100,
-            value=task.task_progress,
-            step=10,
-            format="%d%%",
-            key=f"progress_{task.task_id}",
-            help="拖动滑块来更新任务进度。拖到100%会自动完成，拖离100%会自动重新打开。",
-            on_change=handle_progress_change,
-            args=(task.task_id,)
-        )
-
-        # --- 工时记录 ---
+        st.slider(config.kanban.T_CARD_PROGRESS_SLIDER_LABEL, 0, 100, task.task_progress, 10, "%d%%",
+                  key=f"progress_{task.task_id}", help=config.kanban.T_CARD_PROGRESS_SLIDER_HELP,
+                  on_change=handle_progress_change, args=(task.task_id,))
         display_task_time_logs(task)
-
-        # --- 评论区 (保持不变) ---
         display_task_comments(task)
-
-        # --- [!! 调用独立的管理函数 !!] ---
         display_task_management(task)
 
 
-# --- [!! 优化主卡片布局 !!] ---
 def display_kanban_layout():
-    """
-    显示主看板的三栏布局 (未开始, 进行中, 已完成)。
-    """
-    col_todo, col_doing, col_done = st.columns(3, gap="large")
-
     sorted_tasks = sorted(st.session_state.tasks, key=lambda x: x.creation_time, reverse=True)
+    tasks_todo = [t for t in sorted_tasks if t.status == config.kanban.STATUS_TODO]
+    tasks_doing = [t for t in sorted_tasks if t.status == config.kanban.STATUS_DOING]
+    tasks_done = [t for t in sorted_tasks if t.status == config.kanban.STATUS_DONE]
 
-    tasks_todo = [t for t in sorted_tasks if t.status == "未开始"]
-    tasks_doing = [t for t in sorted_tasks if t.status == "进行中"]
-    tasks_done = [t for t in sorted_tasks if t.status == "已完成"]
-
-    with col_todo:
-        st.header(f"📥 未开始/挂起 ({len(tasks_todo)})", divider="rainbow")
-        for task in tasks_todo:
-            display_task_card(task)
-
-    with col_doing:
-        st.header(f"💻 进行中 ({len(tasks_doing)})", divider="rainbow")
-        for task in tasks_doing:
-            display_task_card(task)
-
-    with col_done:
-        st.header(f"✅ 已完成 ({len(tasks_done)})", divider="rainbow")
-        for task in tasks_done:
-            display_task_card(task)
+    with st.columns(3, gap="large")[0]:
+        st.header(f"{config.kanban.T_COLUMN_TODO_HEADER} ({len(tasks_todo)})", divider="rainbow")
+        for task in tasks_todo: display_task_card(task)
+    with st.columns(3, gap="large")[1]:
+        st.header(f"{config.kanban.T_COLUMN_DOING_HEADER} ({len(tasks_doing)})", divider="rainbow")
+        for task in tasks_doing: display_task_card(task)
+    with st.columns(3, gap="large")[2]:
+        st.header(f"{config.kanban.T_COLUMN_DONE_HEADER} ({len(tasks_done)})", divider="rainbow")
+        for task in tasks_done: display_task_card(task)
 
 
-# --- [!! 主函数 !!] ---
 def main():
-    """
-    主函数：按顺序运行应用。
-    """
     initialize_app()
     display_main_controls()
     display_kanban_layout()
 
 
-# --- 启动应用 ---
 if __name__ == "__main__":
     main()
