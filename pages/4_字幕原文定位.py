@@ -54,7 +54,7 @@ def find_keywords_in_transcript(video_id, query):
         print("[DEBUG] 实例化成功，尝试调用 list_transcripts...")
 
         # 步骤 1: 尝试调用实例的 list_transcripts
-        transcript_list = api_instance.list_transcripts(video_id)
+        transcript_list = api_instance.fetch(video_id)
         print(f"[DEBUG] 成功 list_transcripts，找到 {len(transcript_list)} 个字幕条目。")
         # --- 修正结束 ---
 
