@@ -593,6 +593,9 @@ def display_statistics_tab():
 # =========================================================================================
 # <<< 修复后的日历视图函数 >>>
 # =========================================================================================
+# =========================================================================================
+# <<< 修复后的日历视图函数 >>>
+# =========================================================================================
 def display_timeline_tab():
     st.header("任务时间线视图 📅", divider="rainbow")
 
@@ -660,7 +663,6 @@ def display_timeline_tab():
 
     filtered_df['Display Name'] = filtered_df.apply(get_display_name, axis=1)
 
-    # <<< 关键修复：将Y轴和颜色列强制转换为字符串类型 >>>
     filtered_df['Display Name'] = filtered_df['Display Name'].astype(str)
     filtered_df['Task'] = filtered_df['Task'].astype(str)
 
@@ -668,6 +670,8 @@ def display_timeline_tab():
     filtered_df['Clipped_Finish'] = filtered_df['Finish'].clip(upper=end_date_dt)
 
     st.subheader("任务活动时间线", anchor=False)
+
+    # <<< 主要修改在这里 >>>
     fig = px.timeline(
         filtered_df,
         x_start="Clipped_Start",
@@ -681,8 +685,11 @@ def display_timeline_tab():
             "Start": "|%Y-%m-%d %H:%M:%S",
             "Finish": "|%Y-%m-%d %H:%M:%S",
             "Task": False
-        }
+        },
+        height=400  # <<< 新增：设置图表高度，可以根据任务数量调整
     )
+    # 通过 update_traces 调整条形宽度，使其更“胖”
+    fig.update_traces(width=0.8)  # <<< 新增：设置条形的宽度比例 (0.1到1之间)
 
     fig.update_layout(
         xaxis_title="时间",
