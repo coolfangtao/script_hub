@@ -282,6 +282,9 @@ def get_export_data():
 # =========================================================================================
 # <<< 升级后的“创建新任务”函数 >>>
 # =========================================================================================
+# =========================================================================================
+# <<< 升级并修复交互逻辑后的“创建新任务”函数 >>>
+# =========================================================================================
 def display_main_controls():
     st.header(config.kanban.T_CONTROL_PANEL_HEADER, divider="rainbow")
 
@@ -292,29 +295,21 @@ def display_main_controls():
         is_connected = True
     else:
         is_connected = 'github_token' in st.session_state and 'github_repo' in st.session_state
-
         with st.container(border=True):
             st.subheader(config.kanban.T_GITHUB_CONNECT_HEADER, anchor=False)
-
             if not is_connected:
                 st.info(config.kanban.T_CLOUD_MODE_INFO)
-
                 if st.session_state.tasks:
-                    st.warning(
-                        "**注意：** 您当前页面上有未同步的任务。连接到 GitHub 将会丢弃这些任务，并从您的仓库加载数据。"
-                    )
-
+                    st.warning("**注意：** 您当前页面上有未同步的任务。连接到 GitHub 将会丢弃这些任务，并从您的仓库加载数据。")
                 col_token, col_repo = st.columns(2)
                 g_token = col_token.text_input(config.kanban.T_GITHUB_TOKEN_INPUT, type="password")
                 g_repo = col_repo.text_input(config.kanban.T_GITHUB_REPO_INPUT, placeholder="your-username/your-repo")
-
                 if st.button(config.kanban.T_GITHUB_CONNECT_BUTTON, use_container_width=True):
                     if g_token and g_repo:
-                        st.session_state.github_token = g_token
-                        st.session_state.github_repo = g_repo
+                        st.session_state.github_token, st.session_state.github_repo = g_token, g_repo
                         tasks = load_tasks_from_github(g_token, g_repo)
                         if tasks is not None:
-                            st.session_state.tasks = tasks
+                            st.session_state.tasks = tasks;
                             st.rerun()
                     else:
                         st.warning(config.kanban.T_ERROR_GITHUB_CREDS_MISSING)
@@ -327,48 +322,46 @@ def display_main_controls():
     col1, col2 = st.columns(2)
     with col1, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_CREATE_TASK_HEADER, anchor=False)
-        with st.form(key="new_task_form", clear_on_submit=True):
-            name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER)
 
-            # --- 核心修改从这里开始 ---
+        # --- 核心修改：将交互式选择框移到 form 外部 ---
 
-            # 1. 动态获取所有已存在的任务类型
-            default_types = config.kanban.TASK_TYPES
-            existing_types = []
-            if 'tasks' in st.session_state and st.session_state.tasks:
-                existing_types = sorted(list(set(t.task_type for t in st.session_state.tasks)))
+        # 1. 动态获取所有已存在的任务类型
+        default_types = config.kanban.TASK_TYPES
+        existing_types = sorted(list(set(t.task_type for t in st.session_state.get('tasks', []))))
+        combined_types = sorted(list(set(default_types + existing_types)))
 
-            # 合并默认类型和现有类型，并去重
-            combined_types = sorted(list(set(default_types + existing_types)))
+        # 2. 创建一个特殊的选项用于添加新类型
+        ADD_NEW_OPTION = "➕ 添加新类型..."
+        options = combined_types + [ADD_NEW_OPTION]
 
-            # 2. 创建一个特殊的选项用于添加新类型
-            ADD_NEW_OPTION = "➕ 添加新类型..."
-            options = combined_types + [ADD_NEW_OPTION]
+        selected_option = st.selectbox(
+            label=config.kanban.T_TASK_TYPE_LABEL,
+            options=options,
+            key="task_type_selector"
+        )
 
-            selected_option = st.selectbox(
-                label=config.kanban.T_TASK_TYPE_LABEL,
-                options=options,
-                key="task_type_selector"  # 使用 key 来帮助 Streamlit 跟踪组件状态
+        new_type_name = ""
+        # 3. 这个条件判断现在可以立即响应用户的选择
+        if selected_option == ADD_NEW_OPTION:
+            new_type_name = st.text_input(
+                "请输入新的类型名称:",
+                placeholder="例如：会议、调研、紧急修复"
             )
 
-            new_type_name = ""
-            # 3. 如果用户选择“添加新类型”，则显示一个文本输入框
-            if selected_option == ADD_NEW_OPTION:
-                new_type_name = st.text_input(
-                    "请输入新的类型名称:",
-                    placeholder="例如：会议、调研、紧急修复"
-                )
+        # --- Form 现在只包含需要打包提交的部分 ---
+        with st.form(key="new_task_form"):
+            name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER)
 
             if st.form_submit_button(config.kanban.T_ADD_TASK_BUTTON, use_container_width=True):
                 if name:
                     final_task_type = ""
-                    # 4. 在提交时，判断最终的任务类型是什么
+                    # 4. 在提交时，从 form 外部的变量中获取任务类型
                     if selected_option == ADD_NEW_OPTION:
                         if new_type_name:
                             final_task_type = new_type_name
                         else:
                             st.warning("您选择了添加新类型，但未输入类型名称。")
-                            st.stop()  # 阻止表单提交
+                            st.stop()
                     else:
                         final_task_type = selected_option
 
@@ -378,18 +371,15 @@ def display_main_controls():
                     st.rerun()
                 else:
                     st.warning(config.kanban.T_WARN_EMPTY_TASK_NAME)
-            # --- 核心修改在这里结束 ---
 
     with col2, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_LOCAL_IO_HEADER, anchor=False)
         uploaded = st.file_uploader(config.kanban.T_UPLOAD_LABEL, type=["json"], help=config.kanban.T_UPLOAD_HELP)
         if uploaded: handle_tasks_import(uploaded)
-
         fname = f"{config.kanban.T_EXPORT_FILE_PREFIX}{datetime.now(beijing_tz).strftime('%Y%m%d_%H%M%S')}.json"
         st.download_button(config.kanban.T_DOWNLOAD_BUTTON, get_export_data(), fname, "application/json",
                            help=config.kanban.T_DOWNLOAD_HELP, use_container_width=True,
                            disabled=not st.session_state.tasks)
-
         if config.globals.RUN_MODE == "cloud":
             st.button("⬆️ 手动同步到 GitHub", on_click=sync_state, use_container_width=True, disabled=not is_connected)
 
