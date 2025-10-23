@@ -611,6 +611,9 @@ def display_statistics_tab():
 # =========================================================================================
 # <<< 功能升级后的日历视图函数 >>>
 # =========================================================================================
+# =========================================================================================
+# <<< 修复并升级后的日历视图函数 >>>
+# =========================================================================================
 def display_timeline_tab():
     st.header("任务时间线视图 📅", divider="rainbow")
 
@@ -683,18 +686,15 @@ def display_timeline_tab():
     filtered_df['Clipped_Start'] = filtered_df['Start'].clip(lower=start_date_dt)
     filtered_df['Clipped_Finish'] = filtered_df['Finish'].clip(upper=end_date_dt)
 
-    # <<< 新增：创建一个函数来生成条形图上的标签文本 >>>
     def create_bar_label(row):
         duration = row['Clipped_Finish'] - row['Clipped_Start']
         duration_str = format_timedelta_to_str(duration)
-        # 如果时长太短，只显示总时长，避免文字重叠
-        if duration.total_seconds() < 1800: # 小于30分钟
+        if duration.total_seconds() < 1800:
             return f"<b>{duration_str}</b>"
         start_str = row['Clipped_Start'].strftime('%H:%M')
         end_str = row['Clipped_Finish'].strftime('%H:%M')
         return f"<b>{start_str} → {end_str} ({duration_str})</b>"
 
-    # <<< 新增：应用该函数，创建新的文本列 >>>
     filtered_df['bar_text'] = filtered_df.apply(create_bar_label, axis=1)
 
     st.subheader("任务活动时间线", anchor=False)
@@ -708,50 +708,40 @@ def display_timeline_tab():
         title=f"任务时间线 ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})",
         labels={"Task": "任务名称"},
         hover_name="Display Name",
-        hover_data={
-            "Start": "|%Y-%m-%d %H:%M:%S",
-            "Finish": "|%Y-%m-%d %H:%M:%S",
-            "Task": False
-        },
-        text="bar_text", # <<< 新增：告诉图表使用我们新创建的列作为文本标签 >>>
+        hover_data={"Start": "|%Y-%m-%d %H:%M:%S", "Finish": "|%Y-%m-%d %H:%M:%S", "Task": False},
+        text="bar_text",
         height=600
     )
     fig.update_traces(
-        width=0.7,
-        textposition='inside',      # <<< 新增：让文字显示在条形内部
-        textfont_color='white',     # <<< 新增：设置文字颜色为白色以保证清晰
-        insidetextanchor='middle'   # <<< 新增：让文字在条形内部居中
+        width=0.7, textposition='inside', textfont_color='white', insidetextanchor='middle'
     )
 
-    # <<< 新增：循环添加日期和中午的分割线 >>>
-    # 生成需要标记的所有日期
+    # <<< 核心修复：将画线和加文字分开处理 >>>
     all_dates = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
     for day in all_dates:
-        # 添加日期分割线 (零点)
         midnight_ts = datetime.combine(day, datetime.min.time()).replace(tzinfo=beijing_tz)
-        fig.add_vline(
-            x=midnight_ts,
-            line_dash="solid",
-            line_color="grey",
-            annotation_text=day.strftime("%m-%d"),
-            annotation_position="top left"
-        )
-        # 添加中午分割线 (12点)
         noon_ts = datetime.combine(day, datetime.time(12, 0)).replace(tzinfo=beijing_tz)
-        fig.add_vline(
-            x=noon_ts,
-            line_dash="dash",
-            line_color="lightgrey"
+
+        # 第1步：只画线，不加文字
+        fig.add_vline(x=midnight_ts, line_dash="solid", line_color="grey")
+        fig.add_vline(x=noon_ts, line_dash="dash", line_color="lightgrey")
+
+        # 第2步：用 add_annotation 单独添加文字
+        fig.add_annotation(
+            x=midnight_ts,
+            y=1.01,  # y=1 代表图表顶部，1.01 稍微再往上一点
+            yref="paper",  # 'paper' 表示y坐标是相对于整个绘图区域的比例
+            text=day.strftime("%b %d"),  # 例如 "Oct 23"
+            showarrow=False,
+            xanchor="left",  # 文字的左边对齐到线上
+            font=dict(color="grey", size=10)
         )
 
     fig.update_layout(
         xaxis_title="时间",
         yaxis_title="任务",
         showlegend=True,
-        xaxis=dict(
-            type="date",
-            tickformat="%H:%M\n%m-%d"
-        )
+        xaxis=dict(type="date", tickformat="%H:%M\n%m-%d")
     )
     fig.update_yaxes(categoryorder='total ascending')
 
