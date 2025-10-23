@@ -3,7 +3,8 @@
 import streamlit as st
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled
 
 
 # --- YouTube API 功能 ---
@@ -46,19 +47,26 @@ def search_videos(youtube_service, query, max_results=5):
 def find_subtitle_in_transcript(video_id, subtitle_text):
     """
     获取指定视频的字幕，并查找包含目标文本的片段。
+    此函数已根据最新的 youtube_transcript_api 版本进行更新。
     """
     found_segments = []
+    # 首先，实例化YouTubeTranscriptApi类
+    ytt_api = YouTubeTranscriptApi()
     try:
-        # 尝试获取多种常用语言的字幕
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['zh-CN', 'zh-TW', 'en', 'ja', 'ko'])
+        # 使用实例的 fetch 方法，这是对 list().find_transcript().fetch() 的快捷方式
+        # fetch方法返回一个FetchedTranscript对象，它包含了FetchedTranscriptSnippet对象的列表
+        transcript = ytt_api.fetch(video_id, languages=['zh-CN', 'zh-TW', 'en', 'ja', 'ko'])
 
-        for item in transcript_list:
+        # FetchedTranscript 对象是可迭代的
+        # 迭代的每一项都是一个 FetchedTranscriptSnippet 数据类实例
+        for snippet in transcript:
             # 不区分大小写进行匹配
-            if subtitle_text.lower() in item['text'].lower():
+            # 使用属性访问 .text, .start, .duration
+            if subtitle_text.lower() in snippet.text.lower():
                 found_segments.append({
-                    'text': item['text'],
-                    'start': int(item['start']),
-                    'duration': item['duration']
+                    'text': snippet.text,
+                    'start': int(snippet.start),
+                    'duration': snippet.duration
                 })
         return found_segments
     except (NoTranscriptFound, TranscriptsDisabled):
