@@ -5,8 +5,10 @@ from itertools import groupby
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 from shared.sidebar import create_common_sidebar
-from shared.config import config  # <<< 导入全局配置实例
+from shared.config import AppConfig  # <<< 导入全局配置实例
 from github import Github, UnknownObjectException
+
+config = AppConfig()
 
 # --- 初始化和页面设置 ---
 st_autorefresh(interval=config.kanban.AUTO_REFRESH_INTERVAL_MS, key="clock_refresher")

@@ -135,9 +135,6 @@ class AppConfig:
         self.globals = GlobalConfig()
         self.kanban = KanbanPageConfig()
 
-# --- 创建一个全局唯一的配置实例供应用导入 ---
-config = AppConfig()
-
 class Config:
     """
     这个类用于集中存放所有Streamlit应用的配置参数。理论上所有的硬编码都应该放在这里
