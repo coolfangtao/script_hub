@@ -590,11 +590,119 @@ def display_statistics_tab():
         st.info("暂无已完成的任务可供分析耗时。")
 
 
+# =========================================================================================
+# <<< 新增：日历/时间线视图标签页函数 >>>
+# =========================================================================================
+def display_timeline_tab():
+    st.header("任务时间线视图 📅", divider="rainbow")
+
+    tasks = st.session_state.get('tasks', [])
+
+    # 1. 数据准备：提取所有任务的活跃时间段
+    timeline_data = []
+    for task in tasks:
+        # 添加已完成的时间段
+        for segment in task.active_time_segments:
+            timeline_data.append({
+                "Task": task.task_name,
+                "Start": segment['start_time'],
+                "Finish": segment['end_time'],
+                "Type": task.task_type
+            })
+        # 如果任务当前正在进行，添加一个从开始到现在的“虚拟”时间段
+        if task.status == config.kanban.STATUS_DOING and task.last_start_active_time:
+            timeline_data.append({
+                "Task": f"{task.task_name} (⚡️进行中)",
+                "Start": task.last_start_active_time,
+                "Finish": datetime.now(beijing_tz),
+                "Type": "进行中"  # 特殊类型以区分颜色
+            })
+
+    if not timeline_data:
+        st.info("没有任务活动记录，请先开始并完成一些任务以生成时间线。")
+        return
+
+    df = pd.DataFrame(timeline_data)
+
+    # 2. UI控件：日期范围选择器
+    st.subheader("选择查看范围", anchor=False)
+    min_date = df['Start'].min().date()
+    max_date = df['Finish'].max().date()
+    today = date.today()
+
+    # 默认选择今天，如果今天没数据，则选择最近的一天
+    default_start = today if min_date <= today <= max_date else min_date
+
+    date_selection = st.date_input(
+        "选择日期或范围",
+        value=(default_start, today),  # 默认显示从有数据的第一天到今天
+        min_value=min_date,
+        max_value=max_date,
+        help="选择一个日期来查看当天，或选择一个范围来查看多天。"
+    )
+
+    # 根据选择确定过滤范围
+    if isinstance(date_selection, tuple) and len(date_selection) == 2:
+        start_date, end_date = date_selection
+    else:  # 单日选择
+        start_date = end_date = date_selection
+
+    # 转换为带有时区的datetime对象以进行比较
+    start_date_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=beijing_tz)
+    end_date_dt = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=beijing_tz)
+
+    # 3. 过滤数据
+    # 选择与所选范围有交集的所有时间段
+    filtered_df = df[
+        (df['Start'] <= end_date_dt) & (df['Finish'] >= start_date_dt)
+        ].copy()
+
+    if filtered_df.empty:
+        st.warning(f"在 {start_date.strftime('%Y-%m-%d')} 到 {end_date.strftime('%Y-%m-%d')} 期间没有找到任务活动记录。")
+        return
+
+    # 确保时间轴的显示范围仅限于选择的日期
+    filtered_df['Clipped_Start'] = filtered_df['Start'].clip(lower=start_date_dt)
+    filtered_df['Clipped_Finish'] = filtered_df['Finish'].clip(upper=end_date_dt)
+
+    # 4. 绘制图表
+    st.subheader("任务活动时间线", anchor=False)
+    fig = px.timeline(
+        filtered_df,
+        x_start="Clipped_Start",
+        x_end="Clipped_Finish",
+        y="Task",
+        color="Type",
+        title=f"任务时间线 ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})",
+        labels={"Type": "任务类型"},
+        hover_name="Task",
+        hover_data={
+            "Start": "|%Y-%m-%d %H:%M:%S",  # 格式化悬浮提示
+            "Finish": "|%Y-%m-%d %H:%M:%S",
+            "Task": False  # 在hover数据中隐藏
+        }
+    )
+
+    fig.update_layout(
+        xaxis_title="时间",
+        yaxis_title="任务",
+        showlegend=True,
+        xaxis=dict(
+            type="date",
+            tickformat="%H:%M\n%m-%d"  # 显示小时和分钟，下面是月日
+        )
+    )
+    # 让Y轴的任务名按其开始时间排序，更直观
+    fig.update_yaxes(categoryorder='total ascending')
+
+    st.plotly_chart(fig, use_container_width=True)
+
+
 def main():
     initialize_app()
 
-    # 创建两个标签页
-    tab1, tab2 = st.tabs(["📌 任务看板", "📊 统计分析"])
+    # 创建三个标签页
+    tab1, tab2, tab3 = st.tabs(["📌 任务看板", "📊 统计分析", "📅 日历视图"])
 
     with tab1:
         # 第一个标签页的内容：原有的看板
@@ -602,8 +710,12 @@ def main():
         display_kanban_layout()
 
     with tab2:
-        # 第二个标签页的内容：新的统计页面
+        # 第二个标签页的内容：统计页面
         display_statistics_tab()
+
+    with tab3:
+        # 第三个标签页的内容：新的日历/时间线视图
+        display_timeline_tab()
 
 
 if __name__ == "__main__":
