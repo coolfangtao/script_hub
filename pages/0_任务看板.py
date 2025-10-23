@@ -269,31 +269,37 @@ def display_main_controls():
     if config.globals.RUN_MODE == "local":
         st.info(config.kanban.T_LOCAL_MODE_INFO)
     else:  # 云端模式
+        # --- 修改开始 ---
+        # 为所有云端用户提供统一、安全的 GitHub 连接界面
         with st.container(border=True):
             st.subheader(config.kanban.T_GITHUB_CONNECT_HEADER, anchor=False)
-            # 如果是所有者且预设了GitHub信息
-            if config.globals.GITHUB_TOKEN and not st.session_state.get("github_token"):
-                st.info(config.kanban.T_GITHUB_PRECONFIGURED_INFO.format(repo=config.globals.GITHUB_REPO))
-                if st.button("⬇️ 从预设仓库加载我的任务", use_container_width=True):
-                    tasks = load_tasks_from_github()
-                    if tasks is not None: st.session_state.tasks = tasks; st.rerun()
-                st.caption("其他用户请在下方输入自己的信息进行连接。")
+            st.info(config.kanban.T_CLOUD_MODE_INFO)  # 提示用户需要连接GitHub
 
             # 为所有公共用户提供输入框
             col_token, col_repo = st.columns(2)
-            g_token = col_token.text_input(config.kanban.T_GITHUB_TOKEN_INPUT, type="password")
-            g_repo = col_repo.text_input(config.kanban.T_GITHUB_REPO_INPUT, placeholder="your-username/your-repo")
+            g_token = col_token.text_input(
+                config.kanban.T_GITHUB_TOKEN_INPUT,
+                type="password",
+                key="github_token_input"  # 使用固定的key
+            )
+            g_repo = col_repo.text_input(
+                config.kanban.T_GITHUB_REPO_INPUT,
+                placeholder="your-username/your-repo",
+                key="github_repo_input"  # 使用固定的key
+            )
 
             if st.button(config.kanban.T_GITHUB_CONNECT_BUTTON, use_container_width=True):
                 if g_token and g_repo:
+                    # 将用户输入的值存入 session_state
                     st.session_state.github_token = g_token
                     st.session_state.github_repo = g_repo
+                    # 使用用户输入的值加载任务
                     tasks = load_tasks_from_github(g_token, g_repo)
-                    if tasks is not None: st.session_state.tasks = tasks; st.rerun()
+                    if tasks is not None:
+                        st.session_state.tasks = tasks
+                        st.rerun()
                 else:
                     st.warning(config.kanban.T_ERROR_GITHUB_CREDS_MISSING)
-
-    st.markdown("---")
 
     # 创建任务 和 本地导入/导出 功能区
     col1, col2 = st.columns(2)
