@@ -591,7 +591,7 @@ def display_statistics_tab():
 
 
 # =========================================================================================
-# <<< 新增：日历/时间线视图标签页函数 >>>
+# <<< 修复后的日历视图函数 >>>
 # =========================================================================================
 def display_timeline_tab():
     st.header("任务时间线视图 📅", divider="rainbow")
@@ -600,7 +600,7 @@ def display_timeline_tab():
 
     timeline_data = []
     for task in tasks:
-        base_task_name = task.task_name  # 存储原始任务名称
+        base_task_name = task.task_name
         for segment in task.active_time_segments:
             timeline_data.append({
                 "Task": base_task_name,
@@ -609,12 +609,11 @@ def display_timeline_tab():
                 "Type": task.task_type
             })
         if task.status == config.kanban.STATUS_DOING and task.last_start_active_time:
-            # 正在进行的任务也使用原始名称，以便颜色保持一致
             timeline_data.append({
                 "Task": base_task_name,
                 "Start": task.last_start_active_time,
                 "Finish": datetime.now(beijing_tz),
-                "Type": "进行中"  # 仍然保留Type用于可能的其他用途
+                "Type": "进行中"
             })
 
     if not timeline_data:
@@ -654,14 +653,16 @@ def display_timeline_tab():
         st.warning(f"在 {start_date.strftime('%Y-%m-%d')} 到 {end_date.strftime('%Y-%m-%d')} 期间没有找到任务活动记录。")
         return
 
-    # 为了在Y轴上显示“进行中”状态，我们创建一个新的列
-    # 这样既能按任务名统一颜色，又能显示当前状态
     def get_display_name(row):
         if row['Type'] == '进行中':
             return f"{row['Task']} (⚡️进行中)"
         return row['Task']
 
     filtered_df['Display Name'] = filtered_df.apply(get_display_name, axis=1)
+
+    # <<< 关键修复：将Y轴和颜色列强制转换为字符串类型 >>>
+    filtered_df['Display Name'] = filtered_df['Display Name'].astype(str)
+    filtered_df['Task'] = filtered_df['Task'].astype(str)
 
     filtered_df['Clipped_Start'] = filtered_df['Start'].clip(lower=start_date_dt)
     filtered_df['Clipped_Finish'] = filtered_df['Finish'].clip(upper=end_date_dt)
@@ -671,10 +672,10 @@ def display_timeline_tab():
         filtered_df,
         x_start="Clipped_Start",
         x_end="Clipped_Finish",
-        y="Display Name",  # <<< 修改：Y轴使用新的显示名称
-        color="Task",  # <<< 修改：颜色根据原始任务名称
+        y="Display Name",
+        color="Task",
         title=f"任务时间线 ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})",
-        labels={"Task": "任务名称"},  # <<< 修改：图例标题
+        labels={"Task": "任务名称"},
         hover_name="Display Name",
         hover_data={
             "Start": "|%Y-%m-%d %H:%M:%S",
