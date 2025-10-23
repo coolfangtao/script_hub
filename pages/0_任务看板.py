@@ -598,24 +598,23 @@ def display_timeline_tab():
 
     tasks = st.session_state.get('tasks', [])
 
-    # 1. 数据准备：提取所有任务的活跃时间段
     timeline_data = []
     for task in tasks:
-        # 添加已完成的时间段
+        base_task_name = task.task_name  # 存储原始任务名称
         for segment in task.active_time_segments:
             timeline_data.append({
-                "Task": task.task_name,
+                "Task": base_task_name,
                 "Start": segment['start_time'],
                 "Finish": segment['end_time'],
                 "Type": task.task_type
             })
-        # 如果任务当前正在进行，添加一个从开始到现在的“虚拟”时间段
         if task.status == config.kanban.STATUS_DOING and task.last_start_active_time:
+            # 正在进行的任务也使用原始名称，以便颜色保持一致
             timeline_data.append({
-                "Task": f"{task.task_name} (⚡️进行中)",
+                "Task": base_task_name,
                 "Start": task.last_start_active_time,
                 "Finish": datetime.now(beijing_tz),
-                "Type": "进行中"  # 特殊类型以区分颜色
+                "Type": "进行中"  # 仍然保留Type用于可能的其他用途
             })
 
     if not timeline_data:
@@ -624,35 +623,29 @@ def display_timeline_tab():
 
     df = pd.DataFrame(timeline_data)
 
-    # 2. UI控件：日期范围选择器
     st.subheader("选择查看范围", anchor=False)
     min_date = df['Start'].min().date()
     max_date = df['Finish'].max().date()
     today = date.today()
 
-    # 默认选择今天，如果今天没数据，则选择最近的一天
     default_start = today if min_date <= today <= max_date else min_date
 
     date_selection = st.date_input(
         "选择日期或范围",
-        value=(default_start, today),  # 默认显示从有数据的第一天到今天
+        value=(default_start, today),
         min_value=min_date,
         max_value=max_date,
         help="选择一个日期来查看当天，或选择一个范围来查看多天。"
     )
 
-    # 根据选择确定过滤范围
     if isinstance(date_selection, tuple) and len(date_selection) == 2:
         start_date, end_date = date_selection
-    else:  # 单日选择
+    else:
         start_date = end_date = date_selection
 
-    # 转换为带有时区的datetime对象以进行比较
     start_date_dt = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=beijing_tz)
     end_date_dt = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=beijing_tz)
 
-    # 3. 过滤数据
-    # 选择与所选范围有交集的所有时间段
     filtered_df = df[
         (df['Start'] <= end_date_dt) & (df['Finish'] >= start_date_dt)
         ].copy()
@@ -661,25 +654,32 @@ def display_timeline_tab():
         st.warning(f"在 {start_date.strftime('%Y-%m-%d')} 到 {end_date.strftime('%Y-%m-%d')} 期间没有找到任务活动记录。")
         return
 
-    # 确保时间轴的显示范围仅限于选择的日期
+    # 为了在Y轴上显示“进行中”状态，我们创建一个新的列
+    # 这样既能按任务名统一颜色，又能显示当前状态
+    def get_display_name(row):
+        if row['Type'] == '进行中':
+            return f"{row['Task']} (⚡️进行中)"
+        return row['Task']
+
+    filtered_df['Display Name'] = filtered_df.apply(get_display_name, axis=1)
+
     filtered_df['Clipped_Start'] = filtered_df['Start'].clip(lower=start_date_dt)
     filtered_df['Clipped_Finish'] = filtered_df['Finish'].clip(upper=end_date_dt)
 
-    # 4. 绘制图表
     st.subheader("任务活动时间线", anchor=False)
     fig = px.timeline(
         filtered_df,
         x_start="Clipped_Start",
         x_end="Clipped_Finish",
-        y="Task",
-        color="Type",
+        y="Display Name",  # <<< 修改：Y轴使用新的显示名称
+        color="Task",  # <<< 修改：颜色根据原始任务名称
         title=f"任务时间线 ({start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')})",
-        labels={"Type": "任务类型"},
-        hover_name="Task",
+        labels={"Task": "任务名称"},  # <<< 修改：图例标题
+        hover_name="Display Name",
         hover_data={
-            "Start": "|%Y-%m-%d %H:%M:%S",  # 格式化悬浮提示
+            "Start": "|%Y-%m-%d %H:%M:%S",
             "Finish": "|%Y-%m-%d %H:%M:%S",
-            "Task": False  # 在hover数据中隐藏
+            "Task": False
         }
     )
 
@@ -689,10 +689,9 @@ def display_timeline_tab():
         showlegend=True,
         xaxis=dict(
             type="date",
-            tickformat="%H:%M\n%m-%d"  # 显示小时和分钟，下面是月日
+            tickformat="%H:%M\n%m-%d"
         )
     )
-    # 让Y轴的任务名按其开始时间排序，更直观
     fig.update_yaxes(categoryorder='total ascending')
 
     st.plotly_chart(fig, use_container_width=True)
