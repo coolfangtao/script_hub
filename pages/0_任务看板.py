@@ -280,58 +280,65 @@ def get_export_data():
 def display_main_controls():
     st.header(config.kanban.T_CONTROL_PANEL_HEADER, divider="rainbow")
 
-    is_connected = False  # 初始化连接状态
+    is_connected = False
 
-    # 根据运行模式显示不同的UI
     if config.globals.RUN_MODE == "local":
         st.info(config.kanban.T_LOCAL_MODE_INFO)
-        is_connected = True  # 本地模式视为“始终连接”
-    else:  # 云端模式
+        is_connected = True
+    else:
         is_connected = 'github_token' in st.session_state and 'github_repo' in st.session_state
 
         with st.container(border=True):
             st.subheader(config.kanban.T_GITHUB_CONNECT_HEADER, anchor=False)
 
             if not is_connected:
-                # --- 用户未连接时，显示连接表单 ---
                 st.info(config.kanban.T_CLOUD_MODE_INFO)
+
+                # <<< 核心修改：增加安全警告 >>>
+                # 如果当前会话中已经有任务，就警告用户连接会覆盖它们
+                if st.session_state.tasks:
+                    st.warning(
+                        "**注意：** 您当前页面上有未同步的任务。连接到 GitHub 将会丢弃这些任务，并从您的仓库加载数据。"
+                    )
+
                 col_token, col_repo = st.columns(2)
                 g_token = col_token.text_input(config.kanban.T_GITHUB_TOKEN_INPUT, type="password")
                 g_repo = col_repo.text_input(config.kanban.T_GITHUB_REPO_INPUT, placeholder="your-username/your-repo")
 
                 if st.button(config.kanban.T_GITHUB_CONNECT_BUTTON, use_container_width=True):
                     if g_token and g_repo:
+                        # 1. 设置连接凭证
                         st.session_state.github_token = g_token
                         st.session_state.github_repo = g_repo
+
+                        # 2. 从 GitHub 加载数据
                         tasks = load_tasks_from_github(g_token, g_repo)
+
+                        # 3. 无论加载结果如何（即使是空列表），都用它来覆盖当前会话
+                        # 这是确保数据流单向性的关键
                         if tasks is not None:
                             st.session_state.tasks = tasks
                             st.rerun()
                     else:
                         st.warning(config.kanban.T_ERROR_GITHUB_CREDS_MISSING)
             else:
-                # --- 用户已连接时，显示状态和断开按钮 ---
                 st.success(f"✅ 已连接到仓库: **{st.session_state.github_repo}**")
                 st.button("🔌 断开连接", on_click=disconnect_github, use_container_width=True, type="secondary")
 
     st.markdown("---")
 
-    # --- 任务操作区 ---
-    # <<< 修改：移除了对下方控件的 disabled 限制，使其在任何情况下都可用 >>>
+    # 创建任务 和 本地导入/导出 功能区 (此部分代码无需修改，保持原样)
     col1, col2 = st.columns(2)
     with col1, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_CREATE_TASK_HEADER, anchor=False)
         with st.form(key="new_task_form", clear_on_submit=True):
-            # <<< 移除 disabled 参数 >>>
             name = st.text_input(config.kanban.T_TASK_NAME_LABEL, placeholder=config.kanban.T_TASK_NAME_PLACEHOLDER)
-            # <<< 移除 disabled 参数 >>>
             type = st.selectbox(config.kanban.T_TASK_TYPE_LABEL, config.kanban.TASK_TYPES)
 
             if st.form_submit_button(config.kanban.T_ADD_TASK_BUTTON, use_container_width=True):
                 if name:
                     st.session_state.tasks.append(Task(task_name=name, task_type=type))
                     st.success(config.kanban.T_SUCCESS_TASK_ADDED.format(task_name=name))
-                    # sync_state() 在未连接时不会做任何事，这是安全的
                     sync_state()
                     st.rerun()
                 else:
@@ -339,18 +346,14 @@ def display_main_controls():
 
     with col2, st.container(border=True, height=config.kanban.UI_CONTROL_PANEL_HEIGHT):
         st.subheader(config.kanban.T_LOCAL_IO_HEADER, anchor=False)
-
-        # <<< 移除 disabled 参数 >>>
         uploaded = st.file_uploader(config.kanban.T_UPLOAD_LABEL, type=["json"], help=config.kanban.T_UPLOAD_HELP)
         if uploaded: handle_tasks_import(uploaded)
 
         fname = f"{config.kanban.T_EXPORT_FILE_PREFIX}{datetime.now(beijing_tz).strftime('%Y%m%d_%H%M%S')}.json"
-        # <<< 移除 is_connected 判断，只根据是否有任务来决定是否禁用 >>>
         st.download_button(config.kanban.T_DOWNLOAD_BUTTON, get_export_data(), fname, "application/json",
                            help=config.kanban.T_DOWNLOAD_HELP, use_container_width=True,
                            disabled=not st.session_state.tasks)
 
-        # <<< 核心：只有这个按钮需要根据连接状态来禁用 >>>
         if config.globals.RUN_MODE == "cloud":
             st.button("⬆️ 手动同步到 GitHub", on_click=sync_state, use_container_width=True, disabled=not is_connected)
 
