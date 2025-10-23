@@ -1,4 +1,4 @@
-# app.py (版本 4 - 库兼容版)
+# app.py (版本 5 - 策略修正版)
 
 import streamlit as st
 from googleapiclient.discovery import build
@@ -15,7 +15,7 @@ st.set_page_config(layout="wide", page_title="视频片段定位器", page_icon=
 
 # 我们把缓存加回来，因为网络已经通了
 @st.cache_data(ttl=3600)
-def search_youtube_videos(api_key, query, max_results=5):
+def search_youtube_videos(api_key, query, max_results=15):  # <-- 核心修正 1: 将默认结果从5提高到15
     """使用 YouTube API 搜索与查询相关的、带字幕的视频。"""
     print(f"\n[DEBUG] 正在调用 search_youtube_videos 函数...")
     print(f"[DEBUG] 搜索词: {query}")
@@ -25,7 +25,10 @@ def search_youtube_videos(api_key, query, max_results=5):
             part='snippet',
             q=query,
             type='video',
-            videoCaption='closedCaption',
+            # --- 核心修正 2: 从 'closedCaption' 改为 'any' ---
+            # 'closedCaption' 会返回字幕被禁用的视频
+            # 'any' 会返回所有视频，我们依赖后续的字幕库来过滤
+            videoCaption='any',
             maxResults=max_results
         )
         response = request.execute()
