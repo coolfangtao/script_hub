@@ -5,7 +5,7 @@ import os
 import pandas as pd
 import plotly.express as px
 from itertools import groupby
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 from streamlit_autorefresh import st_autorefresh
 from shared.sidebar import create_common_sidebar
 from shared.config import AppConfig  # <<< 导入全局配置实例
@@ -614,6 +614,9 @@ def display_statistics_tab():
 # =========================================================================================
 # <<< 修复并升级后的日历视图函数 >>>
 # =========================================================================================
+# =========================================================================================
+# <<< 修复并升级后的日历视图函数 >>>
+# =========================================================================================
 def display_timeline_tab():
     st.header("任务时间线视图 📅", divider="rainbow")
 
@@ -716,24 +719,23 @@ def display_timeline_tab():
         width=0.7, textposition='inside', textfont_color='white', insidetextanchor='middle'
     )
 
-    # <<< 核心修复：将画线和加文字分开处理 >>>
     all_dates = [start_date + timedelta(days=x) for x in range((end_date - start_date).days + 1)]
     for day in all_dates:
         midnight_ts = datetime.combine(day, datetime.min.time()).replace(tzinfo=beijing_tz)
-        noon_ts = datetime.combine(day, datetime.time(12, 0)).replace(tzinfo=beijing_tz)
 
-        # 第1步：只画线，不加文字
+        # <<< 核心修复：直接使用 time()，而不是 datetime.time() >>>
+        noon_ts = datetime.combine(day, time(12, 0)).replace(tzinfo=beijing_tz)
+
         fig.add_vline(x=midnight_ts, line_dash="solid", line_color="grey")
         fig.add_vline(x=noon_ts, line_dash="dash", line_color="lightgrey")
 
-        # 第2步：用 add_annotation 单独添加文字
         fig.add_annotation(
             x=midnight_ts,
-            y=1.01,  # y=1 代表图表顶部，1.01 稍微再往上一点
-            yref="paper",  # 'paper' 表示y坐标是相对于整个绘图区域的比例
-            text=day.strftime("%b %d"),  # 例如 "Oct 23"
+            y=1.01,
+            yref="paper",
+            text=day.strftime("%b %d"),
             showarrow=False,
-            xanchor="left",  # 文字的左边对齐到线上
+            xanchor="left",
             font=dict(color="grey", size=10)
         )
 
