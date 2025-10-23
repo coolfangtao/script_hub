@@ -750,24 +750,106 @@ def display_timeline_tab():
     st.plotly_chart(fig, use_container_width=True)
 
 
+# =========================================================================================
+# <<< 新增：评论知识库标签页函数 >>>
+# =========================================================================================
+def display_comments_tab():
+    st.header("💬 评论知识库", divider="rainbow")
+
+    tasks_with_comments = [task for task in st.session_state.get('tasks', []) if task.task_comments]
+
+    if not tasks_with_comments:
+        st.info("目前还没有任何任务有评论记录。")
+        return
+
+    # --- 1. 创建筛选器 ---
+    st.subheader("筛选评论", anchor=False)
+
+    # 获取所有出现过的评论类型用于筛选
+    all_comment_types = sorted(
+        list(set(comment['type'] for task in tasks_with_comments for comment in task.task_comments)))
+
+    # 获取所有有评论的任务名用于筛选
+    task_names_with_comments = sorted(list(set(task.task_name for task in tasks_with_comments)))
+
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_types = st.multiselect(
+            "按评论类型筛选",
+            options=all_comment_types,
+            default=[],
+            help="只看特定类型的评论，如只看“问题记录”。"
+        )
+    with col2:
+        selected_tasks = st.multiselect(
+            "按任务名称筛选",
+            options=task_names_with_comments,
+            default=[],
+            help="只看特定任务下的评论。"
+        )
+
+    st.markdown("---")
+
+    # --- 2. 准备并过滤数据 ---
+    all_comments = []
+    for task in tasks_with_comments:
+        for comment in task.task_comments:
+            # 应用筛选逻辑
+            if selected_types and comment['type'] not in selected_types:
+                continue
+            if selected_tasks and task.task_name not in selected_tasks:
+                continue
+
+            all_comments.append({
+                "task_name": task.task_name,
+                "task_type": task.task_type,
+                "content": comment['content'],
+                "type": comment['type'],
+                "time": comment['time']
+            })
+
+    if not all_comments:
+        st.warning("根据您的筛选条件，没有找到匹配的评论。")
+        return
+
+    # 按评论时间倒序排列，最新的在最前面
+    sorted_comments = sorted(all_comments, key=lambda c: c['time'], reverse=True)
+
+    # --- 3. 显示评论列表 ---
+    st.subheader(f"找到 {len(sorted_comments)} 条相关评论", anchor=False)
+
+    for comment in sorted_comments:
+        icon = config.kanban.COMMENT_ICON_MAP.get(comment['type'], "💬")
+
+        with st.container(border=True):
+            header_cols = st.columns([1, 4])
+            with header_cols[0]:
+                st.markdown(f"##### {icon} {comment['type']}")
+            with header_cols[1]:
+                st.caption(f"关联任务：**{comment['task_name']}** ({comment['task_type']})")
+
+            st.markdown(comment['content'])
+            st.caption(f"记录于: {comment['time'].strftime('%Y-%m-%d %H:%M:%S')}")
+
+
 def main():
     initialize_app()
 
-    # 创建三个标签页
-    tab1, tab2, tab3 = st.tabs(["📌 任务看板", "📊 统计分析", "📅 日历视图"])
+    # 创建四个标签页
+    tab1, tab2, tab3, tab4 = st.tabs(["📌 任务看板", "📊 统计分析", "📅 日历视图", "💬 评论知识库"])
 
     with tab1:
-        # 第一个标签页的内容：原有的看板
         display_main_controls()
         display_kanban_layout()
 
     with tab2:
-        # 第二个标签页的内容：统计页面
         display_statistics_tab()
 
     with tab3:
-        # 第三个标签页的内容：新的日历/时间线视图
         display_timeline_tab()
+
+    with tab4:
+        display_comments_tab()
 
 
 if __name__ == "__main__":
