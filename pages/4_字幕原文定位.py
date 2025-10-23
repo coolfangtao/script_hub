@@ -15,7 +15,7 @@ st.set_page_config(layout="wide", page_title="视频片段定位器", page_icon=
 
 # 我们把缓存加回来，因为网络已经通了
 @st.cache_data(ttl=3600)
-def search_youtube_videos(api_key, query, max_results=15):  # <-- 核心修正 1: 将默认结果从5提高到15
+def search_youtube_videos(api_key, query, max_results=300):  # <-- 核心修正 1: 将默认结果从5提高到15
     """使用 YouTube API 搜索与查询相关的、带字幕的视频。"""
     print(f"\n[DEBUG] 正在调用 search_youtube_videos 函数...")
     print(f"[DEBUG] 搜索词: {query}")
@@ -59,6 +59,7 @@ def find_keywords_in_transcript(video_id, query):
 
         # 步骤 1: 列出所有可用的字幕
         transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        print("[DEBUG] transcript_list")
 
         # 步骤 2: 尝试找到一个我们支持的语言（中文优先，其次英文）
         transcript_to_fetch = None
