@@ -265,7 +265,7 @@ def get_export_data():
 def display_main_controls():
     st.header(config.kanban.T_CONTROL_PANEL_HEADER, divider="rainbow")
 
-    # <<< 修改：根据运行模式显示不同的UI >>>
+    # <<< 根据运行模式显示不同的UI >>>
     if config.globals.RUN_MODE == "local":
         st.info(config.kanban.T_LOCAL_MODE_INFO)
     else:  # 云端模式
@@ -294,6 +294,15 @@ def display_main_controls():
                     st.warning(config.kanban.T_ERROR_GITHUB_CREDS_MISSING)
 
     st.markdown("---")
+
+    st_equal_container_height = """
+    <style>
+        div[data-testid="stVerticalBlockBorderWrapper"] {
+            height: 100%;
+        }
+    </style>
+    """
+    st.markdown(st_equal_container_height, unsafe_allow_html=True)
 
     # 创建任务 和 本地导入/导出 功能区
     col1, col2 = st.columns(2)
