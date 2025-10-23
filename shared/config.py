@@ -38,9 +38,9 @@ class KanbanPageConfig:
         self.TASK_TYPES = ["主线任务", "副线任务"]
 
         # --- 评论区配置 ---
-        self.COMMENT_TYPES = ["备注", "问题", "心得", "新的"]
-        self.COMMENT_ICON_MAP = {"心得": "💡", "问题": "❓", "备注": "📌", "新的": "💬"}
-        self.COMMENT_COLOR_MAP = {"心得": "green", "问题": "red", "备注": "blue", "新的": "gray"}
+        self.COMMENT_TYPES = ["备注", "问题", "心得"]
+        self.COMMENT_ICON_MAP = {"心得": "💡", "问题": "❓", "备注": "📌"}
+        self.COMMENT_COLOR_MAP = {"心得": "green", "问题": "red", "备注": "blue"}
 
         # --- UI 文本 (可用于未来国际化) ---
         self.T_MAIN_TITLE = f"{self.PAGE_ICON} {self.PAGE_TITLE}"

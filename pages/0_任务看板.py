@@ -387,10 +387,8 @@ def display_kanban_layout():
     tasks_doing = [t for t in sorted_tasks if t.status == config.kanban.STATUS_DOING]
     tasks_done = [t for t in sorted_tasks if t.status == config.kanban.STATUS_DONE]
 
-    # 1. 将页面分为三列
+    # 将页面分为三列
     col1, col2, col3 = st.columns(3, gap="large")
-
-    # 2. 将内容放入存储的列对象中
 
     with col1:  # 使用存储的第一个列对象
         st.header(f"{config.kanban.T_COLUMN_TODO_HEADER} ({len(tasks_todo)})", divider="rainbow")
