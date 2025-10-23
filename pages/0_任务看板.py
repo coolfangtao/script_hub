@@ -134,8 +134,8 @@ class Task:
 def format_timedelta_to_str(duration):
     if not isinstance(duration, timedelta) or duration.total_seconds() <= 0: return "0秒"
     total_seconds = int(duration.total_seconds())
-    days, rem = divmod(total_seconds, 86400);
-    hours, rem = divmod(rem, 3600);
+    days, rem = divmod(total_seconds, 86400)
+    hours, rem = divmod(rem, 3600)
     minutes, seconds = divmod(rem, 60)
     parts = []
     if days > 0: parts.append(f"{days}天")
@@ -462,23 +462,30 @@ def display_task_time_logs(task):
 def display_task_management(task):
     st.divider()
     col_info, col_manage = st.columns([3, 1])
-    with col_info:
-        st.caption(f"ID: {task.task_id}");
-        st.caption(f"创建于: {task.creation_time.strftime('%Y-%m-%d %H:%M:%S')}")
     with col_manage, st.popover(config.kanban.T_CARD_MANAGE_POPOVER):
         with st.form(key=f"edit_form_{task.task_id}"):
             st.subheader(config.kanban.T_CARD_EDIT_HEADER, anchor=False)
             edited_name = st.text_input(config.kanban.T_TASK_NAME_LABEL, value=task.task_name)
-            type_options = config.kanban.TASK_TYPES
-            index = type_options.index(task.task_type) if task.task_type in type_options else 0
-            edited_type = st.selectbox(config.kanban.T_TASK_TYPE_LABEL, options=type_options, index=index,
-                                       key=f"task_type_{task.task_id}")
-            if st.form_submit_button(config.kanban.T_CARD_SAVE_BUTTON, use_container_width=True):
-                task.task_name, task.task_type = edited_name, edited_type
-                st.toast(config.kanban.T_SUCCESS_TASK_UPDATED.format(task_name=task.task_name), icon="✅");
-                sync_state();
-                st.rerun()
-        st.divider()
+
+            # --- START OF FIX ---
+            # 1. 动态获取所有已存在的任务类型
+            default_types = config.kanban.TASK_TYPES
+            existing_types = sorted(list(set(t.task_type for t in st.session_state.get('tasks', []))))
+            combined_types = sorted(list(set(default_types + existing_types)))
+
+            # 2. 确保当前任务的类型在选项中，并找到它的索引
+            if task.task_type not in combined_types:
+                combined_types.append(task.task_type)  # 以防万一
+                combined_types.sort()
+
+            index = combined_types.index(task.task_type) if task.task_type in combined_types else 0
+
+            edited_type = st.selectbox(
+                config.kanban.T_TASK_TYPE_LABEL,
+                options=combined_types,  # <--- 使用合并后的类型列表
+                index=index,
+                key=f"task_type_{task.task_id}"
+            )
         if st.button(config.kanban.T_CARD_DELETE_BUTTON, type="primary", use_container_width=True,
                      help=config.kanban.T_CARD_DELETE_HELP, key=f"delete_btn_{task.task_id}"):
             st.session_state.tasks = [t for t in st.session_state.tasks if t.task_id != task.task_id]
