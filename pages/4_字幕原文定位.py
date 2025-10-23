@@ -1,20 +1,17 @@
-# app.py
+# app.py (版本 2 - 灵活搜索版)
 
 import streamlit as st
 from googleapiclient.discovery import build
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
 import re
-from shared.sidebar import create_common_sidebar
 
 # ------------------- 页面配置 -------------------
-# 使用 wide 布局让界面更舒展
 st.set_page_config(layout="wide", page_title="视频片段定位器", page_icon="🎬")
-create_common_sidebar()
+
 
 # ------------------- 核心功能函数 (带缓存) -------------------
 
-# 使用缓存避免重复调用API，提高性能并节省配额
-@st.cache_data(ttl=3600)  # 缓存1小时
+@st.cache_data(ttl=3600)
 def search_youtube_videos(api_key, query, max_results=5):
     """使用 YouTube API 搜索与查询相关的、带字幕的视频。"""
     try:
@@ -23,46 +20,56 @@ def search_youtube_videos(api_key, query, max_results=5):
             part='snippet',
             q=query,
             type='video',
-            videoCaption='closedCaption',  # 关键：只搜索有字幕的视频
+            videoCaption='closedCaption',
             maxResults=max_results
         )
         response = request.execute()
         return response.get('items', [])
     except Exception as e:
-        # 向用户显示一个更友好的错误信息
         st.error(f"无法连接到 YouTube API。请检查你的 API 密钥和网络连接。错误详情: {e}")
         return []
 
 
+# --- NEW: 更灵活的搜索逻辑 ---
 @st.cache_data(ttl=3600)
-def find_text_in_transcript(video_id, text_to_find):
-    """在视频字幕中查找指定文本，返回第一个匹配项的时间和上下文。"""
+def find_keywords_in_transcript(video_id, query):
+    """在字幕中查找包含所有关键词的片段。"""
     try:
-        # 优先获取中文，其次是英文，可以根据你的需要调整
+        # 提取关键词 (小写，并移除简单词)
+        keywords = [word.lower() for word in query.split() if len(word) > 2]
+        if not keywords:
+            return None  # 如果没有有效的关键词，则无法搜索
+
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=['zh-CN', 'zh-Hans', 'zh', 'en'])
 
-        # 为了更好的上下文，我们将字幕拼接起来搜索
-        full_transcript_text = " ".join([seg['text'] for seg in transcript])
+        # 遍历字幕中的每一句话
+        for i, segment in enumerate(transcript):
+            segment_text_lower = segment['text'].lower()
 
-        # 使用正则表达式查找（不区分大小写）
-        match = re.search(f"(.{{0,50}}){re.escape(text_to_find)}(.{{0,50}})", full_transcript_text,
-                          re.IGNORECASE | re.DOTALL)
+            # 检查这句话是否包含了所有关键词
+            if all(keyword in segment_text_lower for keyword in keywords):
 
-        if not match:
-            return None
+                # 为了提供更丰富的上下文，我们可以向前看一句
+                context_start_index = max(0, i - 1)
+                context_end_index = min(len(transcript) - 1, i + 1)
 
-        # 找到匹配后，再定位到具体的时间戳
-        for segment in transcript:
-            if text_to_find.lower() in segment['text'].lower():
-                context = f"...{match.group(1).strip() if match.group(1) else ''} **{text_to_find}** {match.group(2).strip() if match.group(2) else ''}..."
+                full_context = " ".join(
+                    [transcript[j]['text'] for j in range(context_start_index, context_end_index + 1)])
+
+                # 高亮显示关键词
+                highlighted_context = full_context
+                for keyword in keywords:
+                    # 使用正则表达式进行不区分大小写的高亮替换
+                    highlighted_context = re.sub(f"({re.escape(keyword)})", r"**\1**", highlighted_context,
+                                                 flags=re.IGNORECASE)
+
                 return {
                     "start_time": int(segment['start']),
-                    "context": context
+                    "context": f"...{highlighted_context}..."
                 }
-        return None
+        return None  # 遍历完所有字幕都没找到
 
     except (TranscriptsDisabled, NoTranscriptFound):
-        # 这是一个预期的“错误”，所以使用 st.info 提示而不是 st.error
         return "TranscriptsDisabled"
     except Exception:
         return None
@@ -70,33 +77,28 @@ def find_text_in_transcript(video_id, text_to_find):
 
 # ------------------- Streamlit 界面布局 -------------------
 
-# 1. 标题和介绍
 st.title("🎬 视频片段智能定位器")
 st.markdown("输入一段文字，程序将自动从 YouTube 中查找包含这段文字的视频，并直接跳转到该时间点播放。")
-st.markdown("---")  # 添加一条分割线
+st.markdown("---")
 
-# 2. API 密钥检查
 try:
     API_KEY = st.secrets["youtube_key"]
 except (KeyError, FileNotFoundError):
     st.error("错误：未找到 YouTube API 密钥。请在 Streamlit Secrets 中配置 `youtube_key`。")
-    st.stop()  # 如果没有密钥，停止执行
+    st.stop()
 
-# 3. 搜索输入区
 col1, col2 = st.columns([4, 1])
 with col1:
     search_query = st.text_input(
         "输入你想查找的文字或对话：",
-        "The future of renewable energy",
+        "What is artificial intelligence",
         label_visibility="collapsed",
-        placeholder="例如：The future of renewable energy"
+        placeholder="建议使用英文核心关键词以提高成功率"
     )
 with col2:
     search_button = st.button("🔍 开始搜索", use_container_width=True, type="primary")
 
-# 4. 结果展示区
 if search_button and search_query:
-    # 使用状态容器，让用户知道后台正在发生什么
     status_placeholder = st.empty()
 
     status_placeholder.info("第一步：正在 YouTube 上搜索相关视频...")
@@ -105,40 +107,52 @@ if search_button and search_query:
     if not videos:
         status_placeholder.warning("未能找到任何相关视频。请尝试更换关键词。")
     else:
-        status_placeholder.info(f"第二步：找到了 {len(videos)} 个视频，正在逐一分析字幕内容...")
+        status_placeholder.info(f"第二步：找到了 {len(videos)} 个视频，正在逐一分析字幕...")
 
         found_match = False
-        results_placeholder = st.container()  # 创建一个容器来存放所有结果卡片
+        results_placeholder = st.container()
 
-        for video in videos:
+        # --- NEW: 添加了更详细的状态更新 ---
+        progress_bar = st.progress(0, text="分析进度")
+
+        for i, video in enumerate(videos):
             video_id = video['id']['videoId']
             video_title = video['snippet']['title']
-            channel_title = video['snippet']['channelTitle']
 
-            match_data = find_text_in_transcript(video_id, search_query)
+            # 更新进度条和文本
+            progress_text = f"分析中 ({i + 1}/{len(videos)}): {video_title}"
+            progress_bar.progress((i + 1) / len(videos), text=progress_text)
+
+            match_data = find_keywords_in_transcript(video_id, search_query)
+
+            if match_data == "TranscriptsDisabled":
+                # 在结果区显示此视频字幕不可用，而不是静默跳过
+                with results_placeholder.expander(f"⚠️ **{video_title}** - 字幕不可用或受限"):
+                    st.write("无法分析此视频，因为它关闭了字幕功能或不提供可访问的字幕。")
+                continue  # 继续检查下一个视频
 
             if isinstance(match_data, dict):
                 found_match = True
-                status_placeholder.success("🎉 找到了！已定位到视频片段。")
+                status_placeholder.success("🎉 找到了！已定位到匹配的视频片段。")
 
-                # 使用带边框的容器来创建卡片效果
                 with results_placeholder.container(border=True):
                     st.subheader(video_title)
-                    st.caption(f"频道: {channel_title}")
+                    st.caption(f"频道: {video['snippet']['channelTitle']}")
 
-                    st.info(f"**找到的文本上下文：**\n\n{match_data['context']}")
+                    # 使用 markdown 来渲染高亮效果
+                    st.markdown(f"**找到的文本上下文：**\n\n{match_data['context']}")
 
-                    # 生成带时间戳的URL并在st.video中播放
                     start_seconds = match_data['start_time']
                     video_url = f"https://www.youtube.com/watch?v={video_id}&t={start_seconds}s"
                     st.video(video_url)
                     st.markdown(f"🔗 [在 YouTube 上打开]({video_url})")
 
-                # 找到第一个就停止，以获得最快的响应。如果想找所有匹配项，可以去掉 break。
+                progress_bar.empty()  # 找到后隐藏进度条
                 break
 
         if not found_match:
-            status_placeholder.warning("分析了所有相关视频，但未在字幕中找到你输入的精确文字。")
+            progress_bar.empty()
+            status_placeholder.warning("分析了所有相关视频，但未在字幕中找到同时包含所有关键词的片段。请尝试更简单、更核心的关键词。")
 
 elif search_button and not search_query:
     st.warning("请输入你要搜索的内容。")
