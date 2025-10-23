@@ -505,7 +505,7 @@ def display_kanban_layout():
 
 
 # =========================================================================================
-# <<< 新增：统计分析标签页函数 >>>
+# <<< 修复后的统计分析标签页函数 >>>
 # =========================================================================================
 def display_statistics_tab():
     st.header("任务统计分析 📊", divider="rainbow")
@@ -515,15 +515,32 @@ def display_statistics_tab():
         st.info("看板上还没有任务，快去创建一个吧！")
         return
 
-    # 1. 数据准备：将任务对象列表转换为Pandas DataFrame
-    task_data = [task.to_dict() for task in tasks]
-    df = pd.DataFrame(task_data)
+    # 1. <<< 核心修复：直接从Task对象构建DataFrame，避免不必要的类型转换 >>>
+    # 我们不再使用 [task.to_dict() for task in tasks] 的方式
+    df = pd.DataFrame(
+        [
+            {
+                "creation_time": t.creation_time,  # 直接使用datetime对象
+                "completion_time": t.completion_time,  # 直接使用datetime对象或None
+                "status": t.status,
+                "task_type": t.task_type,
+                "total_active_time_seconds": t.total_active_time.total_seconds(),
+                "task_duration_seconds": t.task_duration.total_seconds() if t.task_duration else None,
+            }
+            for t in tasks
+        ]
+    )
 
-    # 转换数据类型以便分析
-    df['creation_time'] = pd.to_datetime(df['creation_time'])
-    df['completion_time'] = pd.to_datetime(df['completion_time'])
+    # 2. <<< 核心修复：删除下面这两行导致错误的代码 >>>
+    # 因为DataFrame在创建时已经使用了正确的datetime类型，所以不再需要转换
+    # df['creation_time'] = pd.to_datetime(df['creation_time']) # <--- 已删除
+    # df['completion_time'] = pd.to_datetime(df['completion_time']) # <--- 已删除
+
+    # 转换数据类型以便分析 (这两行仍然需要)
     df['total_active_time_hours'] = df['total_active_time_seconds'] / 3600
     df['task_duration_hours'] = df['task_duration_seconds'] / 3600
+
+    # --- 后续的统计和绘图代码保持不变 ---
 
     # 2. 显示关键指标 (KPIs)
     st.subheader("核心指标", anchor=False)
@@ -561,6 +578,10 @@ def display_statistics_tab():
 
     # 4. 任务时间趋势
     st.subheader("任务时间趋势", anchor=False)
+    # 确保creation_time有时区信息，以便正确处理
+    if df['creation_time'].dt.tz is None:
+        df['creation_time'] = df['creation_time'].dt.tz_localize('UTC').dt.tz_convert(beijing_tz)
+
     df['creation_date'] = df['creation_time'].dt.date
     tasks_per_day = df.groupby('creation_date').size().reset_index(name='count')
     fig_trend = px.bar(tasks_per_day, x='creation_date', y='count', title="每日创建任务数",
