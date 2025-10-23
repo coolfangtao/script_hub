@@ -15,7 +15,7 @@ st.set_page_config(layout="wide", page_title="视频片段定位器", page_icon=
 
 # 我们把缓存加回来，因为网络已经通了
 @st.cache_data(ttl=3600)
-def search_youtube_videos(api_key, query, max_results=100):  # <-- 核心修正 1: 将默认结果从5提高到15
+def search_youtube_videos(api_key, query, max_results=10000):  # <-- 核心修正 1: 将默认结果从5提高到15
     """使用 YouTube API 搜索与查询相关的、带字幕的视频。"""
     print(f"\n[DEBUG] 正在调用 search_youtube_videos 函数...")
     print(f"[DEBUG] 搜索词: {query}")
