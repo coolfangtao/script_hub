@@ -169,7 +169,19 @@ if search_button and search_query:
         status_placeholder.warning("未能找到任何相关视频。请尝试更换关键词。")
     else:
         print(f"[DEBUG] 结论：找到 {len(videos)} 个视频，准备开始分析字幕。")
-        status_placeholder.info(f"第二步：找到了 {len(videos)} 个视频，正在逐一分析字幕...")
+        status_placeholder.success(f"第一步完成：找到了 {len(videos)} 个相关视频。")  # <-- 修改状态
+
+        # --- 新增：立即显示所有找到的视频 ---
+        with st.expander(f"点击查看找到的 {len(videos)} 个视频列表"):
+            for i, video in enumerate(videos):
+                video_id = video['id']['videoId']
+                video_title = video['snippet']['title']
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
+                st.markdown(f"{i + 1}. **{video_title}**\n   - 🔗 [在 YouTube 上打开]({video_url})")
+
+        st.markdown("---")
+        status_placeholder.info(f"第二步：正在逐一分析这 {len(videos)} 个视频的字幕...")
+        # --- 新增结束 ---
 
         found_match = False
         results_placeholder = st.container()
@@ -226,3 +238,4 @@ if search_button and search_query:
 
 elif search_button and not search_query:
     st.warning("请输入你要搜索的内容。")
+
