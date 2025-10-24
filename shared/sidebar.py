@@ -12,7 +12,7 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/7_AI_对话页面.py"
         },
         {
-            "label": "🎵 语音分析",
+            "label": "🎵 语句分析",
             "path": r"pages/3_英语句子语音现象分析.py"
         },
         {
@@ -34,17 +34,17 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/0_任务看板.py"
         },
         {
-            "label": "🛍️ 商品提取",
+            "label": "🛍️ 商品信息提取",
             "path": r"pages/4_一键提取亚马逊页面关键信息.py"
         },
     ],
     "📝 文本处理": [
         {
-            "label": "🎬 B站标题",
+            "label": "🎬 B站标题提取",
             "path": r"pages/4_提取B站标题.py"
         },
         {
-            "label": "📚 读书笔记",
+            "label": "📚 读书笔记转换",
             "path": r"pages/4_读书笔记转markdown文档.py"
         },
         {
