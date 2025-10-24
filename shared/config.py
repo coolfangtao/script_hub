@@ -34,6 +34,8 @@ class GlobalConfig:
         self.GITHUB_PRIVATE_REPO = st.secrets.get("github_data_repo")
         self.GITHUB_PUBLIC_REPO = st.secrets.get("github_data_public_repo")
 
+        self.GEMINI_API_KEY = "gemini_api_key"
+
         # 可用的AI模型
         self.GEMINI_MODEL_OPTIONS = [
             "gemini-2.5-flash-lite",  # 默认模型，可用，2.15秒
