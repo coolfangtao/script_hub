@@ -179,12 +179,15 @@ class FundDashboardUI:
     def render_historical_chart(self):
         """渲染历史走势对比的折线图"""
         st.subheader("📈 近期走势对比")
-        selected_funds = st.multoselect(
+
+        # vvvvvvvv 修正这一行 vvvvvvvv
+        selected_funds = st.multiselect(
             '选择要对比的基金（建议不超过4个）:',
             options=list(self.config.FUNDS.keys()),
             format_func=lambda code: f"{self.config.FUNDS[code]} ({code})",
             default=self.config.DEFAULT_CHART_SELECTION
         )
+        # ^^^^^^^^ 修正结束 ^^^^^^^^
 
         if not selected_funds:
             st.info("请在上方选择至少一只基金以显示走势图。")
