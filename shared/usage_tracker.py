@@ -133,12 +133,27 @@ class UsageTracker:
 usage_tracker = UsageTracker()
 
 
-def track_script_usage(script_name):
+def track_script_usage(script_name=None):
     """公共函数：在页面开头调用此函数来跟踪访问"""
     import streamlit as st
 
-    # 获取当前脚本路径
-    script_path = st.runtime.scriptrunner.script_run_context.get_script_run_ctx().main_script_path
+    try:
+        # 新的 Streamlit API 方式获取脚本路径
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        ctx = get_script_run_ctx()
+        if ctx is None:
+            # 如果无法获取上下文，使用默认路径
+            script_path = "unknown_script.py"
+        else:
+            script_path = ctx.main_script_path
+    except Exception as e:
+        # 备用方案：如果新API也失败，使用简单路径
+        st.warning(f"无法获取脚本路径: {e}")
+        script_path = "unknown_script.py"
+
+    # 如果提供了脚本名称，使用提供的名称；否则使用路径
+    if script_name is None:
+        script_name = script_path.split('/')[-1] if '/' in script_path else script_path
 
     # 跟踪使用情况
     usage_tracker.track_usage(script_name, script_path)
