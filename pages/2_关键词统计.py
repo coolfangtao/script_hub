@@ -451,12 +451,22 @@ def plot_keyword_analysis(df: pd.DataFrame):
 
     with col2:
         st.write("### 📈 关键指标")
-        st.metric("总关键词数", len(df_filtered))
-        st.metric("搜索量中位数", f"{search_median:,.0f}")
-        st.metric("流量占比中位数", f"{traffic_median:.2f}%")
-        if has_asin:
-            total_asin = df_filtered['涉及ASIN数量'].sum() if '涉及ASIN数量' in df_filtered.columns else 'N/A'
-            st.metric("总涉及ASIN数", total_asin)
+
+        # 创建两列布局
+        col2_1, col2_2 = st.columns(2)
+
+        with col2_1:
+            st.metric("总关键词数", len(df_filtered))
+            st.metric("搜索量中位数", f"{search_median:,.0f}")
+
+        with col2_2:
+            st.metric("流量占比中位数", f"{traffic_median:.2f}%")
+            if has_asin:
+                total_asin = df_filtered['涉及ASIN数量'].sum() if '涉及ASIN数量' in df_filtered.columns else 'N/A'
+                st.metric("总涉及ASIN数", total_asin)
+            else:
+                # 如果没有ASIN数据，可以显示其他指标或留空
+                st.metric("数据来源", "单ASIN")
 
     # 显示详细数据表格
     st.write("### 📋 详细数据")
