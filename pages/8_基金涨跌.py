@@ -257,7 +257,7 @@ def main():
         st.divider()
         ui.render_data_table(fund_data)
         st.divider()
-        ui.render_historical_chart(fund_data)
+        ui.render_historical_chart()
 
 
 if __name__ == "__main__":
