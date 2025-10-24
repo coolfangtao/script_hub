@@ -2,6 +2,8 @@ import streamlit as st
 from bs4 import BeautifulSoup
 import re
 import pandas as pd  # 导入 pandas 用于表格
+from shared.sidebar import create_common_sidebar
+create_common_sidebar()
 
 
 # --- 您提供的原始解析函数 ---
