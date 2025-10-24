@@ -15,7 +15,7 @@ class PhoneticsPageConfig(GlobalConfig):
     """存储此页面专属的配置，继承全局配置。"""
 
     def __init__(self):
-        # super().__init__()  # 关键修复：调用父类初始化
+        super().__init__()  # 关键修复：调用父类初始化
         self.PAGE_TITLE = "英语语音现象分析器"
         self.PAGE_ICON = "🗣️"
         self.OUTPUT_DIR = "tts_audio"
