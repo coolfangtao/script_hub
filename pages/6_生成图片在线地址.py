@@ -165,7 +165,7 @@ if st.button("生成在线链接", disabled=not uploaded_files or not is_configu
         image_bytes = uploaded_file.getvalue()
         col_index = i % num_columns
         with cols[col_index]:
-            st.image(image_bytes, caption=f"预览: {uploaded_file.name}", use_column_width=True)
+            st.image(image_bytes, caption=f"预览: {uploaded_file.name}", use_container_width=True)
             with st.spinner("正在生成链接..."):
                 # 调用通用函数，传入动态获取的配置
                 image_url = upload_image_to_github(
