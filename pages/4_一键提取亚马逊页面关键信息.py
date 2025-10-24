@@ -257,6 +257,7 @@ def extract_reviews(soup):
 def extract_product_details(soup):
     """
     提取 "Product details" 部分的信息 (例如 ASIN, 制造商等)
+    (已更新，可处理 div 和 table 两种结构)
     """
     details = {}
     # 查找 "Product Details" 容器 (div > ul > li 结构)
@@ -282,6 +283,9 @@ def extract_product_details(soup):
                 value_text = re.sub(r'\s+', ' ', value_text)
 
                 if value_text and key_clean:
+                    # (新增) 特别清理 "Best Sellers Rank"
+                    if key_clean == 'Best Sellers Rank':
+                        value_text = value_text.split('(See Top 100')[0].strip()
                     details[key_clean] = value_text
     else:
         # 备选方案: 查找 (table > tr > th/td 结构)
@@ -293,7 +297,18 @@ def extract_product_details(soup):
                 value_element = row.find('td')
                 if key_element and value_element:
                     key_clean = key_element.get_text(strip=True)
-                    value_text = value_element.get_text(separator=' ', strip=True)
+
+                    # (新增) 跳过 "Customer Reviews"，因为它由 extract_rating 单独处理
+                    if key_clean == 'Customer Reviews':
+                        continue
+
+                    value_text_raw = value_element.get_text(separator=' ', strip=True)
+                    value_text = re.sub(r'\s+', ' ', value_text_raw).strip()
+
+                    # (新增) 特别清理 "Best Sellers Rank"
+                    if key_clean == 'Best Sellers Rank':
+                        value_text = value_text.split('(See Top 100')[0].strip()
+
                     details[key_clean] = value_text
 
     return details
@@ -570,8 +585,4 @@ if st.button("提取信息", key="extract_button", type="primary"):
                 st.exception(e)
     else:
         st.warning("警告：文本框为空，请输入网页源代码。")
-
-
-
-
 
