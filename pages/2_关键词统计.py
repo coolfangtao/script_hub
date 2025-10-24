@@ -143,7 +143,7 @@ def plot_keyword_traffic(df: pd.DataFrame):
     df_filtered["自然流量绝对占比"] = df_filtered["流量占比"] * df_filtered["自然流量占比"]
     df_filtered["广告流量绝对占比"] = df_filtered["流量占比"] * df_filtered["广告流量占比"]
 
-    # 2. 按“流量词”分组并合计相关指标
+    # 2. 按"流量词"分组并合计相关指标
     aggregated_df = df_filtered.groupby("流量词").agg({
         "流量占比": "sum",
         "自然流量绝对占比": "sum",
@@ -169,7 +169,27 @@ def plot_keyword_traffic(df: pd.DataFrame):
         color_discrete_map={"自然流量绝对占比": "#636EFA", "广告流量绝对占比": "#EF553B"},
         text="占比"
     )
+
+    # 更新堆叠柱子的文本显示
     fig.update_traces(texttemplate='%{text:.2%}', textposition='inside', insidetextanchor='middle')
+
+    # --- 新增：在顶部添加总流量占比标注 ---
+    # 为每个关键词添加总流量占比的标注
+    for i, row in top_20_traffic.iterrows():
+        fig.add_annotation(
+            x=row['流量占比'],  # x位置为总流量占比
+            y=row['流量词'],  # y位置为关键词
+            text=f"{row['流量占比']:.2%}",  # 显示总流量占比
+            showarrow=False,
+            xanchor='left',
+            xshift=10,  # 向右偏移一点，避免与柱子重叠
+            font=dict(color='black', size=10),
+            bgcolor='white',
+            bordercolor='gray',
+            borderwidth=1,
+            borderpad=2
+        )
+
     fig.update_layout(
         xaxis_title="流量占比", yaxis_title="关键词",
         yaxis={'categoryorder': 'total ascending'}, height=800,
