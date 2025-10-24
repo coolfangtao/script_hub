@@ -7,7 +7,7 @@ from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
 
 # 侧边栏和页面配置建议放在代码的开始部分
 st.set_page_config(page_title="文本对比工具", layout="wide")
-track_script_usage("📄 文本对比")
+# track_script_usage("📄 文本对比")
 create_common_sidebar()
 
 

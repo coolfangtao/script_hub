@@ -67,7 +67,7 @@ def run_extraction():
 
 # --- 5. 侧边栏 ---
 try:
-    track_script_usage("🎬 B站标题")
+    # track_script_usage("🎬 B站标题")
     create_common_sidebar()
 except Exception as e:
     st.sidebar.error(f"加载侧边栏失败: {e}")

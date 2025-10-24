@@ -1,7 +1,7 @@
 import streamlit as st
 from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
-track_script_usage("🧹 去除空行")
+# track_script_usage("🧹 去除空行")
 create_common_sidebar()
 
 

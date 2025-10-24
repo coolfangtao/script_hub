@@ -380,7 +380,7 @@ class AppUI:
 # --- 4. 主程序逻辑 ---
 def main():
     # 初始化配置和UI
-    track_script_usage("🔍 关键词统计")
+    # track_script_usage("🔍 关键词统计")
     create_common_sidebar()
     config = AppConfig()
     ui = AppUI(config)

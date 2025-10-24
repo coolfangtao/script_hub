@@ -232,7 +232,7 @@ def main():
 
     ui.setup_page()
     ui.inject_custom_css()
-    track_script_usage("🎵 语音分析")
+    # track_script_usage("🎵 语音分析")
     create_common_sidebar()
     ui.display_header()
 

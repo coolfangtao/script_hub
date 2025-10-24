@@ -175,7 +175,7 @@ def setup_ui():
     st.set_page_config(page_title="EDS能谱杂质分析工具", layout="wide")
     st.title("🔬 EDS能谱杂质智能分析工具")
     st.markdown("上传一张或多张EDS分析截图，工具将自动识别元素含量并判断杂质类型。")
-    track_script_usage("📈 杂质统计")
+    # track_script_usage("📈 杂质统计")
     create_common_sidebar()
 
     # 在主页面创建输入组件

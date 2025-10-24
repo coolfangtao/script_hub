@@ -9,7 +9,7 @@ from typing import Optional, Dict, Tuple, List, Any
 from io import BytesIO
 from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar # 假设这个函数存在于您的项目中
-track_script_usage("📝 Listing生成")
+# track_script_usage("📝 Listing生成")
 create_common_sidebar()
 
 
@@ -413,7 +413,7 @@ def main():
     ui = AppUI(config)
 
     ui.setup_page()
-    track_script_usage("页面名称")
+    # track_script_usage("页面名称")
     create_common_sidebar()
     uploaded_files = ui.display_header_and_uploader()
 

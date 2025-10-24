@@ -16,7 +16,7 @@ from shared.sidebar import create_common_sidebar
 # 如果 get_run_mode() 不在 GlobalConfig 内部，确保它能被正确调用
 cfg = GlobalConfig()
 
-track_script_usage("🔗 在线图床")
+# track_script_usage("🔗 在线图床")
 create_common_sidebar()  # 调用函数创建侧边栏
 
 

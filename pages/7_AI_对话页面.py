@@ -18,7 +18,7 @@ def setup_page_and_sidebar():
         layout="wide"
     )
     # 注意：侧边栏仍然会创建，但API输入框不会出现在那里
-    track_script_usage("💬 AI对话")
+    # track_script_usage("💬 AI对话")
     create_common_sidebar()
 
 

@@ -149,7 +149,7 @@ config = AppConfig()
 
 # --- 初始化和页面设置 ---
 st_autorefresh(interval=config.kanban.AUTO_REFRESH_INTERVAL_MS, key="clock_refresher")
-track_script_usage("✅ 任务看板")
+# track_script_usage("✅ 任务看板")
 create_common_sidebar()
 beijing_tz = config.globals.APP_TIMEZONE
 
