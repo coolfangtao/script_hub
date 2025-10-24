@@ -353,11 +353,13 @@ def main():
             # 展示流量占比
             plot_keyword_traffic(df)
 
+            # 展示搜索和购买占比
+            plot_search_volume_and_purchases(df)
+
             # --- 词频分析 ---
             st.subheader("单ASIN组成关键词的单词频率 (Word Frequency)")
             display_aggregated_word_frequency(df)
 
-            plot_search_volume_and_purchases(df)
             display_raw_data(df)
 
     # --- 多文件处理逻辑 ---
@@ -411,13 +413,15 @@ def main():
 
             if selected_asin_df is not None:
                 display_key_metrics(selected_asin_df, asin=choice)
+                # 展示流量占比
                 plot_keyword_traffic(selected_asin_df)
+                # 展示搜索和购买占比
+                plot_search_volume_and_purchases(selected_asin_df)
 
                 # --- 词频分析 ---
                 st.subheader("单ASIN组成关键词的单词频率 (Word Frequency)")
                 display_aggregated_word_frequency(selected_asin_df)
 
-                plot_search_volume_and_purchases(selected_asin_df)
                 display_raw_data(selected_asin_df)
 
 
