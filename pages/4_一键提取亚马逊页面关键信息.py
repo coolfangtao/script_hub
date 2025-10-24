@@ -5,6 +5,7 @@ import pandas as pd
 import requests
 import io
 import zipfile
+from shared.sidebar import create_common_sidebar
 
 
 # --- 1. 配置类 ---
@@ -378,6 +379,7 @@ class AppUI:
 # --- 4. 主程序逻辑 ---
 def main():
     # 初始化配置和UI
+    create_common_sidebar()
     config = AppConfig()
     ui = AppUI(config)
 
