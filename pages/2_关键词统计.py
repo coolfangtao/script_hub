@@ -195,6 +195,62 @@ def plot_keyword_traffic(df: pd.DataFrame):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def plot_search_volume_and_purchases(df: pd.DataFrame):
+    """展示关键词搜索量和购买量的堆叠条形图。"""
+    st.subheader("关键词搜索量和购买量 (Search Volume and Purchases)")
+
+    df_filtered = df[df['月搜索量'] > 0].copy()
+    if df_filtered.empty:
+        st.warning("没有有效的月搜索量数据可供展示。")
+        return
+
+    top_20_search = df_filtered.sort_values(by="月搜索量", ascending=False).head(20)
+    top_20_search["未购买量"] = top_20_search["月搜索量"] - top_20_search["购买量"]
+
+    plot_df = top_20_search.melt(
+        id_vars=["流量词", "购买率"],
+        value_vars=["购买量", "未购买量"],
+        var_name="类型", value_name="数量"
+    )
+
+    fig = px.bar(
+        plot_df, y="流量词", x="数量", color="类型", orientation='h',
+        title="Top 20 关键词搜索量与购买量",
+        labels={"流量词": "关键词", "数量": "月搜索量"},
+        color_discrete_map={"购买量": "#00CC96", "未购买量": "#FECB52"}
+    )
+
+    # 为每个条形添加购买率标注
+    annotations = []
+    for _, row in top_20_search.iterrows():
+        # 购买率标注（在柱子内部右侧）
+        annotations.append(dict(
+            x=row['月搜索量'] * 0.98, y=row['流量词'],
+            text=f"购买率: {row['购买率']:.2%}",
+            showarrow=False, font=dict(color="black", size=10),
+            xanchor='right'
+        ))
+
+        # 新增：总搜索量标注（在柱子顶端）
+        annotations.append(dict(
+            x=row['月搜索量'], y=row['流量词'],
+            text=f"{row['月搜索量']:,}",  # 格式化数字，添加千位分隔符
+            showarrow=False,
+            xanchor='left',
+            xshift=10,  # 向右偏移一点，避免与柱子重叠
+            font=dict(color='green', size=12, weight='bold'),
+        ))
+
+    fig.update_layout(annotations=annotations)
+
+    fig.update_layout(
+        xaxis_title="月搜索量", yaxis_title="关键词",
+        yaxis={'categoryorder': 'total ascending'}, height=800,
+        legend_title_text='类型'
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
 def calculate_word_frequency(df: pd.DataFrame) -> Tuple[Dict[str, int], pd.DataFrame]:
     """从流量词列计算单词频率。"""
     words = df['流量词'].dropna().str.lower().str.split().sum()
@@ -264,62 +320,6 @@ def display_aggregated_word_frequency(df: pd.DataFrame):
     # 2. 依次展示词云和表格
     display_word_cloud(word_counts)
     display_frequency_table(freq_df)
-
-
-def plot_search_volume_and_purchases(df: pd.DataFrame):
-    """展示关键词搜索量和购买量的堆叠条形图。"""
-    st.subheader("关键词搜索量和购买量 (Search Volume and Purchases)")
-
-    df_filtered = df[df['月搜索量'] > 0].copy()
-    if df_filtered.empty:
-        st.warning("没有有效的月搜索量数据可供展示。")
-        return
-
-    top_20_search = df_filtered.sort_values(by="月搜索量", ascending=False).head(20)
-    top_20_search["未购买量"] = top_20_search["月搜索量"] - top_20_search["购买量"]
-
-    plot_df = top_20_search.melt(
-        id_vars=["流量词", "购买率"],
-        value_vars=["购买量", "未购买量"],
-        var_name="类型", value_name="数量"
-    )
-
-    fig = px.bar(
-        plot_df, y="流量词", x="数量", color="类型", orientation='h',
-        title="Top 20 关键词搜索量与购买量",
-        labels={"流量词": "关键词", "数量": "月搜索量"},
-        color_discrete_map={"购买量": "#00CC96", "未购买量": "#FECB52"}
-    )
-
-    # 为每个条形添加购买率标注
-    annotations = []
-    for _, row in top_20_search.iterrows():
-        # 购买率标注（在柱子内部右侧）
-        annotations.append(dict(
-            x=row['月搜索量'] * 0.98, y=row['流量词'],
-            text=f"购买率: {row['购买率']:.2%}",
-            showarrow=False, font=dict(color="black", size=10),
-            xanchor='right'
-        ))
-
-        # 新增：总搜索量标注（在柱子顶端）
-        annotations.append(dict(
-            x=row['月搜索量'], y=row['流量词'],
-            text=f"{row['月搜索量']:,}",  # 格式化数字，添加千位分隔符
-            showarrow=False,
-            xanchor='left',
-            xshift=10,  # 向右偏移一点，避免与柱子重叠
-            font=dict(color='green', size=12, weight='bold'),
-        ))
-
-    fig.update_layout(annotations=annotations)
-
-    fig.update_layout(
-        xaxis_title="月搜索量", yaxis_title="关键词",
-        yaxis={'categoryorder': 'total ascending'}, height=800,
-        legend_title_text='类型'
-    )
-    st.plotly_chart(fig, use_container_width=True)
 
 
 def display_raw_data(df: pd.DataFrame, title: str = "原始数据 (Raw Data)"):
