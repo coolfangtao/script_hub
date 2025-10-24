@@ -414,14 +414,14 @@ def main():
     create_common_sidebar()
     uploaded_files = ui.display_header_and_uploader()
 
-    # ------------------ 状态管理逻辑 ------------------
-    # 获取当前上传文件的唯一标识（文件名列表）
-    current_file_names = sorted([f.name for f in uploaded_files])
+    # ------------------ 优化后的状态管理逻辑 ------------------
 
-    # 如果 session_state 中没有数据，或者上传的文件已改变，则重新处理
-    if 'processed_data' not in st.session_state or st.session_state.get('file_names') != current_file_names:
-        if uploaded_files:
-            with st.spinner("首次处理文件中，请稍候..."):
+    # 只有当用户上传了新文件时，才触发数据处理和缓存更新
+    if uploaded_files:
+        current_file_names = sorted([f.name for f in uploaded_files])
+        # 检查上传的文件是否与缓存中的文件不同
+        if st.session_state.get('file_names') != current_file_names:
+            with st.spinner("检测到新文件，正在处理中..."):
                 individual_sheets = {}
                 dfs_for_consolidation = []
                 for file in uploaded_files:
@@ -433,7 +433,6 @@ def main():
 
                 if dfs_for_consolidation:
                     consolidated_df = pd.concat(dfs_for_consolidation, ignore_index=True)
-                    # 将所有需要的数据存入 session_state
                     st.session_state.processed_data = {
                         "individual": individual_sheets,
                         "consolidated": consolidated_df
@@ -441,11 +440,11 @@ def main():
                     st.session_state.file_names = current_file_names
                     st.success(f"成功处理并缓存了 {len(dfs_for_consolidation)} 个文件！")
                 else:
-                    st.session_state.processed_data = None  # 没有成功处理的文件
-        else:
-            st.session_state.processed_data = None  # 清空数据
+                    # 如果上传的文件都处理失败，则清空状态
+                    st.session_state.processed_data = None
+                    st.session_state.file_names = None
 
-    # ------------------ 渲染逻辑 ------------------
+    # ------------------ 渲染逻辑 (保持不变) ------------------
     if not st.session_state.get('processed_data'):
         st.info("请上传文件以开始分析。")
         return
