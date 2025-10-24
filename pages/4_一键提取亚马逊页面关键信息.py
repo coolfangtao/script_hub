@@ -5,8 +5,9 @@ import pandas as pd  # 导入 pandas 用于表格
 import requests  # (新增) 用于下载图片
 import io  # (新增) 用于内存中创建zip
 import zipfile  # (新增) 用于创建zip
+from shared.sidebar import create_common_sidebar
 
-
+create_common_sidebar()
 # --- 您提供的原始解析函数 ---
 # (为了保持代码整洁，这里省略了函数的内部实现，但它们与您提供的一致)
 
