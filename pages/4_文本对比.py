@@ -3,6 +3,9 @@ import difflib
 import re
 from typing import List, Tuple
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
+
+# 侧边栏和页面配置建议放在代码的开始部分
+st.set_page_config(page_title="文本对比工具", layout="wide")
 create_common_sidebar()
 
 
@@ -65,12 +68,11 @@ def inject_custom_css():
     )
 
 
-# --- 核心逻辑 (Bug已修复) ---
+# --- 核心逻辑 (无需改动) ---
 
 def tokenize_text(text: str) -> List[str]:
     """
-    【修复】将文本分割成单个字符的序列，以实现字符级的精确对比。
-    这对于处理中文、日文等无空格语言至关重要。
+    将文本分割成单个字符的序列，以实现字符级的精确对比。
     """
     return list(text)
 
@@ -79,7 +81,6 @@ def get_diff_ops(text1: str, text2: str) -> List[Tuple[str, int, int, int, int]]
     """
     使用difflib和新的分词器计算两段文本的差异操作码。
     """
-    # 使用修复后的分词器
     matcher = difflib.SequenceMatcher(None, tokenize_text(text1), tokenize_text(text2), autojunk=False)
     return matcher.get_opcodes()
 
@@ -87,14 +88,12 @@ def get_diff_ops(text1: str, text2: str) -> List[Tuple[str, int, int, int, int]]
 def generate_diff_html(text: str, ops: List[Tuple[str, int, int, int, int]], is_original: bool) -> str:
     """
     根据差异操作码生成用于展示的HTML字符串。
-    此函数无需改动，因为它能正确处理字符列表。
     """
     tokens = tokenize_text(text)
     html_parts = []
 
     for tag, i1, i2, j1, j2 in ops:
         if is_original:
-            # 获取原文的字符片段并用span包裹
             segment_tokens = tokens[i1:i2]
             segment_html = "".join(segment_tokens)
             if tag == 'equal':
@@ -104,7 +103,6 @@ def generate_diff_html(text: str, ops: List[Tuple[str, int, int, int, int]], is_
             elif tag == 'replace':
                 html_parts.append(f'<span class="diff-replace">{segment_html}</span>')
         else:
-            # 获取修改后文本的字符片段并用span包裹
             segment_tokens = tokens[j1:j2]
             segment_html = "".join(segment_tokens)
             if tag == 'equal':
@@ -117,7 +115,7 @@ def generate_diff_html(text: str, ops: List[Tuple[str, int, int, int, int]], is_
     return "".join(html_parts)
 
 
-# --- UI展示 (无需改动) ---
+# --- UI展示 (已优化) ---
 
 def display_legend():
     """
@@ -138,7 +136,6 @@ def main():
     """
     主函数，构建Streamlit应用界面。
     """
-    st.set_page_config(page_title="文本对比工具", layout="wide")
     inject_custom_css()
 
     st.title("📝 文本对比工具")
@@ -147,38 +144,58 @@ def main():
 
     display_legend()
 
-    # 使用一个更能体现字符级差异的示例文本
-    sample_original = "这是第一行。\n这是第二行，内容相同。\n这是将被修改的第三行。"
-    sample_modified = "这是第1行。\n这是第二行，内容不相同。\n这是被修改过的第三行。"
+    # --- 新增：Session State 初始化 ---
+    # 使用 session_state 来持久化输入和输出，确保页面切换或刷新后数据不丢失。
+    if "original_text" not in st.session_state:
+        st.session_state.original_text = "这是第一行。\n这是第二行，内容相同。\n这是将被修改的第三行。"
+    if "modified_text" not in st.session_state:
+        st.session_state.modified_text = "这是第1行。\n这是第二行，内容不相同。\n这是被修改过的第三行。"
+    if "original_diff_html" not in st.session_state:
+        st.session_state.original_diff_html = ""
+    if "modified_diff_html" not in st.session_state:
+        st.session_state.modified_diff_html = ""
 
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("原文")
-        original_text = st.text_area("输入原始文本", height=300, key="original", value=sample_original)
+        # 使用 key 参数将 text_area 组件与 session_state 自动双向绑定
+        st.text_area("输入原始文本", height=300, key="original_text")
 
     with col2:
         st.subheader("修改后")
-        modified_text = st.text_area("输入修改后的文本", height=300, key="modified", value=sample_modified)
+        st.text_area("输入修改后的文本", height=300, key="modified_text")
 
     if st.button("🔍 对比文本", use_container_width=True):
+        # 从 session_state 获取最新的文本内容
+        original_text = st.session_state.original_text
+        modified_text = st.session_state.modified_text
+
         if original_text and modified_text:
             ops = get_diff_ops(original_text, modified_text)
-
-            st.divider()
-            st.subheader("对比结果")
-
-            res_col1, res_col2 = st.columns(2)
-            with res_col1:
-                st.markdown("#### 原文差异")
-                original_diff_html = generate_diff_html(original_text, ops, is_original=True)
-                st.markdown(f'<div class="diff-container">{original_diff_html}</div>', unsafe_allow_html=True)
-
-            with res_col2:
-                st.markdown("#### 修改后差异")
-                modified_diff_html = generate_diff_html(modified_text, ops, is_original=False)
-                st.markdown(f'<div class="diff-container">{modified_diff_html}</div>', unsafe_allow_html=True)
+            # 将计算出的HTML结果也存入 session_state
+            st.session_state.original_diff_html = generate_diff_html(original_text, ops, is_original=True)
+            st.session_state.modified_diff_html = generate_diff_html(modified_text, ops, is_original=False)
         else:
+            # 如果输入为空，则清空之前可能存在的对比结果
+            st.session_state.original_diff_html = ""
+            st.session_state.modified_diff_html = ""
             st.warning("请输入原文和修改后的文本以便进行对比。")
+
+    # --- 优化：结果展示逻辑 ---
+    # 只要 session_state 中有结果，就总是显示它们。
+    # 这使得结果在页面重载后依然可见，直到下一次点击按钮或清空输入。
+    if st.session_state.original_diff_html and st.session_state.modified_diff_html:
+        st.divider()
+        st.subheader("对比结果")
+
+        res_col1, res_col2 = st.columns(2)
+        with res_col1:
+            st.markdown("#### 原文差异")
+            st.markdown(f'<div class="diff-container">{st.session_state.original_diff_html}</div>', unsafe_allow_html=True)
+
+        with res_col2:
+            st.markdown("#### 修改后差异")
+            st.markdown(f'<div class="diff-container">{st.session_state.modified_diff_html}</div>', unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
