@@ -121,7 +121,7 @@ def create_common_sidebar():
                 st.page_link(script["path"], label=script["label"])
 
     # 4. 添加使用统计信息
-    # show_usage_stats()
+    show_usage_stats()
 
     # 5. 小新动画
     shin_chan_animation()

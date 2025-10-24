@@ -139,7 +139,8 @@ class UsageTracker:
             st.error(f"启动跟踪线程失败: {e}")
             return False
 
-    @st.cache_data(ttl=600)  # 核心！缓存10分钟
+    # 告诉 cache 如何 "哈希" UsageTracker 实例：只需使用它的内存ID
+    @st.cache_data(ttl=600, hash_funcs={UsageTracker: id})  # 核心！缓存10分钟
     def get_usage_stats(self):
         """
         获取使用统计（带缓存）。
