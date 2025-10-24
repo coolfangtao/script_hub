@@ -4,6 +4,7 @@ import streamlit as st
 from shared.sidebar import create_common_sidebar
 from shared.update_log import show_changelog
 from shared.feedback import setup_database, show_feedback_module
+from shared.usage_tracker import usage_tracker
 
 # --- 页面基础设置 (必须是第一个st命令) ---
 st.set_page_config(
@@ -95,6 +96,23 @@ def display_core_features():
     st.divider()
 
 
+def show_global_usage_stats():
+    stats = usage_tracker.get_usage_stats()
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("总访问次数", stats['total_visits'])
+    with col2:
+        st.metric("启用脚本", stats['total_scripts'])
+    with col3:
+        st.metric("平均使用", f"{stats['total_visits'] // max(stats['total_scripts'], 1)}次")
+
+    if stats['top_scripts']:
+        st.subheader("🔥 最受欢迎的功能")
+        for i, (path, data) in enumerate(stats['top_scripts'][:5], 1):
+            st.write(f"{i}. **{data['script_name']}** - {data['count']}次访问")
+
+
 def display_friendly_links():
     """显示友情链接模块。"""
     st.header("🔗 友情链接")
@@ -130,6 +148,7 @@ def main():
     # --- 2. 页面主体内容渲染 ---
     display_welcome_banner()
     display_core_features()
+    show_global_usage_stats()
 
     # 更新日志
     show_changelog()
