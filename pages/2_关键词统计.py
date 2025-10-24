@@ -462,7 +462,7 @@ def plot_keyword_analysis(df: pd.DataFrame):
         with col2_2:
             st.metric("流量占比中位数", f"{traffic_median:.2f}%")
             if has_asin:
-                total_asin = df_filtered['涉及ASIN数量'].sum() if '涉及ASIN数量' in df_filtered.columns else 'N/A'
+                total_asin = df_filtered['涉及ASIN数量'].unique() if '涉及ASIN数量' in df_filtered.columns else 'N/A'
                 st.metric("总涉及ASIN数", total_asin)
             else:
                 # 如果没有ASIN数据，可以显示其他指标或留空
