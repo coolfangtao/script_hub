@@ -6,100 +6,24 @@ import edge_tts
 import os
 import google.generativeai as genai
 from typing import Optional
-from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
-from shared.config import Config
-cfg = Config()
-
-# --- 页面和侧边栏配置 ---
-# 配置页面信息
-st.set_page_config(page_title="英语语音现象分析器", page_icon="🗣️", layout="wide")
-# 调用函数创建共享的侧边栏
-create_common_sidebar()
-
-# --- 常量和样式定义 ---
-# 定义语音输出的目录
-OUTPUT_DIR = "tts_audio"
-if not os.path.exists(OUTPUT_DIR):
-    os.makedirs(OUTPUT_DIR)
-
-# 定义可选的 AI 模型列表
-MODEL_OPTIONS = [
-    "gemini-2.0-flash",
-    "gemini-2.5-pro",
-    "gemini-2.0-flash-exp",
-    "gemini-2.0-flash-lite",
-    "gemini-2.0-flash-preview-image-generation",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash-tts",
-    "gemini-2.5-flash",
-    "gemini-robotics-er-1.5-preview",
-    "gemma-3-12b",
-    "gemma-3-1b",
-    "gemma-3-27b",
-    "gemma-3-2b",
-    "gemma-3-4b",
-    "learnim-2.0-flash-experimental",
-    "imagen-3.0-generate",
-    "veo-2.0-generate-001",
-    "gemini-2.0-flash-live",
-    "gemini-2.5-flash-live",
-    "gemini-2.5-flash-native-audio-dialog"
-]
-
-# 注入自定义CSS样式
-st.markdown("""
-    <style>
-    .phonetic-analysis {
-        background-color: #f0f2f6;
-        border-left: 6px solid #1E90FF;
-        padding: 15px;
-        border-radius: 5px;
-        font-size: 1.1em;
-        line-height: 1.6;
-        color: #212529; /* <--  已修复：为这个框设置固定的深色文字 */
-    }
-    .phonetic-analysis strong {
-        color: #005A9C;
-    }
-    /* 隐藏Streamlit页脚 */
-    footer {visibility: hidden;}
-    </style>
-""", unsafe_allow_html=True)
+from shared.sidebar import create_common_sidebar
+from shared.config import GlobalConfig
 
 
-# --- 核心功能函数 ---
+# --- 1. 页面专属配置 ---
+class PhoneticsPageConfig(GlobalConfig):
+    """存储此页面专属的配置，继承全局配置。"""
 
-async def generate_tts(text: str, voice: str = "en-US-JennyNeural") -> Optional[str]:
-    """
-    使用 edge-tts 生成语音文件.
-    :param text: 要转换的文本.
-    :param voice: 使用的语音模型.
-    :return: 成功则返回音频文件路径, 否则返回 None.
-    """
-    try:
-        sanitized_filename = "".join(c for c in text if c.isalnum() or c in (' ', '.', '_')).rstrip()
-        output_file = os.path.join(OUTPUT_DIR, f"{sanitized_filename}.mp3")
-        communicate = edge_tts.Communicate(text, voice)
-        await communicate.save(output_file)
-        return output_file
-    except Exception as e:
-        st.error(f"语音生成失败: {e}", icon="😢")
-        return None
-
-
-def analyze_phonetics_with_gemini(text: str, model_name: str) -> str:
-    """
-    使用指定的 Gemini API 模型分析文本的语音现象.
-    :param text: 要分析的英语句子.
-    :param model_name: 要使用的 Gemini 模型名称.
-    :return: 包含分析结果的 Markdown 格式字符串.
-    """
-    if not text:
-        return ""
-
-    try:
-        model = genai.GenerativeModel(model_name)
-        prompt = f"""
+    def __init__(self):
+        super().__init__()
+        self.PAGE_TITLE = "英语语音现象分析器"
+        self.PAGE_ICON = "🗣️"
+        self.OUTPUT_DIR = "tts_audio"
+        self.DEFAULT_VOICE = "en-US-JennyNeural"
+        self.DEFAULT_SENTENCE = "Let's get a cup of coffee."
+        self.PLACEHOLDER_TEXT = "例如: What are you going to do?"
+        self.DEFAULT_MODEL = "gemini-1.5-flash"
+        self.PROMPT_TEMPLATE = """
         请作为一名专业的英语语音教师，分析以下句子的语音现象。
 
         句子: "{text}"
@@ -117,102 +41,239 @@ def analyze_phonetics_with_gemini(text: str, model_name: str) -> str:
 
         请严格按照以上要求，生成一个清晰、准确的分析结果。
         """
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        st.error(f"Gemini API 调用失败: {e}", icon="🔥")
-        return "分析时遇到错误，请检查您的 API 密钥是否有效或网络连接是否正常。"
 
 
-def process_and_display_results(sentence: str, selected_model: str):
-    """
-    协调分析和TTS过程，并在页面上展示结果。
-    此版本先生成语音，再在下方生成分析。
-    :param sentence: 用户输入的句子.
-    :param selected_model: 用户选择的AI模型.
-    """
-    if not sentence:
-        st.warning("请输入一个句子进行分析。", icon="✍️")
-        return
+# --- 2. 核心业务逻辑 ---
+class PhoneticsAnalyzer:
+    """封装核心的语音生成和文本分析功能。"""
 
-    # --- 1. 文本转语音 (TTS) ---
-    st.subheader("标准发音")
-    with st.spinner("🔊 正在生成语音，请稍候..."):
-        # 使用更稳健的方式在 Streamlit 中运行异步代码
+    def __init__(self, config: PhoneticsPageConfig):
+        self.config = config
+        if not os.path.exists(self.config.OUTPUT_DIR):
+            os.makedirs(self.config.OUTPUT_DIR)
+
+    async def generate_tts(self, text: str) -> Optional[str]:
+        """使用 edge-tts 生成语音文件。"""
         try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            sanitized_filename = "".join(c for c in text if c.isalnum() or c in (' ', '.', '_')).rstrip()[
+                                 :50]  # 限制文件名长度
+            output_file = os.path.join(self.config.OUTPUT_DIR, f"{sanitized_filename}.mp3")
 
-        audio_file_path = loop.run_until_complete(generate_tts(sentence, voice=cfg.DEFAULT_VOICE_NAME))
+            # 如果文件已存在，则直接返回路径，避免重复生成
+            if os.path.exists(output_file):
+                return output_file
 
-        if audio_file_path and os.path.exists(audio_file_path):
-            st.success("语音生成成功！")
-            st.audio(audio_file_path, format="audio/mp3")
-            with open(audio_file_path, "rb") as file:
-                st.download_button(
-                    label="📥 下载语音 (MP3)",
-                    data=file,
-                    file_name=os.path.basename(audio_file_path),
-                    mime="audio/mp3"
-                )
-        else:
-            # generate_tts 函数内部已经显示了具体的错误信息，所以这里不需要再显示
-            pass
+            communicate = edge_tts.Communicate(text, self.config.DEFAULT_VOICE)
+            await communicate.save(output_file)
+            return output_file
+        except Exception as e:
+            st.error(f"语音生成失败: {e}", icon="😢")
+            return None
 
-    st.divider()  # 添加一条分割线
+    def analyze_with_gemini(self, text: str, model_name: str) -> str:
+        """使用指定的 Gemini API 模型分析文本的语音现象。"""
+        if not text:
+            return ""
+        try:
+            model = genai.GenerativeModel(model_name)
+            prompt = self.config.PROMPT_TEMPLATE.format(text=text)
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            st.error(f"Gemini API 调用失败: {e}", icon="🔥")
+            return "分析时遇到错误，请检查您的 API 密钥是否有效或网络连接是否正常。"
 
-    # --- 2. 语音现象分析 ---
-    st.subheader("语音现象分析")
-    with st.spinner("🤖 正在分析中，请稍候..."):
-        analysis_result = analyze_phonetics_with_gemini(sentence, selected_model)
-        st.markdown(f'<div class="phonetic-analysis">{analysis_result}</div>', unsafe_allow_html=True)
+    def process_and_store_results(self, sentence: str, selected_model: str):
+        """协调分析和TTS过程，并将结果存储在 session_state 中。"""
+        if not sentence:
+            st.warning("请输入一个句子进行分析。", icon="✍️")
+            return
+
+        # --- 1. 文本转语音 (TTS) ---
+        with st.spinner("🔊 正在生成语音，请稍候..."):
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            audio_file_path = loop.run_until_complete(self.generate_tts(sentence))
+            st.session_state.audio_path = audio_file_path
+
+        # --- 2. 语音现象分析 ---
+        with st.spinner("🤖 正在分析中，请稍候..."):
+            analysis_result = self.analyze_with_gemini(sentence, selected_model)
+            st.session_state.analysis_result = analysis_result
 
 
-# --- 主程序入口 ---
+# --- 3. 页面UI布局 ---
+class PhoneticsPageUI:
+    """封装页面的所有UI渲染逻辑。"""
 
+    def __init__(self, config: PhoneticsPageConfig):
+        self.config = config
+
+    def setup_page(self):
+        """配置页面基本信息。"""
+        st.set_page_config(
+            page_title=self.config.PAGE_TITLE,
+            page_icon=self.config.PAGE_ICON,
+            layout="wide"
+        )
+
+    def display_header(self):
+        """显示页面标题和说明。"""
+        st.title(f"{self.config.PAGE_ICON} {self.config.PAGE_TITLE}")
+        st.markdown("输入一个英语句子，即可生成标准发音，并由AI分析其中包含的连读、略读等语音现象。\n"
+                    "**部分符号说明：**\n"
+                    "- 连读 (Liaison): 使用 `‿` 连接单词\n"
+                    "- 略读 (Elision): 在被省略的音素位置使用删除线 `~`\n"
+                    "- 插读 (Intrusion): 在插入音素的位置使用 `+` 号\n"
+                    "- 停顿: `|` 符号表示自然的语调停顿。")
+
+    def inject_custom_css(self):
+        """注入自定义CSS样式。"""
+        st.markdown("""
+            <style>
+            .phonetic-analysis {
+                background-color: #f0f2f6;
+                border-left: 6px solid #1E90FF;
+                padding: 15px;
+                border-radius: 5px;
+                font-size: 1.1em;
+                line-height: 1.6;
+                color: #212529;
+            }
+            .phonetic-analysis strong { color: #005A9C; }
+            footer { visibility: hidden; }
+            </style>
+        """, unsafe_allow_html=True)
+
+    def get_api_key(self) -> Optional[str]:
+        """根据运行模式获取API Key。"""
+        if self.config.RUN_MODE == "cloud":
+            with st.sidebar:
+                st.info("检测到Cloud运行模式，请输入您的API密钥。")
+                api_key = st.text_input("Gemini API Key", type="password", key="gemini_api_key_input")
+                if not api_key:
+                    st.warning("请输入您的Gemini API Key以继续。", icon="🔑")
+                    return None
+                return api_key
+        else:  # local模式
+            try:
+                return st.secrets["gemini_api_key"]
+            except (KeyError, FileNotFoundError):
+                st.error("本地模式运行失败：未在 Streamlit secrets 中找到名为 'gemini_api_key' 的Gemini API密钥。", icon="🚫")
+                return None
+
+    def display_input_form(self):
+        """显示输入表单，并返回用户输入和提交状态。"""
+        # 使用 session_state 中的值作为默认值，实现状态保持
+        selected_model = st.selectbox(
+            "**请选择一个分析模型：**",
+            options=self.config.GEMINI_MODEL_OPTIONS,
+            index=self.config.GEMINI_MODEL_OPTIONS.index(st.session_state.selected_model)
+        )
+        st.session_state.selected_model = selected_model  # 更新选择到session
+
+        with st.form("input_form"):
+            sentence = st.text_input(
+                "**在这里输入英语句子或短语：**",
+                value=st.session_state.sentence_input,
+                placeholder=self.config.PLACEHOLDER_TEXT
+            )
+            submitted = st.form_submit_button("分析并生成语音", type="primary")
+
+        if submitted:
+            # 提交时，用新输入更新 session_state
+            st.session_state.sentence_input = sentence
+
+        return st.session_state.sentence_input, submitted
+
+    def display_results(self):
+        """从 session_state 读取并显示结果。"""
+        if not st.session_state.get('analysis_result') and not st.session_state.get('audio_path'):
+            return  # 如果没有任何结果，则不显示
+
+        st.divider()
+
+        # --- 显示TTS结果 ---
+        st.subheader("标准发音")
+        audio_path = st.session_state.get('audio_path')
+        if audio_path:
+            if os.path.exists(audio_path):
+                st.success("语音已生成！")
+                st.audio(audio_path, format="audio/mp3")
+                with open(audio_path, "rb") as file:
+                    st.download_button(
+                        label="📥 下载语音 (MP3)",
+                        data=file,
+                        file_name=os.path.basename(audio_path),
+                        mime="audio/mp3"
+                    )
+            else:
+                st.warning("缓存的语音文件已丢失，请重新生成。")
+        elif st.session_state.sentence_input:  # 如果有句子输入但没有音频路径，说明生成失败
+            st.error("语音文件生成失败，请检查后台错误信息。")
+
+        st.divider()
+
+        # --- 显示分析结果 ---
+        st.subheader("语音现象分析")
+        analysis_result = st.session_state.get('analysis_result')
+        if analysis_result:
+            st.markdown(f'<div class="phonetic-analysis">{analysis_result}</div>', unsafe_allow_html=True)
+        elif st.session_state.sentence_input:  # 如果有句子输入但没有分析结果，说明分析失败
+            st.error("语音分析失败，请检查后台错误信息或API Key。")
+
+
+# --- 4. 主程序入口 ---
 def main():
     """主函数, 运行 Streamlit 应用."""
-    st.title("🗣️ 英语句子语音现象分析器")
-    st.markdown("输入一个英语句子，即可生成标准发音，并由AI分析其中包含的连读、略读等语音现象。\n"
-                "**部分符号说明：**\n"
-                "- 连读 (Liaison): 使用 `‿` 连接单词，例如 an‿apple\n"
-                "- 略读 (Elision): 在被省略的音素位置使用删除线 `~`，例如 las~t night\n"
-                "- 插读 (Intrusion): 在插入音素的位置使用 `+` 号，例如 go+w away\n"
-                "- 停顿: `|` 符号表示自然的语调停顿。")
+    # 初始化配置、UI和分析器实例
+    config = PhoneticsPageConfig()
+    ui = PhoneticsPageUI(config)
+    analyzer = PhoneticsAnalyzer(config)
 
-    # 模型选择框
-    selected_model = st.selectbox(
-        "**请选择一个分析模型：**",
-        options=MODEL_OPTIONS,
-        index=MODEL_OPTIONS.index(cfg.ANALYSIS_DEFAULT_MODEL)  # 默认选中 'gemini-2.0-flash'
-    )
+    # 页面基础设置
+    ui.setup_page()
+    ui.inject_custom_css()
+    create_common_sidebar()
+    ui.display_header()
 
-    with st.form("input_form"):
-        sentence = st.text_input(
-            "**在这里输入英语句子或短语：**",
-            value="Let's get a cup of coffee.",
-            placeholder="例如: What are you going to do?"
-        )
-        submitted = st.form_submit_button("分析并生成语音", type="primary")
+    # 初始化 session_state
+    if 'sentence_input' not in st.session_state:
+        st.session_state.sentence_input = config.DEFAULT_SENTENCE
+    if 'analysis_result' not in st.session_state:
+        st.session_state.analysis_result = ""
+    if 'audio_path' not in st.session_state:
+        st.session_state.audio_path = None
+    if 'selected_model' not in st.session_state:
+        st.session_state.selected_model = config.DEFAULT_MODEL
 
+    # 获取并配置API密钥
+    api_key = ui.get_api_key()
+    if not api_key:
+        return  # 如果没有key，则停止执行
+
+    try:
+        genai.configure(api_key=api_key)
+    except Exception as e:
+        st.error(f"API 密钥配置失败，请检查您的密钥是否正确。错误: {e}", icon="🚨")
+        return
+
+    # 显示输入表单并获取用户操作
+    sentence, submitted = ui.display_input_form()
+
+    # 如果用户提交了新请求，则清空旧结果并开始处理
     if submitted:
-        # 从secrets读取API密钥
-        try:
-            api_key = st.secrets[cfg.GEMINI_API_KEY]
-            genai.configure(api_key=api_key)
-        except (KeyError, FileNotFoundError):
-            st.error("操作失败：未在 Streamlit secrets 中找到名为 'API_KEY' 的 Gemini API 密钥。", icon="🚫")
-            return
-        except Exception as e:
-            st.error(f"API 密钥配置失败，请检查您的密钥是否正确。错误: {e}", icon="🚨")
-            return
+        st.session_state.audio_path = None
+        st.session_state.analysis_result = ""
+        analyzer.process_and_store_results(sentence, st.session_state.selected_model)
 
-        # 开始处理并展示结果
-        process_and_display_results(sentence, selected_model)
+    # 无论是否提交，都尝试显示 session_state 中的结果
+    ui.display_results()
 
 
 if __name__ == "__main__":
     main()
-
