@@ -251,6 +251,139 @@ def plot_search_volume_and_purchases(df: pd.DataFrame):
     st.plotly_chart(fig, use_container_width=True)
 
 
+def plot_keyword_analysis(df: pd.DataFrame):
+    """综合分析关键词的搜索量和流量占比，识别不同类型的关键词"""
+    st.subheader("关键词综合分析 (Keyword Analysis)")
+
+    # 数据预处理
+    df_filtered = df[(df['月搜索量'] > 0) & (df['流量占比'] > 0)].copy()
+    if df_filtered.empty:
+        st.warning("没有有效的搜索量和流量数据可供分析。")
+        return
+
+    # 计算指标
+    df_filtered['总流量贡献'] = df_filtered['流量占比'] * 100  # 转换为百分比便于分析
+
+    # 计算搜索量和流量占比的中位数作为分界线
+    search_median = df_filtered['月搜索量'].median()
+    traffic_median = df_filtered['总流量贡献'].median()
+
+    # 分类关键词
+    def classify_keyword(row):
+        search_vol = row['月搜索量']
+        traffic_contribution = row['总流量贡献']
+
+        if search_vol > search_median and traffic_contribution > traffic_median:
+            return '核心大词 (高搜索量+高流量)'
+        elif search_vol > search_median and traffic_contribution <= traffic_median:
+            return '潜力词 (高搜索量+低流量)'
+        elif search_vol <= search_median and traffic_contribution > traffic_median:
+            return '精准词 (低搜索量+高流量)'
+        else:
+            return '长尾词 (低搜索量+低流量)'
+
+    df_filtered['关键词类型'] = df_filtered.apply(classify_keyword, axis=1)
+
+    # 创建散点图
+    fig = px.scatter(
+        df_filtered,
+        x='月搜索量',
+        y='总流量贡献',
+        color='关键词类型',
+        hover_data=['流量词', '购买率', '自然流量占比', '广告流量占比'],
+        title='关键词搜索量 vs 流量占比分析',
+        labels={
+            '月搜索量': '月搜索量',
+            '总流量贡献': '流量占比 (%)',
+            '关键词类型': '关键词类型'
+        },
+        size='总流量贡献',  # 点的大小表示流量占比
+        size_max=20
+    )
+
+    # 添加中位线
+    fig.add_hline(y=traffic_median, line_dash="dash", line_color="red",
+                  annotation_text=f"流量中位数: {traffic_median:.2f}%")
+    fig.add_vline(x=search_median, line_dash="dash", line_color="red",
+                  annotation_text=f"搜索量中位数: {search_median:,.0f}")
+
+    fig.update_layout(height=600)
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 显示分类统计和详细数据
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.write("### 📊 分类统计")
+        type_stats = df_filtered['关键词类型'].value_counts()
+        for type_name, count in type_stats.items():
+            percentage = count / len(df_filtered) * 100
+            st.write(f"**{type_name}**: {count}个 ({percentage:.1f}%)")
+
+    with col2:
+        st.write("### 📈 关键指标")
+        st.metric("总关键词数", len(df_filtered))
+        st.metric("搜索量中位数", f"{search_median:,.0f}")
+        st.metric("流量占比中位数", f"{traffic_median:.2f}%")
+
+    # 显示详细数据表格
+    st.write("### 📋 详细数据")
+
+    # 添加分类筛选器
+    selected_types = st.multiselect(
+        "选择要显示的关键词类型:",
+        options=df_filtered['关键词类型'].unique(),
+        default=df_filtered['关键词类型'].unique()
+    )
+
+    filtered_df = df_filtered[df_filtered['关键词类型'].isin(selected_types)]
+
+    # 显示数据表格
+    display_columns = ['流量词', '月搜索量', '流量占比', '购买率', '自然流量占比', '广告流量占比', '关键词类型']
+    display_df = filtered_df[display_columns].sort_values(['月搜索量', '流量占比'], ascending=[False, False])
+
+    # 格式化显示
+    formatted_df = display_df.copy()
+    formatted_df['月搜索量'] = formatted_df['月搜索量'].apply(lambda x: f"{x:,.0f}")
+    formatted_df['流量占比'] = formatted_df['流量占比'].apply(lambda x: f"{x:.2%}")
+    formatted_df['购买率'] = formatted_df['购买率'].apply(lambda x: f"{x:.2%}")
+    formatted_df['自然流量占比'] = formatted_df['自然流量占比'].apply(lambda x: f"{x:.2%}")
+    formatted_df['广告流量占比'] = formatted_df['广告流量占比'].apply(lambda x: f"{x:.2%}")
+
+    st.dataframe(formatted_df, use_container_width=True)
+
+    # 提供下载功能
+    csv = filtered_df[display_columns].to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 下载筛选后的数据 (CSV)",
+        data=csv,
+        file_name="keyword_analysis.csv",
+        mime="text/csv"
+    )
+
+    # 策略建议
+    st.write("### 💡 策略建议")
+
+    advice_mapping = {
+        '核心大词 (高搜索量+高流量)':
+            "✅ **保持优势**: 这些是您的核心关键词，继续保持优化，考虑增加相关长尾词",
+
+        '潜力词 (高搜索量+低流量)':
+            "🚀 **重点突破**: 高搜索量但流量低，需要优化页面内容、提高排名或增加广告投入",
+
+        '精准词 (低搜索量+高流量)':
+            "🎯 **精准维护**: 转化率高，维护现有排名，可适当拓展相关词",
+
+        '长尾词 (低搜索量+低流量)':
+            "📈 **选择性优化**: 竞争较小，可作为补充，重点关注有转化潜力的词"
+    }
+
+    for keyword_type in selected_types:
+        if keyword_type in advice_mapping:
+            st.info(f"**{keyword_type}**: {advice_mapping[keyword_type]}")
+
+
+
 def calculate_word_frequency(df: pd.DataFrame) -> Tuple[Dict[str, int], pd.DataFrame]:
     """从流量词列计算单词频率。"""
     words = df['流量词'].dropna().str.lower().str.split().sum()
@@ -385,6 +518,8 @@ def main():
             # 展示搜索和购买占比
             plot_search_volume_and_purchases(df)
 
+            plot_keyword_analysis(df)  # 新增的综合分析
+
             # --- 词频分析 ---
             st.subheader("单ASIN组成关键词的单词频率 (Word Frequency)")
             display_aggregated_word_frequency(df)
@@ -446,6 +581,7 @@ def main():
                 plot_keyword_traffic(selected_asin_df)
                 # 展示搜索和购买占比
                 plot_search_volume_and_purchases(selected_asin_df)
+                plot_keyword_analysis(selected_asin_df)  # 新增的综合分析
 
                 # --- 词频分析 ---
                 st.subheader("单ASIN组成关键词的单词频率 (Word Frequency)")
