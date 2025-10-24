@@ -563,6 +563,9 @@ def main():
             display_key_metrics(consolidated_df, is_consolidated=True) # todo:新建特定函数
             plot_asin_traffic_contribution(consolidated_df)
             plot_keyword_traffic(consolidated_df)
+            # 展示搜索和购买占比
+            plot_search_volume_and_purchases(consolidated_df)
+            plot_keyword_analysis(consolidated_df)  # 新增的综合分析
             st.subheader("聚合后组成关键词的单词频率 (Word Frequency)")
             display_aggregated_word_frequency(consolidated_df)
             display_raw_data(consolidated_df, title="合并后的数据表 (Consolidated Data)")
