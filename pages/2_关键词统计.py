@@ -376,14 +376,30 @@ def plot_keyword_analysis(df: pd.DataFrame):
 
     df_filtered['关键词类型'] = df_filtered.apply(classify_keyword, axis=1)
 
+    # 设置图表标题
+    title_suffix = " (多ASIN汇总)" if has_asin else ""
+    chart_title = f'关键词搜索量 vs 流量占比分析{title_suffix}'
+
+    # 创建自定义悬停模板
+    hover_template = (
+        "<span style='font-size: 16px; font-weight: bold; color: green'>📌 %{customdata[0]}</span><br><br>"
+        "<b>搜索量:</b> %{x:,}<br>"
+        "<b>流量占比:</b> %{y:.2f}%<br>"
+        "<b>购买率:</b> %{customdata[1]:.2%}<br>"
+        "<b>自然流量:</b> %{customdata[2]:.2%}<br>"
+        "<b>广告流量:</b> %{customdata[3]:.2%}"
+    )
+
+    # 如果有多ASIN数据，在悬停模板中添加ASIN数量
+    if has_asin:
+        hover_template += "<br><b>涉及ASIN数量:</b> %{customdata[4]}"
+
+    hover_template += "<extra></extra>"
+
     # 准备悬停数据
     hover_data = ['流量词', '购买率', '自然流量占比', '广告流量占比']
     if has_asin:
         hover_data.append('涉及ASIN数量')
-
-    # 设置图表标题
-    title_suffix = " (多ASIN汇总)" if has_asin else ""
-    chart_title = f'关键词搜索量 vs 流量占比分析{title_suffix}'
 
     # 创建散点图
     fig = px.scatter(
@@ -391,7 +407,6 @@ def plot_keyword_analysis(df: pd.DataFrame):
         x='月搜索量',
         y='总流量贡献',
         color='关键词类型',
-        hover_data=hover_data,
         title=chart_title,
         labels={
             '月搜索量': '月搜索量',
@@ -400,6 +415,12 @@ def plot_keyword_analysis(df: pd.DataFrame):
         },
         size='总流量贡献',  # 点的大小表示流量占比
         size_max=20
+    )
+
+    # 更新悬停模板
+    fig.update_traces(
+        hovertemplate=hover_template,
+        customdata=df_filtered[hover_data]
     )
 
     # 添加中位线
