@@ -27,6 +27,8 @@ class GlobalConfig:
         )
 
         self.IMAGE_PATH_IN_REPO = st.secrets.get("IMAGE_PATH_IN_REPO", "images")
+        # 添加数据文件路径
+        self.USAGE_DATA_FILE = "script_usage_data.json"
 
 
         # 从 Streamlit secrets 加载密钥
