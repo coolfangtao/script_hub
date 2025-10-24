@@ -22,7 +22,7 @@ class PhoneticsPageConfig(GlobalConfig):
         self.DEFAULT_VOICE = "en-US-JennyNeural"
         self.DEFAULT_SENTENCE = "Let's get a cup of coffee."
         self.PLACEHOLDER_TEXT = "例如: What are you going to do?"
-        self.DEFAULT_MODEL = "gemini-1.5-flash"
+        self.DEFAULT_MODEL = "gemini-2.5-flash-lite"
         self.PROMPT_TEMPLATE = """
         请作为一名专业的英语语音教师，分析以下句子的语音现象。
 
