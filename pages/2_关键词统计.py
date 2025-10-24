@@ -430,7 +430,7 @@ def plot_keyword_analysis(df: pd.DataFrame):
     )
 
     # 设置所有点的大小相同
-    fig.update_traces(marker=dict(size=12))
+    fig.update_traces(marker=dict(size=8))
 
     # 更新悬停模板
     fig.update_traces(
