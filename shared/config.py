@@ -29,7 +29,19 @@ class GlobalConfig:
 
         # 从 Streamlit secrets 加载密钥
         self.GITHUB_TOKEN = st.secrets.get("github_data_token")
-        self.GITHUB_REPO = st.secrets.get("github_data_repo")
+        self.GITHUB_PRIVATE_REPO = st.secrets.get("github_data_repo")
+        self.GITHUB_PUBLIC_REPO = st.secrets.get("github_data_public_repo")
+
+        # 可用的AI模型
+        self.GEMINI_MODEL_OPTIONS = [
+            "gemini-2.5-flash-lite",  # 默认模型，可用，2.15秒
+            "gemini-2.0-flash",  # 可用，5.11秒
+            "gemini-2.5-pro",   # 可用，14.93秒
+            "gemini-2.0-flash-exp",  # 可用，4.28秒
+            "gemini-2.0-flash-lite",  # 可用，9.62秒
+            "gemini-2.5-flash",  # 可用，6.74秒
+            "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
+        ]
 
         # 定义时区
         self.APP_TIMEZONE = timezone(timedelta(hours=8))  # 北京时间 (UTC+8)
