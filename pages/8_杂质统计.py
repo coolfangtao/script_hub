@@ -19,8 +19,36 @@ import re
 from PIL import Image
 import pandas as pd
 import plotly.express as px
-from shared.config import Config
 from shared.sidebar import create_common_sidebar
+
+
+class Config:
+    """
+    这个类用于集中存放所有Streamlit应用的配置参数。理论上所有的硬编码都应该放在这里
+    它支持从YAML文件加载配置、动态设置/获取值以及清晰地打印所有配置项。
+    """
+
+    def __init__(self):
+        # 杂质检测可用的AI模型
+        self.ZAZHI_JIANCE_GEMINI_MODEL_OPTIONS = [
+            "gemini-2.5-flash-lite",  # 默认模型，可用，2.15秒
+            "gemini-2.0-flash",  # 可用，5.11秒
+            "gemini-2.5-pro",   # 可用，14.93秒
+            "gemini-2.0-flash-exp",  # 可用，4.28秒
+            "gemini-2.0-flash-lite",  # 可用，9.62秒
+            "gemini-2.5-flash",  # 可用，6.74秒
+            "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
+        ]
+        self.ZAZHI_JIANCE_GET_ELEMENTS_DATA_PROMPT = """
+                        请仔细分析提供的图片，该图片展示了X射线能谱（EDS）分析的结果界面。你的任务是从右上角的‘定量结果’表格中，提取所有检测到的元素的定量分析数据。
+                        对于表格中列出的每一个元素，请提取并清晰地列出以下两个数值：
+                        - 质量百分比（Mass %）： 提取该元素在‘质量%’列中的数值及其不确定度。
+                        - 原子百分比（Atomic %）： 提取该元素在‘原子%’列中的数值及其不确定度。
+                        请以 Markdown 表格的格式呈现这些数据，确保所有数值及其对应的不确定度都完整且准确地体现在输出中。
+                        然后关注‘定量结果’列表中的元素及其含量，并结合能谱图的峰位，简要分析该物质的主要组成成分（例如是氧化镁还是碳化物或者硫化物等）。
+                        最后依据结果界面的数据给出杂质（左上图中黑点）的具体尺寸（微米）。
+                        """
+
 
 
 # 实例化配置
