@@ -412,8 +412,8 @@ def plot_keyword_analysis(df: pd.DataFrame):
             '总流量贡献': '流量占比 (%)',
             '关键词类型': '关键词类型'
         },
-        size='总流量贡献',  # 点的大小表示流量占比
-        size_max=20,
+        size=15,  # 点的大小表示流量占比
+        # size_max=20,
         color_discrete_map={
             '核心大词 (高搜索量+高流量)': '#FF6B6B',  # 红色 - 最重要
             '潜力词 (高搜索量+低流量)': '#FFD93D',  # 黄色 - 有潜力
