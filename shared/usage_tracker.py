@@ -223,6 +223,8 @@ def show_usage_stats():
 
     except Exception as e:
         st.sidebar.error("统计加载失败")
-        # 将 'e' 转换为 str() 来防止 StreamlitAPIException
-        st.sidebar.debug(f"错误详情: {str(e)}")
+        # 记录详细错误到日志，而不是尝试在UI中显示
+        # 尝试在UI中显示 'e' 甚至 'str(e)' 都会导致 StreamlitAPIException
+        logging.error(f"show_usage_stats 失败: {e}", exc_info=True)
+        st.sidebar.debug("详细错误已记录到日志。")
 
