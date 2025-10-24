@@ -17,3 +17,4 @@ streamlit_autorefresh
 PyGithub
 google-api-python-client
 youtube-transcript-api
+beautifulsoup4

@@ -32,6 +32,10 @@ SCRIPTS_BY_GROUP = {
             "label": "每日任务看板",
             "path": r"pages/0_任务看板.py"
         },
+        {
+            "label": "商品信息提取",
+            "path": r"pages/4_一键提取亚马逊页面关键信息.py"
+        },
     ],
     "📝 文本处理": [
         {
