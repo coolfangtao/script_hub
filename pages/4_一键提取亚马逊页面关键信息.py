@@ -2,6 +2,9 @@ import streamlit as st
 from bs4 import BeautifulSoup
 import re
 import pandas as pd  # 导入 pandas 用于表格
+import requests  # (新增) 用于下载图片
+import io  # (新增) 用于内存中创建zip
+import zipfile  # (新增) 用于创建zip
 
 
 # --- 您提供的原始解析函数 ---
@@ -256,6 +259,43 @@ def convert_df_to_csv(df):
     return df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
 
 
+# --- (新增) 下载并压缩图片的函数 ---
+@st.cache_data  # 缓存下载结果
+def download_and_zip_images(image_urls):
+    """
+    Downloads images from a list of URLs and returns them in a zipped BytesIO buffer.
+    """
+    zip_buffer = io.BytesIO()
+    # 使用 with 语句确保 zip 文件被正确关闭
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        progress_bar = st.progress(0, text="开始下载...")
+        total_images = len(image_urls)
+
+        for i, url in enumerate(image_urls):
+            try:
+                response = requests.get(url, timeout=10)  # 10 秒超时
+                if response.status_code == 200:
+                    # 从URL获取一个基本的文件名
+                    filename = url.split('/')[-1].split('?')[0]
+                    # 确保文件名有意义，如果太短或没有扩展名
+                    if not filename or not '.' in filename[-5:]:
+                        filename = f"image_{i + 1}.jpg"
+
+                    zip_file.writestr(filename, response.content)
+                else:
+                    st.warning(f"无法下载图片 (状态码 {response.status_code}): {url}", icon="⚠️")
+            except requests.RequestException as e:
+                st.error(f"下载图片时出错: {url} (错误: {e})", icon="🔥")
+
+            # 更新进度条
+            progress_bar.progress((i + 1) / total_images, text=f"正在下载第 {i + 1}/{total_images} 张图片...")
+
+        progress_bar.progress(1.0, text="压缩完成！")
+
+    zip_buffer.seek(0)
+    return zip_buffer
+
+
 # --- (新增) 格式化基本信息 ---
 def format_other_info_for_display(results):
     """
@@ -372,7 +412,7 @@ def display_streamlit_results(results):
 
             st.dataframe(df_display, use_container_width=True)
 
-            # --- 2b. 下载按钮 ---
+            # --- 2b. 下载按钮 (CSV) ---
             csv_data = convert_df_to_csv(df_display)
             st.download_button(
                 label="下载评论 (CSV 文件)",
@@ -382,7 +422,37 @@ def display_streamlit_results(results):
                 key="download_csv"
             )
 
-            # --- 2c. 简洁文本格式 ---
+            # --- 2c. (新增) 图片下载 ---
+            # 提取所有唯一的图片URL
+            all_image_urls = sorted(list(set(
+                url for review in reviews_list if review.get('images') for url in review['images']
+            )))
+
+            if all_image_urls:
+                st.markdown("---")
+                st.subheader(f"📷 评论图片下载 (共 {len(all_image_urls)} 张)")
+
+                # 使用 session state 来存储 zip 文件的状态
+                if 'zip_buffer' not in st.session_state:
+                    st.session_state.zip_buffer = None
+
+                if st.button("准备图片下载 (ZIP)", key="prep_download"):
+                    # 调用函数并存储结果
+                    # (使用 tuple 是因为 list 不可哈希，无法被 @st.cache_data 缓存)
+                    st.session_state.zip_buffer = download_and_zip_images(tuple(all_image_urls))
+
+                # 如果 zip 文件已经生成，显示最终的下载按钮
+                if st.session_state.zip_buffer:
+                    st.download_button(
+                        label="✅ 点击下载 ZIP 文件",
+                        data=st.session_state.zip_buffer,
+                        file_name="amazon_review_images.zip",
+                        mime="application/zip",
+                        key="download_zip_final"
+                    )
+
+            # --- 2d. 简洁文本格式 ---
+            st.markdown("---")
             st.subheader("简洁文本版评论 (可复制)")
             simple_reviews_text = format_reviews_simple_text(reviews_list)
             st.text_area("评论文本:", value=simple_reviews_text, height=400, disabled=True, key="reviews_text_area")
@@ -415,6 +485,10 @@ html_content = st.text_area("在此处粘贴网页源代码:", height=300, key="
 # 提取按钮
 if st.button("提取信息", key="extract_button", type="primary"):
     if html_content:
+        # (新增) 清理上一次的下载状态
+        if 'zip_buffer' in st.session_state:
+            st.session_state.zip_buffer = None
+
         with st.spinner("正在解析中，请稍候..."):
             try:
                 # 提取所有信息
@@ -432,6 +506,7 @@ if st.button("提取信息", key="extract_button", type="primary"):
                 st.exception(e)
     else:
         st.warning("警告：文本框为空，请输入网页源代码。")
+
 
 
 
