@@ -26,6 +26,8 @@ class GlobalConfig:
             os.path.join(os.path.dirname(__file__), '..', 'local_tasks_data.json')
         )
 
+        self.IMAGE_PATH_IN_REPO = st.secrets.get("IMAGE_PATH_IN_REPO", "images")
+
 
         # 从 Streamlit secrets 加载密钥
         self.GITHUB_TOKEN = st.secrets.get("github_data_token")

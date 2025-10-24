@@ -18,7 +18,7 @@ cfg = GlobalConfig()
 create_common_sidebar()  # 调用函数创建侧边栏
 
 
-def upload_image_to_github(image_bytes, original_filename, token, repo_owner, repo_name, image_path="images"):
+def upload_image_to_github(image_bytes, original_filename, token, repo_owner, repo_name, image_path=cfg.IMAGE_PATH_IN_REPO):
     """
     将图片字节上传到指定的 GitHub 仓库并返回 jsDelivr CDN URL。
     这是一个通用函数，接收所有必要的认证和路径信息。
