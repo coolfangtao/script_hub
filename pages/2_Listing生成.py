@@ -10,12 +10,12 @@ class ListingConfig:
 
     # 应用配置
     PAGE_TITLE = "Listing 智能生成器"
-    PAGE_ICON = "🚀"
+    PAGE_ICON = "📝"
     LAYOUT = "wide"
 
     # API 配置
-    GEMINI_API_KEY = "GEMINI_API_KEY"
-    DEFAULT_MODEL = "gemini-pro"
+    GEMINI_API_KEY = "gemini_api_key"
+    DEFAULT_MODEL = "gemini-2.5-pro"
 
     # 数据配置
     KEYWORD_COLUMNS = ['流量词', '关键词翻译', '流量占比', '月搜索量', '购买率']
@@ -70,14 +70,13 @@ class ListingConfig:
     USAGE_SCENARIOS = "猫、狗、长毛或短毛宠物，以及用于沙发、地毯等场景"
 
     # 生成数量配置
-    TITLE_COUNT = 3
+    TITLE_COUNT = 4
     BULLET_POINTS_COUNT = 5
 
 
 # --- 导入共享模块 ---
 # 假设这些模块存在于您的项目结构中
 from shared.sidebar import create_common_sidebar
-from shared.config import Config
 
 # --- 页面配置 ---
 cfg = ListingConfig()
