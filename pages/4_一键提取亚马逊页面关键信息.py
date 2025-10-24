@@ -3,9 +3,6 @@ from bs4 import BeautifulSoup
 import re
 
 
-# --- 您提供的原始解析函数 ---
-# (为了保持代码整洁，这里省略了函数的内部实现，但它们与您提供的一致)
-
 def extract_all_product_info(html_content):
     """
     从网页源代码中提取商品的所有关键信息
@@ -28,6 +25,10 @@ def extract_all_product_info(html_content):
     # 4. 提取评分信息
     rating_info = extract_rating(soup)
     results['rating'] = rating_info
+
+    # 5. 提取所有用户评论 (新增)
+    reviews = extract_reviews(soup)
+    results['reviews'] = reviews
 
     return results
 
@@ -124,6 +125,109 @@ def extract_rating(soup):
     return rating_info
 
 
+# --- (新增) 提取评论函数 ---
+
+def extract_reviews(soup):
+    """
+    提取所有用户评论信息 (已集成)
+    """
+    reviews = []
+
+    # 使用模糊匹配找到所有评论容器
+    # (已增强：添加备用选择器)
+    review_containers = soup.find_all('div', id=re.compile(r'(customer_review-|review-)'))
+
+    if not review_containers:
+        review_containers = soup.find_all('div', attrs={'data-hook': 'review'})
+
+    for container in review_containers:
+        review = {}
+
+        # 1. 提取用户名
+        profile_name = container.find('span', class_='a-profile-name')
+        if profile_name:
+            review['username'] = profile_name.get_text(strip=True)
+
+        # 2. 提取评论标题/概要
+        review_title = container.find('span', class_='review-title-content')
+        if review_title:
+            review['title'] = review_title.get_text(strip=True)
+        else:
+            # 备选方法：通过data-hook属性
+            title_element = container.find('span', attrs={'data-hook': 'review-title'})
+            if title_element:
+                # 获取标题文本，跳过星级部分
+                title_text = title_element.get_text(strip=True)
+                # 移除星级文本，只保留标题
+                # (这个逻辑可能不总是准确，但保留原样)
+                if 'out of 5 stars' in title_text:
+                    # 尝试更准确地分割
+                    parts = re.split(r'\d+\.\d out of 5 stars', title_text)
+                    if len(parts) > 1:
+                        title_text = parts[1].strip()
+                    else:
+                        # 备用方案
+                        title_text = title_text.split('out of 5 stars')[-1].strip()
+                review['title'] = title_text
+
+        # 3. 提取星级评分
+        star_rating_icon = container.find('i', attrs={'data-hook': 'review-star-rating'})
+        if star_rating_icon:
+            # 尝试从 'a-icon-alt' 中获取
+            star_text = star_rating_icon.find('span', class_='a-icon-alt')
+            if star_text:
+                match = re.search(r'(\d+\.?\d*) out of 5 stars', star_text.get_text())
+                if match:
+                    review['rating'] = match.group(1)
+
+        # 备选方案 (来自您的代码)
+        if 'rating' not in review:
+            star_rating = container.find('i', class_=re.compile(r'a-star-\d'))
+            if star_rating:
+                # 从class名中提取星级数字
+                class_names = star_rating.get('class', [])
+                for class_name in class_names:
+                    if class_name.startswith('a-star-'):
+                        # 提取数字，如 "a-star-4" -> "4"
+                        review['rating'] = class_name.split('-')[-1].replace('-', '.')  # 兼容 a-star-4-5
+                        break
+
+        # 4. 提取评论日期
+        review_date = container.find('span', attrs={'data-hook': 'review-date'})
+        if review_date:
+            review['date'] = review_date.get_text(strip=True)
+
+        # 5. 提取评论正文
+        review_body = container.find('span', attrs={'data-hook': 'review-body'})
+        if review_body:
+            # 获取评论文本，包括可能被折叠的内容
+            review_text = review_body.get_text(strip=True)
+            review['content'] = review_text
+
+        # 6. 提取是否有Verified Purchase
+        verified_badge = container.find('span', attrs={'data-hook': 'avp-badge-linkless'})
+        if verified_badge and 'Verified Purchase' in verified_badge.get_text():
+            review['verified'] = True
+        else:
+            # 备选
+            verified_badge_alt = container.find('span', class_='a-size-mini', string=re.compile('Verified Purchase'))
+            if verified_badge_alt:
+                review['verified'] = True
+            else:
+                review['verified'] = False
+
+        # 7. 提取有帮助的数量
+        helpful_text = container.find('span', attrs={'data-hook': 'helpful-vote-statement'})
+        if helpful_text:
+            helpful_count = helpful_text.get_text(strip=True)
+            review['helpful_count'] = helpful_count
+
+        if review:  # 只添加有内容的评论
+            reviews.append(review)
+
+    return reviews
+
+
 # --- 用于Streamlit的新函数 ---
 
 def display_streamlit_results(results):
@@ -171,6 +275,30 @@ def display_streamlit_results(results):
     else:
         st.warning("未找到商品特性。")
 
+    # 5. 显示评论 (新增)
+    if results.get('reviews'):
+        st.subheader(f"💬 用户评论 (找到 {len(results['reviews'])} 条)")
+        for i, review in enumerate(results['reviews']):
+            expander_title = f"**{review.get('title', '无标题')}** - (评分: {review.get('rating', '?')}/5) - by {review.get('username', '匿名')}"
+            with st.expander(expander_title):
+                cols = st.columns(3)
+                with cols[0]:
+                    st.text(f"👤 用户: {review.get('username', 'N/A')}")
+                with cols[1]:
+                    st.text(f"📅 日期: {review.get('date', 'N/A')}")
+                with cols[2]:
+                    verified_text = "是" if review.get('verified', False) else "否"
+                    st.text(f"✅ 已验证购买: {verified_text}")
+
+                if review.get('helpful_count'):
+                    st.text(f"👍 有帮助: {review.get('helpful_count')}")
+
+                st.markdown("---")
+                st.markdown(review.get('content', '无内容'))
+
+    else:
+        st.info("未找到用户评论。")
+
 
 def format_results_for_copy(results):
     """
@@ -209,6 +337,31 @@ def format_results_for_copy(results):
         for i, feature in enumerate(results['features'], 1):
             lines.append(f"  {i}. {feature}")
         lines.append("-" * 50)
+
+    # 5. 添加评论到复制文本 (新增)
+    if results.get('reviews'):
+        lines.append("\n")
+        lines.append("=" * 50)
+        lines.append(f"💬 用户评论 (找到 {len(results['reviews'])} 条)")
+        lines.append("=" * 50)
+        lines.append("\n")
+
+        for i, review in enumerate(results['reviews'], 1):
+            lines.append(f"--- 评论 {i} ---")
+            lines.append(f"👤 用户名: {review.get('username', 'N/A')}")
+            lines.append(f"⭐ 评分: {review.get('rating', '?')}/5")
+            lines.append(f"📅 日期: {review.get('date', 'N/A')}")
+            lines.append(f"✍️ 标题: {review.get('title', '无标题')}")
+
+            verified_text = "是" if review.get('verified', False) else "否"
+            lines.append(f"✅ 已验证购买: {verified_text}")
+
+            if review.get('helpful_count'):
+                lines.append(f"👍 有帮助: {review.get('helpful_count')}")
+
+            lines.append("---")
+            lines.append(f"内容:\n{review.get('content', '无内容')}")
+            lines.append("\n")
 
     return "\n".join(lines)
 
@@ -252,3 +405,4 @@ if st.button("提取信息", key="extract_button", type="primary"):
                 st.exception(e)
     else:
         st.warning("警告：文本框为空，请输入网页源代码。")
+
