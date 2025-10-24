@@ -223,4 +223,6 @@ def show_usage_stats():
 
     except Exception as e:
         st.sidebar.error("统计加载失败")
-        st.sidebar.debug(f"错误详情: {e}")
+        # 将 'e' 转换为 str() 来防止 StreamlitAPIException
+        st.sidebar.debug(f"错误详情: {str(e)}")
+
