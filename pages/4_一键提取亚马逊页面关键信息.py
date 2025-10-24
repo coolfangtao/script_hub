@@ -5,9 +5,8 @@ import pandas as pd  # 导入 pandas 用于表格
 import requests  # (新增) 用于下载图片
 import io  # (新增) 用于内存中创建zip
 import zipfile  # (新增) 用于创建zip
-from shared.sidebar import create_common_sidebar
 
-create_common_sidebar()
+
 # --- 您提供的原始解析函数 ---
 # (为了保持代码整洁，这里省略了函数的内部实现，但它们与您提供的一致)
 
@@ -37,6 +36,10 @@ def extract_all_product_info(html_content):
     # 5. 提取所有用户评论 (新增)
     reviews = extract_reviews(soup)
     results['reviews'] = reviews
+
+    # 6. 提取商品详细信息 (新增)
+    product_details = extract_product_details(soup)
+    results['product_details'] = product_details
 
     return results
 
@@ -250,6 +253,52 @@ def extract_reviews(soup):
     return reviews
 
 
+# --- (新增) 提取商品详细信息函数 ---
+def extract_product_details(soup):
+    """
+    提取 "Product details" 部分的信息 (例如 ASIN, 制造商等)
+    """
+    details = {}
+    # 查找 "Product Details" 容器 (div > ul > li 结构)
+    details_div = soup.find('div', id='detailBullets_feature_div')
+
+    if details_div:
+        list_items = details_div.find_all('li')
+        for item in list_items:
+            key_element = item.find('span', class_='a-text-bold')
+
+            if key_element:
+                # 1. 获取键 (Key)
+                key_text_full = key_element.get_text(strip=True)  # e.g., "ASIN:"
+                key_clean = key_text_full.replace(':', '').strip()  # e.g., "ASIN"
+
+                # 2. 获取值 (Value)
+                # 使用 separator=' ' 来正确处理 "Best Sellers Rank" 中的嵌套列表
+                full_item_text = item.get_text(separator=' ', strip=True)
+                # 替换掉键的全名，然后去除前导的冒号和空格
+                value_text = full_item_text.replace(key_text_full, '', 1).lstrip(' :').strip()
+
+                # 清理多余的空格
+                value_text = re.sub(r'\s+', ' ', value_text)
+
+                if value_text and key_clean:
+                    details[key_clean] = value_text
+    else:
+        # 备选方案: 查找 (table > tr > th/td 结构)
+        details_table = soup.find('table', id='productDetails_detailBullets_sections1')
+        if details_table:
+            rows = details_table.find_all('tr')
+            for row in rows:
+                key_element = row.find('th')
+                value_element = row.find('td')
+                if key_element and value_element:
+                    key_clean = key_element.get_text(strip=True)
+                    value_text = value_element.get_text(separator=' ', strip=True)
+                    details[key_clean] = value_text
+
+    return details
+
+
 # --- (新增) Streamlit 缓存函数 ---
 @st.cache_data
 def convert_df_to_csv(df):
@@ -343,6 +392,20 @@ def format_other_info_for_display(results):
     else:
         lines.append("商品特性: 未找到")
 
+    lines.append("-" * 40)
+
+    # 商品详情 (新增)
+    if results.get('product_details'):
+        lines.append("商品详情:")
+        details = results['product_details']
+        if details:
+            for key, value in details.items():
+                lines.append(f"  - {key}: {value}")
+        else:
+            lines.append("  未找到商品详情。")
+    else:
+        lines.append("商品详情: 未找到")
+
     return "\n".join(lines)
 
 
@@ -391,7 +454,7 @@ def display_streamlit_results(results):
     st.subheader("📦 商品基本信息")
     other_info_text = format_other_info_for_display(results)
     # 使用 disabled=True 使其只读，但用户仍可复制
-    st.text_area("基本信息 (可复制):", value=other_info_text, height=300, disabled=True, key="other_info_area")
+    st.text_area("基本信息 (可复制):", value=other_info_text, height=350, disabled=True, key="other_info_area")  # 增加了高度
 
     st.markdown("\n\n---\n")
 
@@ -507,6 +570,7 @@ if st.button("提取信息", key="extract_button", type="primary"):
                 st.exception(e)
     else:
         st.warning("警告：文本框为空，请输入网页源代码。")
+
 
 
 
