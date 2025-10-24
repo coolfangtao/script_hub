@@ -7,7 +7,6 @@ import io
 try:
     # 假设 shared.sidebar 模块在同一个父目录下
     from shared.sidebar import create_common_sidebar
-
     create_common_sidebar()  # 调用函数，确保每个页面都有侧边栏
 except ImportError:
     st.sidebar.warning("未找到 'shared.sidebar' 模块，侧边栏将不会显示。")

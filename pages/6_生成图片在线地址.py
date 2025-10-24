@@ -2,57 +2,76 @@
 import streamlit as st
 import requests
 import base64
-from shared.config import Config
-from shared.sidebar import create_common_sidebar # 导入公共侧边栏函数
-cfg = Config()
+import uuid
+from datetime import datetime
+
+# --- 核心配置 ---
+# 导入并实例化全局配置类
+from shared.config import GlobalConfig
+from shared.sidebar import create_common_sidebar
+
+# 实例化配置
+# 假设 get_run_mode() 和 GlobalConfig 定义在 shared.config 中或可被正确导入
+# 如果 get_run_mode() 不在 GlobalConfig 内部，确保它能被正确调用
+cfg = GlobalConfig()
+
 create_common_sidebar()  # 调用函数创建侧边栏
 
-# --- 从 Streamlit Secrets 中安全地获取 API Key ---
-try:
-    IMGBB_API_KEY = st.secrets[cfg.IMGBB_API_KEY]
-except KeyError:
-    # 如果在secrets中找不到key，则设置为None，以便后续处理
-    IMGBB_API_KEY = None
 
-UPLOAD_API_URL = "https://api.imgbb.com/1/upload"
-
-
-def upload_image_to_imgbb(image_bytes, filename):
+def upload_image_to_github(image_bytes, original_filename, token, repo_owner, repo_name, image_path="images"):
     """
-    将图片字节上传到 imgbb 服务并返回URL。
+    将图片字节上传到指定的 GitHub 仓库并返回 jsDelivr CDN URL。
+    这是一个通用函数，接收所有必要的认证和路径信息。
 
     Args:
         image_bytes (bytes): 图片的字节数据。
-        filename (str): 原始文件名。
+        original_filename (str): 原始文件名，用于获取文件扩展名。
+        token (str): GitHub Personal Access Token.
+        repo_owner (str): 仓库所有者的用户名。
+        repo_name (str): 仓库的名称。
+        image_path (str, optional): 仓库中存放图片的文件夹路径. Defaults to "images".
 
     Returns:
-        str: 成功则返回图片URL，失败则返回错误信息。
+        str: 成功则返回图片的 jsDelivr CDN URL，失败则返回错误信息。
     """
-    # 检查API Key是否存在或是否正确配置
-    if not IMGBB_API_KEY:
-        return "错误：未能从 Streamlit Secrets 中加载 IMGBB_API_KEY。请检查您的 .streamlit/secrets.toml 配置文件。"
+    if not all([token, repo_owner, repo_name]):
+        return "错误：GitHub 配置不完整 (Token, Owner, Repo 必须提供)。"
 
     try:
-        # imgbb API 需要 base64 编码的图片字符串
+        file_extension = original_filename.split('.')[-1]
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        unique_filename = f"{timestamp}_{uuid.uuid4().hex[:8]}.{file_extension}"
+
+        # 构建API URL，处理根目录和子目录的情况
+        if image_path:
+            api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{image_path}/{unique_filename}"
+        else:
+            api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{unique_filename}"
+
         b64_image = base64.b64encode(image_bytes).decode('utf-8')
 
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json"
+        }
         payload = {
-            "key": IMGBB_API_KEY,
-            "image": b64_image,
-            "name": filename
+            "message": f"feat: Add image {unique_filename}",
+            "content": b64_image,
+            "committer": {"name": "Streamlit App Uploader", "email": "app@streamlit.io"}
         }
 
-        # 发送POST请求
-        response = requests.post(UPLOAD_API_URL, data=payload, timeout=60)
+        response = requests.put(api_url, headers=headers, json=payload, timeout=60)
         response.raise_for_status()
-
         data = response.json()
 
-        if data.get('success'):
-            return data['data']['url']
+        if 'content' in data and 'path' in data['content']:
+            cdn_url = f"https://cdn.jsdelivr.net/gh/{repo_owner}/{repo_name}/{data['content']['path']}"
+            return cdn_url
         else:
-            return f"API返回错误: {data.get('error', {}).get('message', '未知错误')}"
+            return f"API返回数据格式不正确: {data}"
 
+    except requests.exceptions.HTTPError as e:
+        return f"GitHub API 错误: {e.response.status_code} - {e.response.json().get('message', '无详细信息')}"
     except requests.exceptions.RequestException as e:
         return f"网络请求失败: {e}"
     except Exception as e:
@@ -60,18 +79,70 @@ def upload_image_to_imgbb(image_bytes, filename):
 
 
 # --- Streamlit 页面配置 ---
-st.set_page_config(
-    page_title="图片转在线地址工具",
-    page_icon="🖼️",
-    layout="wide"
-)
+st.set_page_config(page_title="图片转GitHub链接工具", page_icon="🖼️", layout="wide")
+st.title("🖼️ 图片转 GitHub 仓库链接工具")
+st.markdown("批量上传图片，生成由 jsDelivr CDN 加速的在线链接。")
 
-# --- 页面UI ---
-st.title("🖼️ 图片转在线地址工具 (安全版)")
-st.markdown("批量上传图片，轻松生成可分享的在线链接。")
-st.info("⚠️ **重要提示**: 您上传的图片将被存储在图床服务上。请遵守服务条款，**请勿上传任何敏感或私人图片**。")
+# --- 初始化变量 ---
+github_token = None
+repo_owner = None
+repo_name = None
+is_configured = False
 
-# 文件上传组件
+# --- UI 逻辑：根据运行模式（local/cloud）显示不同选项 ---
+
+if cfg.RUN_MODE == "cloud":
+    st.subheader("请选择图片存储方式")
+    storage_option = st.radio(
+        "选择一个选项:",
+        ("使用共享的临时仓库 (方便快捷，但图片可能随时被清理)", "使用我自己的 GitHub 仓库 (推荐，数据由您自己掌控)"),
+        label_visibility="collapsed"
+    )
+
+    if storage_option.startswith("使用共享"):
+        st.warning(
+            "⚠️ **重要提示**: 您即将把图片上传到一个 **公开共享** 的仓库。"
+            "此仓库仅用于功能演示，**不保证数据的永久性**，图片可能会因容量问题被 **不定期清理**。"
+            "**请勿上传任何敏感或私人图片！**"
+        )
+        if cfg.GITHUB_TOKEN and cfg.GITHUB_PUBLIC_REPO:
+            github_token = cfg.GITHUB_TOKEN
+            repo_owner, repo_name = cfg.GITHUB_PUBLIC_REPO.split('/')
+            is_configured = True
+        else:
+            st.error("管理员未配置共享仓库，此选项不可用。")
+
+    else:  # 使用自己的仓库
+        st.info("请提供您自己的 GitHub 信息以确保数据安全和持久。")
+        user_repo_input = st.text_input(
+            "你的公开仓库 (格式: `用户名/仓库名`)",
+            placeholder="e.g., my-username/my-image-repo"
+        )
+        user_token_input = st.text_input(
+            "你的 GitHub Personal Access Token",
+            type="password",
+            help="需要 `repo` 权限。Token仅在本次上传中使用，不会被存储。"
+        )
+        if user_repo_input and user_token_input:
+            if '/' in user_repo_input:
+                github_token = user_token_input
+                repo_owner, repo_name = user_repo_input.split('/')
+                is_configured = True
+            else:
+                st.error("仓库格式不正确，请确保格式为 `用户名/仓库名`。")
+
+else:  # local 模式
+    st.success("✅ **本地模式**: 使用 `secrets.toml` 中配置的 GitHub 仓库。")
+    if cfg.GITHUB_TOKEN and cfg.GITHUB_PUBLIC_REPO:
+        github_token = cfg.GITHUB_TOKEN
+        repo_owner, repo_name = cfg.GITHUB_PUBLIC_REPO.split('/')
+        is_configured = True
+    else:
+        st.error("本地配置错误: 请检查 secrets.toml 中的 `github_data_token` 和 `github_data_public_repo`。")
+
+st.divider()
+
+# --- 文件上传和处理逻辑 ---
 uploaded_files = st.file_uploader(
     "请选择一张或多张图片...",
     type=['png', 'jpg', 'jpeg', 'gif', 'bmp'],
@@ -79,47 +150,37 @@ uploaded_files = st.file_uploader(
     help="您可以按住`Ctrl`(Windows)或`Command`(Mac)键来选择多张图片。"
 )
 
-# 检查API Key是否已配置，如果没有配置，则显示警告并禁用按钮
-api_key_configured = bool(IMGBB_API_KEY)
-if not api_key_configured:
-    st.error("**配置错误**：未找到 imgbb 的 API Key。请确保您已在项目的 `.streamlit/secrets.toml` 文件中正确设置了 `IMGBB_API_KEY`。")
+# 只有当仓库配置完成并且有文件上传时，按钮才可用
+if st.button("生成在线链接", disabled=not uploaded_files or not is_configured, type="primary"):
+    st.header("处理结果")
+    progress_bar = st.progress(0, text="正在准备上传...")
+    total_files = len(uploaded_files)
+    num_columns = 3
+    cols = st.columns(num_columns)
 
-if st.button("生成在线链接", disabled=not uploaded_files or not api_key_configured, type="primary"):
-    if uploaded_files:
-        st.header("处理结果")
-        progress_bar = st.progress(0, text="正在准备上传...")
-        total_files = len(uploaded_files)
-        num_columns = 3
-        cols = st.columns(num_columns)
+    for i, uploaded_file in enumerate(uploaded_files):
+        progress_text = f"正在上传第 {i + 1}/{total_files} 张图片: {uploaded_file.name}"
+        progress_bar.progress((i + 1) / total_files, text=progress_text)
 
-        for i, uploaded_file in enumerate(uploaded_files):
-            progress_text = f"正在上传第 {i + 1}/{total_files} 张图片: {uploaded_file.name}"
-            progress_bar.progress((i + 1) / total_files, text=progress_text)
+        image_bytes = uploaded_file.getvalue()
+        col_index = i % num_columns
+        with cols[col_index]:
+            st.image(image_bytes, caption=f"预览: {uploaded_file.name}", use_column_width=True)
+            with st.spinner("正在生成链接..."):
+                # 调用通用函数，传入动态获取的配置
+                image_url = upload_image_to_github(
+                    image_bytes=image_bytes,
+                    original_filename=uploaded_file.name,
+                    token=github_token,
+                    repo_owner=repo_owner,
+                    repo_name=repo_name
+                )
+            if image_url and image_url.startswith("http"):
+                st.success("链接生成成功！")
+                st.code(image_url, language=None)
+            else:
+                st.error(f"上传失败: {image_url}")
+            st.divider()
 
-            image_bytes = uploaded_file.getvalue()
-            col_index = i % num_columns
-            with cols[col_index]:
-                st.image(image_bytes, caption=f"预览: {uploaded_file.name}", use_column_width=True)
-
-                with st.spinner("正在生成链接..."):
-                    image_url = upload_image_to_imgbb(image_bytes, uploaded_file.name)
-
-                if image_url and image_url.startswith("http"):
-                    st.success("链接生成成功！")
-                    st.code(image_url, language=None)
-                else:
-                    st.error(f"上传失败。错误信息: {image_url}")
-                st.divider()
-
-        progress_bar.empty()
-        st.success("所有图片处理完毕！")
-
-# --- 使用说明 ---
-with st.expander("点击查看使用说明", expanded=True):
-    st.markdown("""
-    1.  **(首次使用)** 请确保您已经在项目文件夹下创建了 `.streamlit/secrets.toml` 文件，并正确配置了您的 `IMGBB_API_KEY`。
-    2.  点击上方的“Browse files”按钮，或直接将图片文件拖拽到上传区域。
-    3.  选择您想要转换的所有图片文件 (imgbb免费版有大小限制, 通常为32MB)。
-    4.  选择完毕后，点击蓝色的“生成在线链接”按钮（https://coolfangtao.imgbb.com/）。
-    5.  应用将自动处理每张图片，并在下方显示图片的预览和生成的在线URL。
-    """)
+    progress_bar.empty()
+    st.success("所有图片处理完毕！")

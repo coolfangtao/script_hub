@@ -149,7 +149,7 @@ def format_timedelta_to_str(duration):
 def get_github_repo(token=None, repo_name=None):
     # 优先使用传入的凭证，其次是全局配置
     g_token = token or config.globals.GITHUB_TOKEN
-    g_repo = repo_name or config.globals.GITHUB_REPO
+    g_repo = repo_name or config.globals.GITHUB_PRIVATE_REPO
     if not g_token or not g_repo: return None
     try:
         return Github(g_token).get_repo(g_repo)
