@@ -1,6 +1,6 @@
 import streamlit as st
 from bs4 import BeautifulSoup  # 导入新库
-from shared.usage_tracker import track_script_usage
+# from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
 
 # --- 1. 页面配置 ---

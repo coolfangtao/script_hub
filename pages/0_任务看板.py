@@ -7,7 +7,7 @@ import plotly.express as px
 from itertools import groupby
 from datetime import datetime, timedelta, date, time
 from streamlit_autorefresh import st_autorefresh
-from shared.usage_tracker import track_script_usage
+# from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
 from shared.config import GlobalConfig  # <<< 导入全局配置实例
 from github import Github, UnknownObjectException

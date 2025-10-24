@@ -20,7 +20,7 @@ import re
 from PIL import Image
 import pandas as pd
 import plotly.express as px
-from shared.usage_tracker import track_script_usage
+# from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
 
 

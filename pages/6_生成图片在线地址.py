@@ -8,7 +8,7 @@ from datetime import datetime
 # --- 核心配置 ---
 # 导入并实例化全局配置类
 from shared.config import GlobalConfig
-from shared.usage_tracker import track_script_usage
+# from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
 
 # 实例化配置

@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-from shared.usage_tracker import track_script_usage
+# from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
 from shared.config import GlobalConfig
 

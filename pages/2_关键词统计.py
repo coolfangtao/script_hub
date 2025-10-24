@@ -7,7 +7,7 @@ import re
 from collections import Counter
 from typing import Optional, Dict, Tuple, List, Any
 from io import BytesIO
-from shared.usage_tracker import track_script_usage
+# from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar # 假设这个函数存在于您的项目中
 # track_script_usage("📝 Listing生成")
 create_common_sidebar()
