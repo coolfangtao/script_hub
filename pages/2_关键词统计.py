@@ -339,6 +339,9 @@ def plot_keyword_analysis(df: pd.DataFrame):
 
     # 多ASIN情况需要先聚合数据
     if has_asin:
+        # 保存原始ASIN信息用于后续显示
+        asin_info = df_filtered.groupby('流量词')['ASIN'].apply(list).reset_index(name='涉及ASIN列表')
+
         # 聚合多ASIN数据
         aggregated_df = df_filtered.groupby("流量词").agg({
             "月搜索量": "sum",
@@ -349,7 +352,8 @@ def plot_keyword_analysis(df: pd.DataFrame):
             "ASIN": "nunique"
         }).reset_index().rename(columns={"ASIN": "涉及ASIN数量"})
 
-        # 重新计算购买率（基于聚合后的数据）
+        # 合并ASIN列表信息
+        aggregated_df = aggregated_df.merge(asin_info, on='流量词', how='left')
         df_filtered = aggregated_df
         st.info("📊 当前显示多ASIN汇总数据，已按关键词聚合")
 
@@ -390,16 +394,20 @@ def plot_keyword_analysis(df: pd.DataFrame):
         "<b>广告流量:</b> %{customdata[3]:.2%}"
     )
 
-    # 如果有多ASIN数据，在悬停模板中添加ASIN数量
-    if has_asin:
-        hover_template += "<br><b>涉及ASIN数量:</b> %{customdata[4]}"
-
-    hover_template += "<extra></extra>"
-
     # 准备悬停数据
     hover_data = ['流量词', '购买率', '自然流量占比', '广告流量占比']
+
     if has_asin:
-        hover_data.append('涉及ASIN数量')
+        # 处理ASIN列表显示，限制显示数量避免过长
+        df_filtered['ASIN显示'] = df_filtered['涉及ASIN列表'].apply(
+            lambda x: ', '.join(x[:5]) + ('...' if len(x) > 5 else '')  # 最多显示5个ASIN
+        )
+
+        hover_template += "<br><b>涉及ASIN数量:</b> %{customdata[4]}<br>"
+        hover_template += "<b>涉及ASIN:</b> %{customdata[5]}"
+        hover_data.extend(['涉及ASIN数量', 'ASIN显示'])
+
+    hover_template += "<extra></extra>"
 
     # 创建散点图 - 修复版本
     fig = px.scatter(
@@ -483,7 +491,7 @@ def plot_keyword_analysis(df: pd.DataFrame):
     # 显示数据表格
     display_columns = ['流量词', '月搜索量', '流量占比', '购买率', '自然流量占比', '广告流量占比', '关键词类型']
     if has_asin and '涉及ASIN数量' in filtered_df.columns:
-        display_columns.append('涉及ASIN数量')
+        display_columns.extend(['涉及ASIN数量', '涉及ASIN列表'])
 
     display_df = filtered_df[display_columns].sort_values(['月搜索量', '流量占比'], ascending=[False, False])
 
@@ -494,6 +502,12 @@ def plot_keyword_analysis(df: pd.DataFrame):
     formatted_df['购买率'] = formatted_df['购买率'].apply(lambda x: f"{x:.2%}")
     formatted_df['自然流量占比'] = formatted_df['自然流量占比'].apply(lambda x: f"{x:.2%}")
     formatted_df['广告流量占比'] = formatted_df['广告流量占比'].apply(lambda x: f"{x:.2%}")
+
+    # 格式化ASIN列表显示
+    if has_asin and '涉及ASIN列表' in formatted_df.columns:
+        formatted_df['涉及ASIN列表'] = formatted_df['涉及ASIN列表'].apply(
+            lambda x: ', '.join(x) if isinstance(x, list) else x
+        )
 
     st.dataframe(formatted_df, use_container_width=True)
 
