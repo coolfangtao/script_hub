@@ -10,6 +10,7 @@
 4. 将识别出的数据以可编辑的表格形式展示。
 5. 根据预设规则对杂质进行自动分类。
 6. 为每张图片并排展示其分析结果。
+7. (已优化) 使用Session State缓存分析结果，避免页面刷新后数据丢失。
 """
 
 import streamlit as st
@@ -20,7 +21,6 @@ from PIL import Image
 import pandas as pd
 import plotly.express as px
 from shared.sidebar import create_common_sidebar
-from io import BytesIO  # 导入BytesIO用于处理字节数据
 
 
 class Config:
@@ -40,7 +40,6 @@ class Config:
             "gemini-2.5-flash",  # 可用，6.74秒
             "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
         ]
-
         self.ZAZHI_JIANCE_GET_ELEMENTS_DATA_PROMPT = """
                         请仔细分析提供的图片，该图片展示了X射线能谱（EDS）分析的结果界面。你的任务是从右上角的‘定量结果’表格中，提取所有检测到的元素的定量分析数据。
                         对于表格中列出的每一个元素，请提取并清晰地列出以下两个数值：
@@ -57,17 +56,12 @@ cfg = Config()
 
 
 # --- 核心功能函数 ---
-
-# 使用 st.cache_data 装饰器来缓存API的返回结果
-# 这意味着如果使用相同的图片、提示和模型再次调用此函数，将直接返回缓存的结果，无需再次调用API
-@st.cache_data
-def get_gemini_response(image_bytes: bytes, prompt: str, model_name: str):
+def get_gemini_response(image: Image.Image, prompt: str, model_name: str):
     """
     向 Gemini Pro Vision 模型发送图片和提示，并获取响应。
-    使用 st.cache_data 缓存结果以避免重复调用。
 
     参数:
-    image_bytes (bytes): 用户上传的图片的字节数据。
+    image (PIL.Image.Image): 用户上传的图片。
     prompt (str): 用于指导模型分析图片的提示词。
     model_name (str): 使用的AI模型。
 
@@ -76,8 +70,6 @@ def get_gemini_response(image_bytes: bytes, prompt: str, model_name: str):
     """
     start_time = time.time()  # 记录开始时间
     try:
-        # 从字节数据重新构建图片对象
-        image = Image.open(BytesIO(image_bytes))
         model = genai.GenerativeModel(model_name)
         response = model.generate_content([prompt, image], stream=True)
         response.resolve()
@@ -86,8 +78,6 @@ def get_gemini_response(image_bytes: bytes, prompt: str, model_name: str):
         return response.text, duration
     except Exception as e:
         # 在界面上显示更具体的错误信息
-        # 注意：在缓存的函数中直接调用st.error可能会产生意外行为，更好的做法是返回错误信息
-        # 但对于这个应用场景，直接显示错误也是可以接受的。
         st.error(f"调用 Gemini API 时发生错误: {e}")
         return None, 0
 
@@ -149,8 +139,6 @@ def classify_inclusion(eds_df: pd.DataFrame, threshold: float = 0.5) -> str:
     if eds_df.empty:
         return "无有效数据"
 
-    # 将元素列设为索引，以便快速查询
-    # 使用 .get(col, default_value) 来安全地访问列数据
     def get_mass_percent(element):
         if '元素' in eds_df.columns and '质量百分比(%)' in eds_df.columns:
             element_row = eds_df[eds_df['元素'] == element]
@@ -198,7 +186,7 @@ def setup_ui():
                 "🤖 请选择AI模型",
                 options=cfg.ZAZHI_JIANCE_GEMINI_MODEL_OPTIONS,
                 index=0,  # 默认选择第一个
-                help="推荐使用 'gemini-1.5-flash-latest' 以获得最佳的速度与性能平衡。"
+                help="推荐使用 'gemini-1.5-flash-latest' 以获得更快的速度和更优的性能。"
             )
 
         uploaded_files = st.file_uploader(
@@ -214,8 +202,7 @@ def setup_ui():
 
 def display_elemental_composition_chart(df: pd.DataFrame, image_index: int):
     """
-    在Streamlit中创建一个可折叠区域，并使用Plotly Express绘制左右两列、
-    具有水平轴标签的条形图，分别展示元素的质量和原子百分比。
+    在Streamlit中创建一个可折叠区域，并使用Plotly Express绘制图表。
 
     Args:
         df (pd.DataFrame): 包含元素分析数据的DataFrame。
@@ -254,105 +241,131 @@ def display_elemental_composition_chart(df: pd.DataFrame, image_index: int):
             st.caption("上方图表分别展示了识别出的各种元素的质量百分比与原子百分比。可将鼠标悬停在条形图上查看详细数据。")
 
 
-def process_and_display_image(image_file, prompt, model_name, image_index):
+def display_cached_results(result_data, image_index):
     """
-    处理单张上传的图片，并显示其分析结果。
+    使用缓存的数据来显示单张图片的分析结果。
     """
     st.markdown("---")
     col_img, col_results = st.columns([1, 1.2])
 
     with col_img:
-        st.subheader(f"EDS图片: {image_file.name}", divider='rainbow')
-        # 直接传递上传的文件对象给 st.image，它能自动处理
-        st.image(image_file, caption="上传的EDS截图", use_container_width=True)
+        st.subheader(f"EDS图片: {result_data['file_name']}", divider='rainbow')
+        st.image(result_data['image'], caption="上传的EDS截图", use_container_width=True)
 
-    # 从缓存或API调用获取结果。
-    # 我们传递 image_file.getvalue()，即图片的字节内容，作为缓存的键。
-    # 这样，只要图片内容、提示和模型名称不变，就会从缓存中读取结果。
-    response_text, duration = get_gemini_response(image_file.getvalue(), prompt, model_name)
+    with col_results:
+        st.subheader("分析结果", divider='rainbow')
 
-    if response_text:
-        with col_results:
-            st.subheader("分析结果", divider='rainbow')
-            metric_col1, metric_col2 = st.columns(2)
-            with metric_col1:
-                st.metric(label="AI模型调用耗时", value=f"{duration:.2f} 秒")
+        if result_data.get('error'):
+            st.error(result_data['error'])
+            return
 
-            classification_placeholder = metric_col2.empty()
-            df_template = extract_eds_data_to_dataframe(response_text)
+        # 1. 创建两列用于并排显示指标
+        metric_col1, metric_col2 = st.columns(2)
 
-            if df_template.empty:
-                st.warning("AI未能从图片中提取有效数据，请检查图片清晰度。")
-                df_template = pd.DataFrame(columns=['元素', '质量百分比(%)', '原子百分比(%)'])
+        # 2. 在第一列显示API耗时
+        with metric_col1:
+            st.metric(label="AI模型调用耗时", value=f"{result_data['duration']:.2f} 秒")
 
-            final_classification = classify_inclusion(df_template)
-
-            if not df_template.empty:
-                mass_sum = df_template['质量百分比(%)'].sum()
-                atomic_sum = df_template['原子百分比(%)'].sum()
-                total_row = pd.DataFrame({
-                    '元素': ['**总计 (识别数据求和)**'],
-                    '质量百分比(%)': [mass_sum],
-                    '原子百分比(%)': [atomic_sum]
-                })
-                display_df = pd.concat([df_template, total_row], ignore_index=True)
-            else:
-                display_df = df_template
-
-            st.dataframe(display_df, use_container_width=True)
+        # 3. 在第二列显示分类结果
+        with metric_col2:
             styled_classification_html = f"""
-                        <div style="padding-top: 0.5rem;"> <div style="font-size: 0.875rem; color: #28a745; margin-bottom: 4px;">最终杂质分类</div>
-                            <div style="font-size: 2.0rem; font-weight: 600; color: #28a745;">{final_classification}</div>
-                        </div>
-                        """
-            classification_placeholder.markdown(styled_classification_html, unsafe_allow_html=True)
+            <div style="padding-top: 0.5rem;"> <div style="font-size: 0.875rem; color: #28a745; margin-bottom: 4px;">最终杂质分类</div>
+                <div style="font-size: 2.0rem; font-weight: 600; color: #28a745;">{result_data['classification']}</div>
+            </div>
+            """
+            st.markdown(styled_classification_html, unsafe_allow_html=True)
 
-        if response_text and not df_template.empty:
-            display_elemental_composition_chart(df_template, image_index=image_index)
-            with st.expander("查看AI模型原始返回文本"):
-                st.markdown(response_text)
-    else:
-        with col_results:
-            st.subheader("分析结果", divider='rainbow')
-            st.error("无法获取AI模型的响应，请检查您的API密钥、网络连接或图片是否有效。")
+        # 4. 显示数据表格
+        df_display = result_data['dataframe']
+        if not df_display.empty:
+            mass_sum = df_display['质量百分比(%)'].sum()
+            atomic_sum = df_display['原子百分比(%)'].sum()
+            total_row = pd.DataFrame({
+                '元素': ['**总计**'],
+                '质量百分比(%)': [mass_sum],
+                '原子百分比(%)': [atomic_sum]
+            })
+            df_display = pd.concat([df_display, total_row], ignore_index=True)
+        st.dataframe(df_display, use_container_width=True)
+
+    # --- 全宽区域：显示图表和原始数据 ---
+    if not result_data.get('error'):
+        # 调用图表函数
+        display_elemental_composition_chart(result_data['dataframe'], image_index=image_index)
+
+        # 原始文本折叠区域
+        with st.expander("查看AI模型原始返回文本"):
+            st.markdown(result_data['response_text'])
 
 
 def main():
     """
     应用主函数
     """
+    # 初始化 session_state
+    if 'analysis_results' not in st.session_state:
+        st.session_state.analysis_results = []
+
     api_key, model_name, uploaded_files, analyze_button = setup_ui()
 
     if analyze_button:
+        # 校验输入
         if not api_key:
             st.warning("请输入您的Gemini API密钥。")
         elif not uploaded_files:
             st.warning("请至少上传一张图片。")
         else:
             try:
+                # 配置Gemini API
                 genai.configure(api_key=api_key)
+
+                # 清空旧的分析结果
+                st.session_state.analysis_results = []
+
                 with st.spinner('正在分析中，请稍候...'):
-                    if len(uploaded_files) == 1:
-                        process_and_display_image(
-                            uploaded_files[0],
-                            cfg.ZAZHI_JIANCE_GET_ELEMENTS_DATA_PROMPT,
-                            model_name,
-                            0
-                        )
-                    else:
-                        st.header("📊 批量分析结果", anchor=False)
-                        for i, uploaded_file in enumerate(uploaded_files):
-                            process_and_display_image(
-                                uploaded_file,
-                                cfg.ZAZHI_JIANCE_GET_ELEMENTS_DATA_PROMPT,
-                                model_name,
-                                i
-                            )
-                st.balloons()
-                st.success("所有图片分析完成！")
+                    for uploaded_file in uploaded_files:
+                        img = Image.open(uploaded_file)
+                        response_text, duration = get_gemini_response(img, cfg.ZAZHI_JIANCE_GET_ELEMENTS_DATA_PROMPT,
+                                                                      model_name)
+
+                        result_for_file = {
+                            "file_name": uploaded_file.name,
+                            "image": img
+                        }
+
+                        if response_text:
+                            df = extract_eds_data_to_dataframe(response_text)
+                            classification = classify_inclusion(df)
+
+                            result_for_file.update({
+                                "duration": duration,
+                                "response_text": response_text,
+                                "dataframe": df,
+                                "classification": classification,
+                                "error": None
+                            })
+                        else:
+                            result_for_file.update({
+                                "error": "无法获取AI模型的响应，请检查您的API密钥、网络连接或图片是否有效。"
+                            })
+
+                        st.session_state.analysis_results.append(result_for_file)
+
+                # 分析完成后显示成功信息和气球
+                if any(not res.get('error') for res in st.session_state.analysis_results):
+                    st.balloons()
+                    st.success("所有图片分析完成！")
+
             except Exception as e:
                 st.error(f"发生了一个未预料的错误: {e}")
                 st.info("这可能是由于API密钥无效或权限问题导致的。请检查您的密钥。")
+
+    # --- 渲染结果 ---
+    # 无论按钮是否被点击，只要 session_state 中有结果，就显示它们
+    if st.session_state.analysis_results:
+        st.header("📊 分析结果", anchor=False)
+        for i, result_data in enumerate(st.session_state.analysis_results):
+            display_cached_results(result_data, i)
 
 
 if __name__ == "__main__":
