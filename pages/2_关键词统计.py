@@ -401,7 +401,6 @@ def plot_keyword_analysis(df: pd.DataFrame):
     if has_asin:
         hover_data.append('涉及ASIN数量')
 
-    # 创建散点图
     fig = px.scatter(
         df_filtered,
         x='月搜索量',
@@ -414,7 +413,13 @@ def plot_keyword_analysis(df: pd.DataFrame):
             '关键词类型': '关键词类型'
         },
         size='总流量贡献',  # 点的大小表示流量占比
-        size_max=20
+        size_max=20,
+        color_discrete_map={
+            '核心大词 (高搜索量+高流量)': '#FF6B6B',  # 红色 - 最重要
+            '潜力词 (高搜索量+低流量)': '#FFD93D',  # 黄色 - 有潜力
+            '精准词 (低搜索量+高流量)': '#6BCF77',  # 绿色 - 精准高效
+            '长尾词 (低搜索量+低流量)': '#4D96FF'  # 蓝色 - 长尾补充
+        }
     )
 
     # 更新悬停模板
