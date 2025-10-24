@@ -149,14 +149,13 @@ class FundDashboardUI:
         else:
             st.warning(f"⚠️ **市场已收盘，当前显示为 {first_fund_date_str} 的收盘数据**", icon="🌃")
 
-    # vvvvvvvv --- 这里是修改的核心 --- vvvvvvvv
     def render_metric_cards(self, fund_data):
         """以卡片形式展示各基金的核心指标（自定义布局）"""
         if not fund_data: return
 
         cols = st.columns(3)
         for i, data in enumerate(fund_data):
-            with cols[i % 3], st.container(border=True):  # 使用带边框的容器增强卡片感
+            with cols[i % 3], st.container(border=True):
                 # 1. 准备数据和样式
                 change_percent = data['涨跌幅(%)']
                 color = "green" if change_percent >= 0 else "red"
@@ -166,28 +165,23 @@ class FundDashboardUI:
                 # 2. 渲染基金名称和代码
                 st.markdown(f"**{data['基金名称']} ({data['基金代码']})**")
 
-                # 3. 渲染自定义的涨跌幅（放置在价格之上）
-                st.markdown(f'<p style="color:{color}; font-size: 1.25rem; margin-bottom: -0.5rem;">{delta_text}</p>',
+                # 3. 渲染自定义的涨跌幅（使用大号字体）
+                st.markdown(f'<p style="color:{color}; font-size: 2.5rem; font-weight: bold;">{delta_text}</p>',
                             unsafe_allow_html=True)
 
-                # 4. 渲染最新价格（使用大号字体）
-                st.markdown(f'<p style="font-size: 2.5rem; font-weight: bold;">{data["最新价"]:.3f}</p>',
+                # 4. 渲染最新价格（使用小号字体）
+                st.markdown(f'<p style="font-size: 1.25rem;">{data["最新价"]:.3f}</p>',
                             unsafe_allow_html=True)
-
-    # ^^^^^^^^ --- 修改结束 --- ^^^^^^^^
 
     def render_historical_chart(self):
         """渲染历史走势对比的折线图"""
         st.subheader("📈 近期走势对比")
-
-        # vvvvvvvv 修正这一行 vvvvvvvv
-        selected_funds = st.multiselect(
+        selected_funds = st.multiselect(  # <-- 已修正拼写错误
             '选择要对比的基金（建议不超过4个）:',
             options=list(self.config.FUNDS.keys()),
             format_func=lambda code: f"{self.config.FUNDS[code]} ({code})",
             default=self.config.DEFAULT_CHART_SELECTION
         )
-        # ^^^^^^^^ 修正结束 ^^^^^^^^
 
         if not selected_funds:
             st.info("请在上方选择至少一只基金以显示走势图。")
