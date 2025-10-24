@@ -149,23 +149,37 @@ class FundDashboardUI:
         else:
             st.warning(f"⚠️ **市场已收盘，当前显示为 {first_fund_date_str} 的收盘数据**", icon="🌃")
 
+    # vvvvvvvv --- 这里是修改的核心 --- vvvvvvvv
     def render_metric_cards(self, fund_data):
-        """以卡片形式展示各基金的核心指标"""
+        """以卡片形式展示各基金的核心指标（自定义布局）"""
         if not fund_data: return
 
         cols = st.columns(3)
         for i, data in enumerate(fund_data):
-            with cols[i % 3]:
-                st.metric(
-                    label=f"{data['基金名称']} ({data['基金代码']})",
-                    value=f"{data['最新价']:.3f}",
-                    delta=f"{data['涨跌幅(%)']:.2f}% ( {data['涨跌额']} )"
-                )
+            with cols[i % 3], st.container(border=True):  # 使用带边框的容器增强卡片感
+                # 1. 准备数据和样式
+                change_percent = data['涨跌幅(%)']
+                color = "green" if change_percent >= 0 else "red"
+                arrow = "↑" if change_percent >= 0 else "↓"
+                delta_text = f"{arrow} {change_percent:.2f}% ( {data['涨跌额']} )"
+
+                # 2. 渲染基金名称和代码
+                st.markdown(f"**{data['基金名称']} ({data['基金代码']})**")
+
+                # 3. 渲染自定义的涨跌幅（放置在价格之上）
+                st.markdown(f'<p style="color:{color}; font-size: 1.25rem; margin-bottom: -0.5rem;">{delta_text}</p>',
+                            unsafe_allow_html=True)
+
+                # 4. 渲染最新价格（使用大号字体）
+                st.markdown(f'<p style="font-size: 2.5rem; font-weight: bold;">{data["最新价"]:.3f}</p>',
+                            unsafe_allow_html=True)
+
+    # ^^^^^^^^ --- 修改结束 --- ^^^^^^^^
 
     def render_historical_chart(self):
         """渲染历史走势对比的折线图"""
         st.subheader("📈 近期走势对比")
-        selected_funds = st.multiselect(
+        selected_funds = st.multoselect(
             '选择要对比的基金（建议不超过4个）:',
             options=list(self.config.FUNDS.keys()),
             format_func=lambda code: f"{self.config.FUNDS[code]} ({code})",
