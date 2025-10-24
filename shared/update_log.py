@@ -1,4 +1,4 @@
-# 文件路径: shared/changelog.py
+# 文件路径: shared/update_log.py
 
 import streamlit as st
 

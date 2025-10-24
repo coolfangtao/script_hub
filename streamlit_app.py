@@ -2,7 +2,7 @@
 
 import streamlit as st
 from shared.sidebar import create_common_sidebar
-from shared.changelog import show_changelog
+from shared.update_log import show_changelog
 from shared.feedback import setup_database, show_feedback_module
 
 # --- 页面基础设置 (必须是第一个st命令) ---
