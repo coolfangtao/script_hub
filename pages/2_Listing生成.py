@@ -24,7 +24,18 @@ class ListingConfig:
     # 提示词模板
     TITLE_PROMPT_TEMPLATE = """
         你是一名专业的亚马逊美国站的电商运营专家，尤其擅长撰写吸引人的产品标题。
-        请根据以下 TOP {top_n} 的关键词数据，为一款"{product_name}" ({product_english_name}) 撰写 {title_count} 个符合亚马逊平台规则且具有高吸引力的产品标题。
+        请根据以下关键词数据，为一款"{product_name}" ({product_english_name}) 撰写 {title_count} 个符合亚马逊平台规则且具有高吸引力的产品标题。
+
+        **关键词数据参考:**
+        - **流量占比最高的 TOP {top_n} 关键词:**
+        ```csv
+        {traffic_keywords_csv}
+        ```
+
+        - **月搜索量最高的 TOP {top_n} 关键词:**
+        ```csv
+        {search_volume_keywords_csv}
+        ```
 
         **标题要求:**
         1.  **核心关键词优先**: 必须包含最核心的关键词，如 {core_keywords} 等。
@@ -33,17 +44,23 @@ class ListingConfig:
         4.  **长度适中**: 标题总长度建议在 150-200 个字符之间。
         5.  **格式规范**: 每个单词的首字母大写（除了 a, an, the, and, but, for, in, on, at 等虚词）。
 
-        **关键词数据参考:**
-        ```csv
-        {keywords_csv}
-        ```
-
         请直接给出你认为最佳的 {title_count} 个产品标题，并用数字编号。
     """
 
     BULLET_POINTS_PROMPT_TEMPLATE = """
         你是一名专业的亚马逊美国站的文案专家，擅长撰写能够提升转化率的五点描述 (Bullet Points)。
-        请根据以下 TOP {top_n} 的关键词数据，为一款"{product_name}" ({product_english_name}) 撰写 {bullet_points_count} 点描述。
+        请根据以下关键词数据，为一款"{product_name}" ({product_english_name}) 撰写 {bullet_points_count} 点描述。
+
+        **关键词数据参考:**
+        - **流量占比最高的 TOP {top_n} 关键词:**
+        ```csv
+        {traffic_keywords_csv}
+        ```
+
+        - **月搜索量最高的 TOP {top_n} 关键词:**
+        ```csv
+        {search_volume_keywords_csv}
+        ```
 
         **五点描述要求:**
         1.  **突出卖点**: 每一点都应该聚焦一个核心卖点或功能，并详细阐述它能为客户带来的好处。
@@ -51,11 +68,6 @@ class ListingConfig:
         3.  **融入关键词**: 自然地将核心关键词和长尾关键词融入到描述中，以提高 SEO 权重。
         4.  **解决用户痛点**: 设想用户可能遇到的问题 (如{user_pain_points})，并在描述中给出解决方案。
         5.  **覆盖多种使用场景**: 描述产品可以用于{usage_scenarios}。
-
-        **关键词数据参考:**
-        ```csv
-        {keywords_csv}
-        ```
 
         请严格按照 {bullet_points_count} 点的格式，给出完整的五点描述。
     """
@@ -112,9 +124,55 @@ def load_data(uploaded_file):
         return None
 
 
+def get_top_keywords_by_traffic(df: pd.DataFrame, config: ListingConfig):
+    """
+    获取流量占比最高的关键词。
+
+    Args:
+        df (pd.DataFrame): 包含关键词数据的 DataFrame。
+        config (ListingConfig): 配置类实例。
+
+    Returns:
+        pd.DataFrame: 流量占比最高的前N个关键词的DataFrame。
+    """
+    if '流量占比' in df.columns:
+        df_copy = df.copy()
+        df_copy['流量占比'] = pd.to_numeric(df_copy['流量占比'], errors='coerce')
+        df_copy.dropna(subset=['流量占比'], inplace=True)
+        top_traffic_df = df_copy.sort_values(by='流量占比', ascending=False).head(config.TOP_N_KEYWORDS)
+        return top_traffic_df
+    else:
+        st.warning("数据中未找到'流量占比'列，将使用前20行数据作为流量关键词。")
+        return df.head(config.TOP_N_KEYWORDS)
+
+
+def get_top_keywords_by_search_volume(df: pd.DataFrame, config: ListingConfig):
+    """
+    获取月搜索量最高的关键词。
+
+    Args:
+        df (pd.DataFrame): 包含关键词数据的 DataFrame。
+        config (ListingConfig): 配置类实例。
+
+    Returns:
+        pd.DataFrame: 月搜索量最高的前N个关键词的DataFrame。
+    """
+    if '月搜索量' in df.columns:
+        df_copy = df.copy()
+        # 处理月搜索量列，确保是数值类型
+        df_copy['月搜索量'] = pd.to_numeric(df_copy['月搜索量'], errors='coerce')
+        df_copy.dropna(subset=['月搜索量'], inplace=True)
+        top_search_df = df_copy.sort_values(by='月搜索量', ascending=False).head(config.TOP_N_KEYWORDS)
+        return top_search_df
+    else:
+        st.warning("数据中未找到'月搜索量'列，将使用流量占比数据替代。")
+        return get_top_keywords_by_traffic(df, config)
+
+
 def create_prompts(df: pd.DataFrame, config: ListingConfig):
     """
     根据 DataFrame 中的关键词数据，创建用于生成标题和五点描述的提示词。
+    现在同时参考流量占比和搜索量排名前20的关键词。
 
     Args:
         df (pd.DataFrame): 包含关键词数据的 DataFrame。
@@ -123,20 +181,19 @@ def create_prompts(df: pd.DataFrame, config: ListingConfig):
     Returns:
         dict: 包含 'title' 和 'bullet_points' 两个提示词的字典。
     """
-    # 1. 数据预处理：选取流量占比最高的 TOP N 关键词
-    if '流量占比' in df.columns:
-        df['流量占比'] = pd.to_numeric(df['流量占比'], errors='coerce')
-        df.dropna(subset=['流量占比'], inplace=True)
-        top_keywords_df = df.sort_values(by='流量占比', ascending=False).head(config.TOP_N_KEYWORDS)
-    else:
-        # 如果没有'流量占比'列，默认取前 N行
-        top_keywords_df = df.head(config.TOP_N_KEYWORDS)
+    # 1. 获取流量占比最高的关键词
+    top_traffic_df = get_top_keywords_by_traffic(df, config)
 
-    # 2. 筛选出实际存在的列，并转换为 CSV 字符串
-    existing_columns = [col for col in config.KEYWORD_COLUMNS if col in top_keywords_df.columns]
-    keywords_csv = top_keywords_df[existing_columns].to_csv(index=False)
+    # 2. 获取月搜索量最高的关键词
+    top_search_df = get_top_keywords_by_search_volume(df, config)
 
-    # 3. 构建提示词模板
+    # 3. 筛选出实际存在的列，并转换为 CSV 字符串
+    existing_columns = [col for col in config.KEYWORD_COLUMNS if col in df.columns]
+
+    traffic_keywords_csv = top_traffic_df[existing_columns].to_csv(index=False)
+    search_volume_keywords_csv = top_search_df[existing_columns].to_csv(index=False)
+
+    # 4. 构建提示词模板
     title_prompt = textwrap.dedent(config.TITLE_PROMPT_TEMPLATE.format(
         top_n=config.TOP_N_KEYWORDS,
         product_name=config.PRODUCT_NAME,
@@ -144,7 +201,8 @@ def create_prompts(df: pd.DataFrame, config: ListingConfig):
         title_count=config.TITLE_COUNT,
         core_keywords=config.CORE_KEYWORDS,
         key_features=config.KEY_FEATURES,
-        keywords_csv=keywords_csv
+        traffic_keywords_csv=traffic_keywords_csv,
+        search_volume_keywords_csv=search_volume_keywords_csv
     )).strip()
 
     bullet_points_prompt = textwrap.dedent(config.BULLET_POINTS_PROMPT_TEMPLATE.format(
@@ -155,7 +213,8 @@ def create_prompts(df: pd.DataFrame, config: ListingConfig):
         bullet_point_example=config.BULLET_POINT_EXAMPLE,
         user_pain_points=config.USER_PAIN_POINTS,
         usage_scenarios=config.USAGE_SCENARIOS,
-        keywords_csv=keywords_csv
+        traffic_keywords_csv=traffic_keywords_csv,
+        search_volume_keywords_csv=search_volume_keywords_csv
     )).strip()
 
     return {"title": title_prompt, "bullet_points": bullet_points_prompt}
@@ -204,7 +263,7 @@ def main():
         uploaded_file = st.file_uploader(
             "上传您的关键词反查 Excel 文件",
             type=['xlsx'],
-            help="请确保文件中包含流量词、流量占比等关键信息。"
+            help="请确保文件中包含流量词、流量占比、月搜索量等关键信息。"
         )
 
         if 'generated_prompts' not in st.session_state:
@@ -213,8 +272,21 @@ def main():
         if uploaded_file:
             df = load_data(uploaded_file)
             if df is not None:
+                # 显示关键词数据预览
                 with st.expander("点击查看已上传数据的前 5 行", expanded=True):
                     st.dataframe(df.head(), use_container_width=True)
+
+                # 显示关键词统计信息
+                col1, col2 = st.columns(2)
+                with col1:
+                    if '流量占比' in df.columns:
+                        top_traffic = get_top_keywords_by_traffic(df, cfg)
+                        st.metric("流量占比最高关键词", top_traffic.iloc[0]['流量词'] if len(top_traffic) > 0 else "N/A")
+
+                with col2:
+                    if '月搜索量' in df.columns:
+                        top_search = get_top_keywords_by_search_volume(df, cfg)
+                        st.metric("搜索量最高关键词", top_search.iloc[0]['流量词'] if len(top_search) > 0 else "N/A")
 
                 if st.button("📝 分析数据并生成提示词", type="primary"):
                     with st.spinner("正在分析关键词并创建提示词..."):
