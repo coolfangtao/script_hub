@@ -229,3 +229,18 @@ def show_usage_stats():
         logging.error(f"show_usage_stats 失败: {e}", exc_info=True)
         st.sidebar.debug("详细错误已记录到日志。")
 
+def show_global_usage_stats():
+    stats = usage_tracker.get_usage_stats()
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("总访问次数", stats['total_visits'])
+    with col2:
+        st.metric("启用脚本", stats['total_scripts'])
+    with col3:
+        st.metric("平均使用", f"{stats['total_visits'] // max(stats['total_scripts'], 1)}次")
+
+    if stats['top_scripts']:
+        st.subheader("🔥 最受欢迎的功能")
+        for i, (path, data) in enumerate(stats['top_scripts'][:5], 1):
+            st.write(f"{i}. **{data['script_name']}** - {data['count']}次访问")
