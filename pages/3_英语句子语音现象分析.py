@@ -22,6 +22,16 @@ class PhoneticsPageConfig(GlobalConfig):
         self.DEFAULT_VOICE = "en-US-JennyNeural"
         self.DEFAULT_SENTENCE = "Let's get a cup of coffee."
         self.PLACEHOLDER_TEXT = "例如: What are you going to do?"
+        # 可用的AI模型
+        self.GEMINI_MODEL_OPTIONS = [
+            "gemini-2.5-flash-lite",  # 默认模型，可用，2.15秒
+            "gemini-2.0-flash",  # 可用，5.11秒
+            "gemini-2.5-pro",   # 可用，14.93秒
+            "gemini-2.0-flash-exp",  # 可用，4.28秒
+            "gemini-2.0-flash-lite",  # 可用，9.62秒
+            "gemini-2.5-flash",  # 可用，6.74秒
+            "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
+        ]
         self.DEFAULT_MODEL = "gemini-2.5-flash-lite"
         self.PROMPT_TEMPLATE = """
         请作为一名专业的英语语音教师，分析以下句子的语音现象。
