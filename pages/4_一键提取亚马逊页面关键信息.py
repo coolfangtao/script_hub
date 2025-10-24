@@ -2,8 +2,6 @@ import streamlit as st
 from bs4 import BeautifulSoup
 import re
 import pandas as pd  # 导入 pandas 用于表格
-from shared.sidebar import create_common_sidebar
-create_common_sidebar()
 
 
 # --- 您提供的原始解析函数 ---
@@ -228,6 +226,20 @@ def extract_reviews(soup):
             helpful_count = helpful_text.get_text(strip=True)
             review['helpful_count'] = helpful_count
 
+        # 8. 提取图片链接 (新增)
+        image_urls = []
+        image_tags = container.find_all('img', attrs={'data-hook': 'review-image-tile'})
+        for img in image_tags:
+            # 优先使用 data-src (懒加载)
+            url = img.get('data-src') or img.get('src')
+            if url:
+                # 尝试移除缩略图后缀 (例如 ._SY88.jpg) 来获取高清图
+                # \._[A-Z0-9_]+_\.jpg$ 匹配像 ._SY88.jpg 或 ._AC_UF100_..._.jpg 这样的后缀
+                cleaned_url = re.sub(r'\._[A-Z0-9_]+_\.jpg$', '.jpg', url)
+                image_urls.append(cleaned_url)
+
+        review['images'] = image_urls
+
         if review:  # 只添加有内容的评论
             reviews.append(review)
 
@@ -313,6 +325,13 @@ def format_reviews_simple_text(reviews):
         if review.get('helpful_count'):
             lines.append(f"有帮助: {review.get('helpful_count')}")
         lines.append(f"内容: {review.get('content', '无内容')}")
+
+        # (新增) 添加图片链接
+        if review.get('images'):
+            lines.append("图片链接:")
+            for img_url in review.get('images'):
+                lines.append(f"  - {img_url}")
+
         lines.append("\n" + "-" * 30 + "\n")
 
     return "\n".join(lines)
@@ -345,8 +364,8 @@ def display_streamlit_results(results):
             # --- 2a. 创建 DataFrame ---
             df = pd.DataFrame(reviews_list)
 
-            # 调整列顺序以便查看
-            cols_order = ['username', 'rating', 'date', 'title', 'content', 'verified', 'helpful_count']
+            # 调整列顺序以便查看 (新增 'images')
+            cols_order = ['username', 'rating', 'date', 'title', 'content', 'verified', 'helpful_count', 'images']
             # 过滤掉数据中不存在的列 (以防万一)
             existing_cols = [col for col in cols_order if col in df.columns]
             df_display = df[existing_cols]
@@ -413,5 +432,6 @@ if st.button("提取信息", key="extract_button", type="primary"):
                 st.exception(e)
     else:
         st.warning("警告：文本框为空，请输入网页源代码。")
+
 
 
