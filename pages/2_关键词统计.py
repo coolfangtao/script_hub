@@ -183,7 +183,7 @@ def plot_keyword_traffic(df: pd.DataFrame):
             showarrow=False,
             xanchor='left',
             xshift=10,  # 向右偏移一点，避免与柱子重叠
-            font=dict(color='green', size=12),
+            font=dict(color='green', size=12, weight='bold'),
         )
 
     fig.update_layout(
