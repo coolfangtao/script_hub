@@ -15,7 +15,7 @@ class PhoneticsPageConfig(GlobalConfig):
     """存储此页面专属的配置，继承全局配置。"""
 
     def __init__(self):
-        super().__init__()
+        super().__init__()  # 关键修复：调用父类初始化
         self.PAGE_TITLE = "英语语音现象分析器"
         self.PAGE_ICON = "🗣️"
         self.OUTPUT_DIR = "tts_audio"
@@ -158,10 +158,16 @@ class PhoneticsPageUI:
                     st.success("API Key 已配置。您可以折叠此区域。")
 
     def display_input_form(self):
+        # 安全检查：确保 selected_model 在选项列表中
+        current_model = st.session_state.selected_model
+        if current_model not in self.config.GEMINI_MODEL_OPTIONS:
+            current_model = self.config.DEFAULT_MODEL
+            st.session_state.selected_model = current_model
+
         selected_model = st.selectbox(
             "**请选择一个分析模型：**",
             options=self.config.GEMINI_MODEL_OPTIONS,
-            index=self.config.GEMINI_MODEL_OPTIONS.index(st.session_state.selected_model)
+            index=self.config.GEMINI_MODEL_OPTIONS.index(current_model)
         )
         st.session_state.selected_model = selected_model
 
