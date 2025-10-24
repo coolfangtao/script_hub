@@ -20,6 +20,7 @@ from PIL import Image
 import pandas as pd
 import plotly.express as px
 from shared.sidebar import create_common_sidebar
+from io import BytesIO  # 导入BytesIO用于处理字节数据
 
 
 class Config:
@@ -39,6 +40,7 @@ class Config:
             "gemini-2.5-flash",  # 可用，6.74秒
             "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
         ]
+
         self.ZAZHI_JIANCE_GET_ELEMENTS_DATA_PROMPT = """
                         请仔细分析提供的图片，该图片展示了X射线能谱（EDS）分析的结果界面。你的任务是从右上角的‘定量结果’表格中，提取所有检测到的元素的定量分析数据。
                         对于表格中列出的每一个元素，请提取并清晰地列出以下两个数值：
@@ -50,18 +52,22 @@ class Config:
                         """
 
 
-
 # 实例化配置
 cfg = Config()
 
 
 # --- 核心功能函数 ---
-def get_gemini_response(image: Image.Image, prompt: str, model_name: str):
+
+# 使用 st.cache_data 装饰器来缓存API的返回结果
+# 这意味着如果使用相同的图片、提示和模型再次调用此函数，将直接返回缓存的结果，无需再次调用API
+@st.cache_data
+def get_gemini_response(image_bytes: bytes, prompt: str, model_name: str):
     """
     向 Gemini Pro Vision 模型发送图片和提示，并获取响应。
+    使用 st.cache_data 缓存结果以避免重复调用。
 
     参数:
-    image (PIL.Image.Image): 用户上传的图片。
+    image_bytes (bytes): 用户上传的图片的字节数据。
     prompt (str): 用于指导模型分析图片的提示词。
     model_name (str): 使用的AI模型。
 
@@ -70,6 +76,8 @@ def get_gemini_response(image: Image.Image, prompt: str, model_name: str):
     """
     start_time = time.time()  # 记录开始时间
     try:
+        # 从字节数据重新构建图片对象
+        image = Image.open(BytesIO(image_bytes))
         model = genai.GenerativeModel(model_name)
         response = model.generate_content([prompt, image], stream=True)
         response.resolve()
@@ -78,6 +86,8 @@ def get_gemini_response(image: Image.Image, prompt: str, model_name: str):
         return response.text, duration
     except Exception as e:
         # 在界面上显示更具体的错误信息
+        # 注意：在缓存的函数中直接调用st.error可能会产生意外行为，更好的做法是返回错误信息
+        # 但对于这个应用场景，直接显示错误也是可以接受的。
         st.error(f"调用 Gemini API 时发生错误: {e}")
         return None, 0
 
@@ -188,7 +198,7 @@ def setup_ui():
                 "🤖 请选择AI模型",
                 options=cfg.ZAZHI_JIANCE_GEMINI_MODEL_OPTIONS,
                 index=0,  # 默认选择第一个
-                help="推荐使用 'gemini-2.5-flash-lite' 以获得更快的速度和更优的性能。"
+                help="推荐使用 'gemini-1.5-flash-latest' 以获得最佳的速度与性能平衡。"
             )
 
         uploaded_files = st.file_uploader(
@@ -217,7 +227,6 @@ def display_elemental_composition_chart(df: pd.DataFrame, image_index: int):
 
             with col_mass:
                 st.subheader("质量百分比 (%)", anchor=False, divider='blue')
-                # 使用Viridis颜色方案，这是一个连续的彩色方案
                 fig_mass = px.bar(df, x='元素', y='质量百分比(%)', title="质量百分比构成",
                                   labels={'元素': '元素', '质量百分比(%)': '百分比'},
                                   text='质量百分比(%)',
@@ -226,15 +235,11 @@ def display_elemental_composition_chart(df: pd.DataFrame, image_index: int):
                 fig_mass.update_layout(title_font_size=18, xaxis_title_font_size=16, yaxis_title_font_size=16,
                                        xaxis_tickangle=0)
                 fig_mass.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
-                # 隐藏颜色条，因为对于离散的分类数据可能不太合适
                 fig_mass.update_coloraxes(showscale=False)
-
-                # 添加唯一的 key
                 st.plotly_chart(fig_mass, use_container_width=True, key=f"mass_chart_{image_index}")
 
             with col_atomic:
                 st.subheader("原子百分比 (%)", anchor=False, divider='green')
-                # 使用Plasma颜色方案，与Viridis形成对比
                 fig_atomic = px.bar(df, x='元素', y='原子百分比(%)', title="原子百分比构成",
                                     labels={'元素': '元素', '原子百分比(%)': '百分比'},
                                     text='原子百分比(%)',
@@ -244,8 +249,6 @@ def display_elemental_composition_chart(df: pd.DataFrame, image_index: int):
                                          xaxis_tickangle=0)
                 fig_atomic.update_traces(texttemplate='%{text:.2f}%', textposition='outside')
                 fig_atomic.update_coloraxes(showscale=False)
-
-                # 添加唯一的 key
                 st.plotly_chart(fig_atomic, use_container_width=True, key=f"atomic_chart_{image_index}")
 
             st.caption("上方图表分别展示了识别出的各种元素的质量百分比与原子百分比。可将鼠标悬停在条形图上查看详细数据。")
@@ -260,83 +263,55 @@ def process_and_display_image(image_file, prompt, model_name, image_index):
 
     with col_img:
         st.subheader(f"EDS图片: {image_file.name}", divider='rainbow')
-        img = Image.open(image_file)
-        st.image(img, caption="上传的EDS截图", use_container_width=True)
+        # 直接传递上传的文件对象给 st.image，它能自动处理
+        st.image(image_file, caption="上传的EDS截图", use_container_width=True)
 
-    # 首先调用API获取结果
-    response_text, duration = get_gemini_response(img, prompt, model_name)
+    # 从缓存或API调用获取结果。
+    # 我们传递 image_file.getvalue()，即图片的字节内容，作为缓存的键。
+    # 这样，只要图片内容、提示和模型名称不变，就会从缓存中读取结果。
+    response_text, duration = get_gemini_response(image_file.getvalue(), prompt, model_name)
 
     if response_text:
-        # 在右侧列中显示主要的分析结果
         with col_results:
             st.subheader("分析结果", divider='rainbow')
-
-            # 1. 创建两列用于并排显示指标
             metric_col1, metric_col2 = st.columns(2)
-
-            # 2. 在第一列显示API耗时
             with metric_col1:
                 st.metric(label="AI模型调用耗时", value=f"{duration:.2f} 秒")
 
-            # 3. 在第二列创建一个空的占位符，稍后用来填充分类结果
             classification_placeholder = metric_col2.empty()
-
-            # 提取数据为DataFrame
             df_template = extract_eds_data_to_dataframe(response_text)
 
-            # 如果AI未能提取任何数据，则提供一个空模板
             if df_template.empty:
                 st.warning("AI未能从图片中提取有效数据，请检查图片清晰度。")
-                # 创建一个空的DataFrame，但包含正确的列名，以便后续代码正常运行
                 df_template = pd.DataFrame(columns=['元素', '质量百分比(%)', '原子百分比(%)'])
 
-            # 1. 因为表格变为不可编辑，所以我们直接用原始的 df_template 来进行分类
             final_classification = classify_inclusion(df_template)
 
-            # 2. 计算总和
-            #    首先检查DataFrame是否为空，避免计算出错
             if not df_template.empty:
                 mass_sum = df_template['质量百分比(%)'].sum()
                 atomic_sum = df_template['原子百分比(%)'].sum()
-
-                # 3. 创建一个包含总计信息的新DataFrame
-                #    为了让“总计”更突出，我们使用Markdown的加粗语法
                 total_row = pd.DataFrame({
-                    '元素': ['总计（百分比之和，并非原图中总计）'],
+                    '元素': ['**总计 (识别数据求和)**'],
                     '质量百分比(%)': [mass_sum],
                     '原子百分比(%)': [atomic_sum]
                 })
-
-                # 4. 将总计_df和原始_df合并成一个新的df用于显示
                 display_df = pd.concat([df_template, total_row], ignore_index=True)
             else:
-                # 如果原始数据为空，则直接显示空的df_template
                 display_df = df_template
 
-            # 5. 使用 st.dataframe() 来显示一个静态的、不可编辑的表格
             st.dataframe(display_df, use_container_width=True)
-
-            # 将最终分类结果填充到顶部的占位符中
             styled_classification_html = f"""
                         <div style="padding-top: 0.5rem;"> <div style="font-size: 0.875rem; color: #28a745; margin-bottom: 4px;">最终杂质分类</div>
                             <div style="font-size: 2.0rem; font-weight: 600; color: #28a745;">{final_classification}</div>
                         </div>
                         """
             classification_placeholder.markdown(styled_classification_html, unsafe_allow_html=True)
-            # --- 主要改动结束 ---
 
-        # --- 全宽区域：显示图表和原始数据 ---
-        # 这个代码块现在位于 col_results 的外面，因此它将占据全部可用宽度
         if response_text and not df_template.empty:
-            # 调用图表函数，它会创建一个全宽的折叠区域
             display_elemental_composition_chart(df_template, image_index=image_index)
-
-            # 将原始文本的折叠区域也放在这里，保持布局一致性
             with st.expander("查看AI模型原始返回文本"):
                 st.markdown(response_text)
-
     else:
-        # 如果API调用失败，仍然在右侧列显示错误信息
         with col_results:
             st.subheader("分析结果", divider='rainbow')
             st.error("无法获取AI模型的响应，请检查您的API密钥、网络连接或图片是否有效。")
@@ -349,18 +324,14 @@ def main():
     api_key, model_name, uploaded_files, analyze_button = setup_ui()
 
     if analyze_button:
-        # 校验输入
         if not api_key:
             st.warning("请输入您的Gemini API密钥。")
         elif not uploaded_files:
             st.warning("请至少上传一张图片。")
         else:
             try:
-                # 配置Gemini API
                 genai.configure(api_key=api_key)
-
                 with st.spinner('正在分析中，请稍候...'):
-                    # 根据上传文件的数量决定布局
                     if len(uploaded_files) == 1:
                         process_and_display_image(
                             uploaded_files[0],
@@ -379,7 +350,6 @@ def main():
                             )
                 st.balloons()
                 st.success("所有图片分析完成！")
-
             except Exception as e:
                 st.error(f"发生了一个未预料的错误: {e}")
                 st.info("这可能是由于API密钥无效或权限问题导致的。请检查您的密钥。")
