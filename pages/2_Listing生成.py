@@ -29,7 +29,7 @@ class ListingConfig(GlobalConfig):
         # API 配置
         # GEMINI_API_KEY 属性已从 GlobalConfig 继承
         # 覆盖父类的默认模型以使用更具体的版本
-        self.DEFAULT_MODEL = "gemini-1.5-pro"
+        self.DEFAULT_MODEL = "gemini-2.5-pro"
 
         # 数据配置
         self.KEYWORD_COLUMNS = ['流量词', '关键词翻译', '流量占比', '月搜索量', '购买率', 'ASIN']
