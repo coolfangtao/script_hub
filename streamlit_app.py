@@ -61,8 +61,19 @@ def create_feature_card(icon, title, description, button_key, target_page):
 
 def display_welcome_banner():
     """显示页面的欢迎横幅。"""
-    st.title("🚀 欢迎来到 FT 的脚本中心")
+    st.title("🚀 欢迎来到 TF 的脚本中心")
     st.markdown("一个集成了运营维护、文本处理和图像处理等多种高效工具的在线平台。")
+    # --- 新增的座右铭 ---
+    # 使用 Markdown 和一点 HTML/CSS 来美化样式，使其居中、斜体并带有灰色调
+    st.markdown(
+        """
+        <p style='text-align: center; font-style: italic; color: #888;'>
+            —— 一步一个脚印，慢慢来。
+        </p>
+        """,
+        unsafe_allow_html=True
+    )
+    # --- 座右铭结束 ---
     st.markdown("⬅️ 请从左侧侧边栏选择一个工具开始使用。")
     st.divider()
 
@@ -113,7 +124,7 @@ def display_footer():
     st.markdown(
         """
         <p style='text-align: center; color: grey;'>
-            © 2025 FT的脚本中心 | ✉️ 邮箱：morebetter2025@163.com
+            © 2025 TF的脚本中心 | ✉️ 邮箱：morebetter2025@163.com
         </p>
         """,
         unsafe_allow_html=True
