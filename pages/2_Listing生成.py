@@ -17,6 +17,7 @@ class ListingConfig(GlobalConfig):
     Listing 智能生成器的配置类。
     继承 GlobalConfig 以获取共享配置，如 RUN_MODE 和 GEMINI_API_KEY 名称。
     """
+
     def __init__(self):
         # 初始化父类，以设置 RUN_MODE 等属性
         super().__init__()
@@ -30,6 +31,17 @@ class ListingConfig(GlobalConfig):
         # GEMINI_API_KEY 属性已从 GlobalConfig 继承
         # 覆盖父类的默认模型以使用更具体的版本
         self.DEFAULT_MODEL = "gemini-2.5-pro"
+
+        # --- 新增：可选的 Gemini 模型列表 ---
+        self.GEMINI_MODEL_OPTIONS = [
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash",
+            "gemini-2.5-pro",
+            "gemini-2.0-flash-exp",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash",
+            "gemini-robotics-er-1.5-preview",
+        ]
 
         # 数据配置
         self.KEYWORD_COLUMNS = ['流量词', '关键词翻译', '流量占比', '月搜索量', '购买率', 'ASIN']
@@ -112,7 +124,7 @@ st.set_page_config(
 create_common_sidebar()
 
 
-# --- 主要功能函数 (保持不变) ---
+# --- 主要功能函数 (部分已修改) ---
 
 def load_data(uploaded_file):
     """从用户上传的 Excel 文件中加载数据。"""
@@ -221,14 +233,16 @@ def create_prompts(df: pd.DataFrame, config: ListingConfig):
     }
 
 
-def generate_listing_info(api_key: str, prompt: str, config: ListingConfig):
+# --- 修改：generate_listing_info 函数现在接收 model_name 参数 ---
+def generate_listing_info(api_key: str, prompt: str, model_name: str):
     """使用 Google Gemini API 根据提示词生成内容。"""
     if not api_key or not api_key.startswith("AI"):
         st.error("❌ Google Gemini API 密钥无效或未提供，请检查。")
         return None
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(config.DEFAULT_MODEL)
+        # 使用传入的 model_name 初始化模型
+        model = genai.GenerativeModel(model_name)
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
@@ -236,7 +250,7 @@ def generate_listing_info(api_key: str, prompt: str, config: ListingConfig):
         return f"调用API时发生错误: {e}"
 
 
-# --- 主函数与页面渲染 (已重构以支持页面持久化) ---
+# --- 主函数与页面渲染 (已重构以支持页面持久化和模型选择) ---
 
 def main():
     """
@@ -258,8 +272,11 @@ def main():
         st.session_state.generated_title = None
     if 'generated_bullets' not in st.session_state:
         st.session_state.generated_bullets = None
+    # --- 新增：为选择的模型初始化 session_state ---
+    if 'selected_model' not in st.session_state:
+        st.session_state.selected_model = cfg.DEFAULT_MODEL
 
-    # 3. 根据运行模式处理 API Key
+    # 根据运行模式处理 API Key
     api_key = None
     if cfg.RUN_MODE == "cloud":
         st.info("☁️ 您正在云端运行本应用，请输入您的 Google Gemini API 密钥以继续。")
@@ -279,7 +296,19 @@ def main():
 
     # --- 步骤 1: 上传文件与数据处理 ---
     with st.container(border=True):
-        st.header("⚙️ 第 1 步: 上传关键词文件")
+        st.header("⚙️ 第 1 步: 上传文件与配置")
+
+        # --- 新增：模型选择器 ---
+        # 使用 key 直接将选择器的值绑定到 session_state
+        st.selectbox(
+            label="选择您想使用的 AI 模型:",
+            options=cfg.GEMINI_MODEL_OPTIONS,
+            # 确保默认选项是配置文件中指定的模型
+            index=cfg.GEMINI_MODEL_OPTIONS.index(st.session_state.selected_model),
+            key='selected_model',
+            help="模型越强大，生成速度可能越慢，成本也可能更高。"
+        )
+
         uploaded_file = st.file_uploader(
             "上传您的关键词反查 Excel 文件",
             type=['xlsx'],
@@ -322,13 +351,11 @@ def main():
             st.info("请先上传您的 Excel 文件以开始。")
 
     # --- 步骤 2: 编辑提示词 ---
-    # 这部分代码无需修改，因为它已经正确地依赖于 session_state
     if st.session_state.generated_prompts:
         with st.container(border=True):
             st.header("✏️ 第 2 步: 审核并优化提示词")
             st.markdown("您可以在此微调AI的指令。例如，您可以要求生成 5 个而不是 4 个标题，或者改变文案的语气。")
 
-            # ... (后续代码保持不变) ...
             if 'processed_df' in st.session_state.generated_prompts:
                 processed_df = st.session_state.generated_prompts['processed_df']
                 st.info(f"🔧 数据已预处理：从 {len(st.session_state.uploaded_data)} 行原始数据聚合为 {len(processed_df)} 个唯一关键词")
@@ -361,31 +388,35 @@ def main():
                     label="**标题生成提示词 (Title Prompt)**",
                     value=st.session_state.generated_prompts['title'],
                     height=500,
-                    key='title_prompt_editor'  # 添加key防止内容在rerun时丢失
+                    key='title_prompt_editor'
                 )
             with col2:
                 bullet_points_prompt_text = st.text_area(
                     label="**五点描述生成提示词 (Bullet Points Prompt)**",
                     value=st.session_state.generated_prompts['bullet_points'],
                     height=500,
-                    key='bullets_prompt_editor'  # 添加key防止内容在rerun时丢失
+                    key='bullets_prompt_editor'
                 )
 
             st.header("✨ 第 3 步: 生成 Listing")
             if st.button("🚀 点击生成 Listing", type="primary", use_container_width=True):
-                with st.spinner("AI 正在努力创作中，请稍候..."):
+                # --- 修改：更新 spinner 提示信息 ---
+                spinner_message = f"AI 正在使用 `{st.session_state.selected_model}` 模型努力创作中，请稍候..."
+                with st.spinner(spinner_message):
                     # 从编辑框获取最新文本
                     final_title_prompt = st.session_state.title_prompt_editor
                     final_bullets_prompt = st.session_state.bullets_prompt_editor
 
-                    generated_title = generate_listing_info(api_key, final_title_prompt, cfg)
-                    generated_bullets = generate_listing_info(api_key, final_bullets_prompt, cfg)
+                    # --- 修改：将选择的模型名称传入生成函数 ---
+                    selected_model = st.session_state.selected_model
+                    generated_title = generate_listing_info(api_key, final_title_prompt, selected_model)
+                    generated_bullets = generate_listing_info(api_key, final_bullets_prompt, selected_model)
+
                     st.session_state.generated_title = generated_title
                     st.session_state.generated_bullets = generated_bullets
                 st.rerun()
 
     # --- 结果展示 ---
-    # 这部分代码也无需修改
     if 'generated_title' in st.session_state and st.session_state.generated_title:
         with st.container(border=True):
             st.header("✅ 第 4 步: 查看并复制结果")
