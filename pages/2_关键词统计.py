@@ -265,6 +265,7 @@ def display_aggregated_word_frequency(df: pd.DataFrame):
     display_word_cloud(word_counts)
     display_frequency_table(freq_df)
 
+
 def plot_search_volume_and_purchases(df: pd.DataFrame):
     """展示关键词搜索量和购买量的堆叠条形图。"""
     st.subheader("关键词搜索量和购买量 (Search Volume and Purchases)")
@@ -293,12 +294,24 @@ def plot_search_volume_and_purchases(df: pd.DataFrame):
     # 为每个条形添加购买率标注
     annotations = []
     for _, row in top_20_search.iterrows():
+        # 购买率标注（在柱子内部右侧）
         annotations.append(dict(
             x=row['月搜索量'] * 0.98, y=row['流量词'],
             text=f"购买率: {row['购买率']:.2%}",
             showarrow=False, font=dict(color="black", size=10),
             xanchor='right'
         ))
+
+        # 新增：总搜索量标注（在柱子顶端）
+        annotations.append(dict(
+            x=row['月搜索量'], y=row['流量词'],
+            text=f"{row['月搜索量']:,}",  # 格式化数字，添加千位分隔符
+            showarrow=False,
+            xanchor='left',
+            xshift=10,  # 向右偏移一点，避免与柱子重叠
+            font=dict(color='green', size=12, weight='bold'),
+        ))
+
     fig.update_layout(annotations=annotations)
 
     fig.update_layout(
