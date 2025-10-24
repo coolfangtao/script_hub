@@ -1,5 +1,6 @@
 import streamlit as st
 from bs4 import BeautifulSoup  # 导入新库
+from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
 
 # --- 1. 页面配置 ---
@@ -66,6 +67,7 @@ def run_extraction():
 
 # --- 5. 侧边栏 ---
 try:
+    track_script_usage("🎬 B站标题")
     create_common_sidebar()
 except Exception as e:
     st.sidebar.error(f"加载侧边栏失败: {e}")

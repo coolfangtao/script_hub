@@ -6,7 +6,9 @@ import easyocr
 from deep_translator import GoogleTranslator
 from langdetect import detect, LangDetectException  # <--- 新增: 导入语言检测库
 import io
+from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar # <-- 1. 导入函数
+track_script_usage("🌐 图片翻译")
 create_common_sidebar() # <-- 2. 调用函数，确保每个页面都有侧边栏
 
 

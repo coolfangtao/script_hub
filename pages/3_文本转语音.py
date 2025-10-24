@@ -7,7 +7,9 @@ from typing import List, Dict, Any, Optional
 
 
 # 假设您的侧边栏文件位于项目的 "shared" 文件夹中
+from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
+track_script_usage("🔊 文字转语音")
 create_common_sidebar()
 
 # --- 1. 配置类 (Config) ---

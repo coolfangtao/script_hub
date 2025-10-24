@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 import pytz
 import json
+from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
 
 
@@ -228,6 +229,7 @@ def main():
     """主函数，组织页面逻辑"""
     ui = FundDashboardUI()
     ui.setup_page()
+    track_script_usage("📈 基金盯盘")
     create_common_sidebar()
     ui.render_header()
 

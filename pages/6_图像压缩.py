@@ -4,7 +4,9 @@ import io
 from typing import Tuple
 
 # 假设您的侧边栏函数位于此路径
+from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
+track_script_usage("📦 图像压缩")
 create_common_sidebar()
 
 # --- 页面配置 ---

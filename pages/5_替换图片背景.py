@@ -6,7 +6,9 @@ import io
 # --- 1. 导入和调用侧边栏 ---
 try:
     # 假设 shared.sidebar 模块在同一个父目录下
+    from shared.usage_tracker import track_script_usage
     from shared.sidebar import create_common_sidebar
+    track_script_usage("🎨 替换背景")
     create_common_sidebar()  # 调用函数，确保每个页面都有侧边栏
 except ImportError:
     st.sidebar.warning("未找到 'shared.sidebar' 模块，侧边栏将不会显示。")

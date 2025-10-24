@@ -7,6 +7,7 @@ import plotly.express as px
 from itertools import groupby
 from datetime import datetime, timedelta, date, time
 from streamlit_autorefresh import st_autorefresh
+from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
 from shared.config import GlobalConfig  # <<< 导入全局配置实例
 from github import Github, UnknownObjectException
@@ -148,6 +149,7 @@ config = AppConfig()
 
 # --- 初始化和页面设置 ---
 st_autorefresh(interval=config.kanban.AUTO_REFRESH_INTERVAL_MS, key="clock_refresher")
+track_script_usage("✅ 任务看板")
 create_common_sidebar()
 beijing_tz = config.globals.APP_TIMEZONE
 
