@@ -236,14 +236,28 @@ def generate_listing_info(api_key: str, prompt: str, config: ListingConfig):
         return f"调用API时发生错误: {e}"
 
 
-# --- 主函数与页面渲染 (已重构) ---
+# --- 主函数与页面渲染 (已重构以支持页面持久化) ---
 
 def main():
     """
     Streamlit 应用的主函数，负责渲染整个页面。
+    通过 session_state 实现了页面切换后的状态保持。
     """
     st.title(cfg.PAGE_TITLE)
     st.markdown("上传关键词反查报告，AI 助您一键生成高质量的亚马逊商品标题和五点描述。")
+
+    # --- 初始化 Session State ---
+    # 在应用开始时，确保所有需要的键都存在于 session_state 中
+    if 'uploaded_filename' not in st.session_state:
+        st.session_state.uploaded_filename = None
+    if 'uploaded_data' not in st.session_state:
+        st.session_state.uploaded_data = None
+    if 'generated_prompts' not in st.session_state:
+        st.session_state.generated_prompts = None
+    if 'generated_title' not in st.session_state:
+        st.session_state.generated_title = None
+    if 'generated_bullets' not in st.session_state:
+        st.session_state.generated_bullets = None
 
     # 3. 根据运行模式处理 API Key
     api_key = None
@@ -254,7 +268,7 @@ def main():
             type="password",
             help="您的密钥不会被储存或分享。"
         )
-    else: # local mode
+    else:  # local mode
         st.info("🏡 您正在本地运行本应用，将从 secrets.toml 文件加载 API 密钥。")
         api_key = st.secrets.get(cfg.GEMINI_API_KEY)
 
@@ -263,44 +277,58 @@ def main():
         st.warning("请输入或配置您的 API 密钥以开始使用。")
         st.stop()
 
-
-    # --- 步骤 1: 上传文件 ---
+    # --- 步骤 1: 上传文件与数据处理 ---
     with st.container(border=True):
         st.header("⚙️ 第 1 步: 上传关键词文件")
         uploaded_file = st.file_uploader(
             "上传您的关键词反查 Excel 文件",
             type=['xlsx'],
-            help="请确保文件中包含流量词、流量占比、月搜索量、ASIN等关键信息。"
+            help="上传新文件将会覆盖当前已加载的数据，并重置生成流程。"
         )
 
-        if 'generated_prompts' not in st.session_state:
-            st.session_state.generated_prompts = None
-        if 'uploaded_data' not in st.session_state:
-            st.session_state.uploaded_data = None
-
-        if uploaded_file:
+        # 核心逻辑：仅当上传了“新”文件时，才执行数据处理和状态重置
+        if uploaded_file is not None and uploaded_file.name != st.session_state.uploaded_filename:
             df = load_data(uploaded_file)
             if df is not None:
+                # 1. 缓存新数据和新文件名
                 st.session_state.uploaded_data = df
-                with st.expander("📊 点击查看完整数据", expanded=True):
-                    st.dataframe(df, use_container_width=True)
-                    st.markdown(f"**数据总行数:** {len(df)} 行")
-                    if 'ASIN' in df.columns:
-                        st.markdown(f"**涉及ASIN数量:** {df['ASIN'].nunique()} 个")
+                st.session_state.uploaded_filename = uploaded_file.name
+                # 2. 重置所有下游状态，因为源数据已更改
+                st.session_state.generated_prompts = None
+                st.session_state.generated_title = None
+                st.session_state.generated_bullets = None
+                # 使用 st.rerun() 可以立即刷新页面，提供更流畅的体验
+                st.rerun()
 
+        # UI渲染逻辑：完全基于 session_state 中的数据状态
+        if st.session_state.uploaded_data is not None:
+            st.success(f"✅ 当前已加载数据文件: **{st.session_state.uploaded_filename}**")
+            with st.expander("📊 点击查看完整数据"):
+                df_display = st.session_state.uploaded_data
+                st.dataframe(df_display, use_container_width=True)
+                st.markdown(f"**数据总行数:** {len(df_display)} 行")
+                if 'ASIN' in df_display.columns:
+                    st.markdown(f"**涉及ASIN数量:** {df_display['ASIN'].nunique()} 个")
+
+            # 仅当提示词尚未生成时，才显示“生成提示词”按钮
+            if st.session_state.generated_prompts is None:
                 if st.button("📝 分析数据并生成提示词", type="primary"):
                     with st.spinner("正在分析关键词并创建提示词..."):
-                        st.session_state.generated_prompts = create_prompts(df, cfg)
+                        prompts_data = create_prompts(st.session_state.uploaded_data, cfg)
+                        st.session_state.generated_prompts = prompts_data
                     st.success("✅ 提示词已在下方生成！您可以进行修改。")
+                    st.rerun()
         else:
             st.info("请先上传您的 Excel 文件以开始。")
 
     # --- 步骤 2: 编辑提示词 ---
+    # 这部分代码无需修改，因为它已经正确地依赖于 session_state
     if st.session_state.generated_prompts:
         with st.container(border=True):
             st.header("✏️ 第 2 步: 审核并优化提示词")
             st.markdown("您可以在此微调AI的指令。例如，您可以要求生成 5 个而不是 4 个标题，或者改变文案的语气。")
 
+            # ... (后续代码保持不变) ...
             if 'processed_df' in st.session_state.generated_prompts:
                 processed_df = st.session_state.generated_prompts['processed_df']
                 st.info(f"🔧 数据已预处理：从 {len(st.session_state.uploaded_data)} 行原始数据聚合为 {len(processed_df)} 个唯一关键词")
@@ -332,33 +360,42 @@ def main():
                 title_prompt_text = st.text_area(
                     label="**标题生成提示词 (Title Prompt)**",
                     value=st.session_state.generated_prompts['title'],
-                    height=500
+                    height=500,
+                    key='title_prompt_editor'  # 添加key防止内容在rerun时丢失
                 )
             with col2:
                 bullet_points_prompt_text = st.text_area(
                     label="**五点描述生成提示词 (Bullet Points Prompt)**",
                     value=st.session_state.generated_prompts['bullet_points'],
-                    height=500
+                    height=500,
+                    key='bullets_prompt_editor'  # 添加key防止内容在rerun时丢失
                 )
 
             st.header("✨ 第 3 步: 生成 Listing")
             if st.button("🚀 点击生成 Listing", type="primary", use_container_width=True):
                 with st.spinner("AI 正在努力创作中，请稍候..."):
-                    generated_title = generate_listing_info(api_key, title_prompt_text, cfg)
-                    generated_bullets = generate_listing_info(api_key, bullet_points_prompt_text, cfg)
+                    # 从编辑框获取最新文本
+                    final_title_prompt = st.session_state.title_prompt_editor
+                    final_bullets_prompt = st.session_state.bullets_prompt_editor
+
+                    generated_title = generate_listing_info(api_key, final_title_prompt, cfg)
+                    generated_bullets = generate_listing_info(api_key, final_bullets_prompt, cfg)
                     st.session_state.generated_title = generated_title
                     st.session_state.generated_bullets = generated_bullets
+                st.rerun()
 
     # --- 结果展示 ---
+    # 这部分代码也无需修改
     if 'generated_title' in st.session_state and st.session_state.generated_title:
-        st.subheader("✅ 生成结果")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**建议标题:**")
-            st.code(st.session_state.generated_title, language=None)
-        with col2:
-            st.markdown("**建议五点描述:**")
-            st.code(st.session_state.generated_bullets, language=None)
+        with st.container(border=True):
+            st.header("✅ 第 4 步: 查看并复制结果")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**建议标题:**")
+                st.code(st.session_state.generated_title, language=None)
+            with col2:
+                st.markdown("**建议五点描述:**")
+                st.code(st.session_state.generated_bullets, language=None)
 
 
 if __name__ == "__main__":
