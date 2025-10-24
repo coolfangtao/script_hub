@@ -1,7 +1,7 @@
 # 文件路径: shared/sidebar.py
 import streamlit as st
 from shared.elements import shin_chan_animation
-from shared.usage_tracker import usage_tracker  # 导入使用统计跟踪器
+from shared.usage_tracker import show_usage_stats
 
 # --- 核心数据结构: 统一管理所有脚本和分组 ---
 # (这部分数据结构保持不变)
@@ -121,38 +121,7 @@ def create_common_sidebar():
                 st.page_link(script["path"], label=script["label"])
 
     # 4. 添加使用统计信息
-    st.sidebar.divider()
     show_usage_stats()
 
     # 5. 小新动画
     shin_chan_animation()
-
-
-def show_usage_stats():
-    """在侧边栏显示脚本使用统计"""
-    try:
-        # 获取使用统计
-        stats = usage_tracker.get_usage_stats()
-
-        # 创建可折叠的统计区域
-        with st.sidebar.expander("📊 使用统计", expanded=False):
-            # 总体统计
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric("总访问", stats['total_visits'])
-            with col2:
-                st.metric("总脚本", stats['total_scripts'])
-
-            # 热门脚本
-            if stats['top_scripts']:
-                st.markdown("**🔥 热门功能:**")
-                for i, (path, data) in enumerate(stats['top_scripts'][:3], 1):
-                    st.write(f"{i}. {data['script_name']} - {data['count']}次")
-
-            # 刷新按钮
-            if st.button("🔄 刷新统计", use_container_width=True):
-                st.rerun()
-
-    except Exception as e:
-        st.sidebar.error("统计加载失败")
-        st.sidebar.debug(f"错误详情: {e}")
