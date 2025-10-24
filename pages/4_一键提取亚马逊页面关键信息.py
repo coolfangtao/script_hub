@@ -1,7 +1,11 @@
 import streamlit as st
 from bs4 import BeautifulSoup
 import re
+import pandas as pd  # 导入 pandas 用于表格
 
+
+# --- 您提供的原始解析函数 ---
+# (为了保持代码整洁，这里省略了函数的内部实现，但它们与您提供的一致)
 
 def extract_all_product_info(html_content):
     """
@@ -228,143 +232,152 @@ def extract_reviews(soup):
     return reviews
 
 
+# --- (新增) Streamlit 缓存函数 ---
+@st.cache_data
+def convert_df_to_csv(df):
+    """
+    将 DataFrame 转换为 CSV 格式 (用于下载)
+    使用 utf-8-sig 编码确保 Excel 正确打开
+    """
+    return df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
+
+
+# --- (新增) 格式化基本信息 ---
+def format_other_info_for_display(results):
+    """
+    将基本信息格式化为单个字符串以便复制
+    """
+    lines = []
+
+    # 标题
+    if results['title']:
+        lines.append(f"商品标题: {results['title']}")
+    else:
+        lines.append("商品标题: 未找到")
+
+    lines.append("-" * 40)
+
+    # 价格
+    if results['price']:
+        lines.append(f"商品价格: {results['price']}")
+    else:
+        lines.append("商品价格: 未找到")
+
+    lines.append("-" * 40)
+
+    # 评分
+    if results['rating']:
+        rating = results['rating']
+        lines.append("评分信息:")
+        if 'score' in rating:
+            lines.append(f"  - 评分: {rating['score']}/5")
+        if 'full_text' in rating:
+            lines.append(f"  - 详情: {rating['full_text']}")
+        if 'review_count' in rating:
+            lines.append(f"  - 评价数量: {rating['review_count']}")
+    else:
+        lines.append("评分信息: 未找到")
+
+    lines.append("-" * 40)
+
+    # 特性
+    if results['features']:
+        lines.append("商品特性:")
+        for i, feature in enumerate(results['features'], 1):
+            lines.append(f"  {i}. {feature}")
+    else:
+        lines.append("商品特性: 未找到")
+
+    return "\n".join(lines)
+
+
+# --- (新增) 格式化评论为简洁文本 ---
+def format_reviews_simple_text(reviews):
+    """
+    将评论列表格式化为简洁的文本字符串
+    """
+    lines = []
+    if not reviews:
+        return "未找到评论。"
+
+    for i, review in enumerate(reviews, 1):
+        lines.append(f"【评论 {i}】")
+        lines.append(f"用户名: {review.get('username', 'N/A')}")
+        lines.append(f"评分: {review.get('rating', '?')}/5")
+        lines.append(f"日期: {review.get('date', 'N/A')}")
+        lines.append(f"标题: {review.get('title', '无标题')}")
+        verified_text = "是" if review.get('verified', False) else "否"
+        lines.append(f"已验证购买: {verified_text}")
+        if review.get('helpful_count'):
+            lines.append(f"有帮助: {review.get('helpful_count')}")
+        lines.append(f"内容: {review.get('content', '无内容')}")
+        lines.append("\n" + "-" * 30 + "\n")
+
+    return "\n".join(lines)
+
+
 # --- 用于Streamlit的新函数 ---
 
 def display_streamlit_results(results):
     """
-    在Streamlit页面上格式化显示提取结果
+    在Streamlit页面上格式化显示提取结果 (已修改)
     """
     st.header("提取结果")
     st.markdown("---")
 
-    # 显示标题
-    if results['title']:
-        st.subheader("📦 商品标题")
-        st.write(results['title'])
-    else:
-        st.warning("未找到商品标题。")
+    # --- 1. 显示基本信息 (文本框) ---
+    st.subheader("📦 商品基本信息")
+    other_info_text = format_other_info_for_display(results)
+    # 使用 disabled=True 使其只读，但用户仍可复制
+    st.text_area("基本信息 (可复制):", value=other_info_text, height=300, disabled=True, key="other_info_area")
 
-    # 显示价格
-    if results['price']:
-        st.subheader("💰 价格")
-        # 价格可能包含货币符号，也可能不包含
-        st.write(f"{results['price']}")
-    else:
-        st.warning("未找到价格。")
+    st.markdown("\n\n---\n")
 
-    # 显示评分
-    if results['rating']:
-        st.subheader("⭐ 评分")
-        rating = results['rating']
-        if 'score' in rating:
-            st.write(f"**评分:** {rating['score']}/5")
-        if 'full_text' in rating:
-            st.write(f"**详情:** {rating['full_text']}")
-        if 'review_count' in rating:
-            st.write(f"**评价数量:** {rating['review_count']}")
-    else:
-        st.warning("未找到评分信息。")
-
-    # 显示特性列表
-    if results['features']:
-        st.subheader("📋 商品特性")
-        md_list = ""
-        for i, feature in enumerate(results['features'], 1):
-            md_list += f" {i}. {feature}\n"
-        st.markdown(md_list)
-    else:
-        st.warning("未找到商品特性。")
-
-    # 5. 显示评论 (新增)
+    # --- 2. 显示评论 (表格) ---
+    st.subheader("💬 用户评论")
     if results.get('reviews'):
-        st.subheader(f"💬 用户评论 (找到 {len(results['reviews'])} 条)")
-        for i, review in enumerate(results['reviews']):
-            expander_title = f"**{review.get('title', '无标题')}** - (评分: {review.get('rating', '?')}/5) - by {review.get('username', '匿名')}"
-            with st.expander(expander_title):
-                cols = st.columns(3)
-                with cols[0]:
-                    st.text(f"👤 用户: {review.get('username', 'N/A')}")
-                with cols[1]:
-                    st.text(f"📅 日期: {review.get('date', 'N/A')}")
-                with cols[2]:
-                    verified_text = "是" if review.get('verified', False) else "否"
-                    st.text(f"✅ 已验证购买: {verified_text}")
+        reviews_list = results['reviews']
+        st.write(f"共找到 {len(reviews_list)} 条评论")
 
-                if review.get('helpful_count'):
-                    st.text(f"👍 有帮助: {review.get('helpful_count')}")
+        try:
+            # --- 2a. 创建 DataFrame ---
+            df = pd.DataFrame(reviews_list)
 
-                st.markdown("---")
-                st.markdown(review.get('content', '无内容'))
+            # 调整列顺序以便查看
+            cols_order = ['username', 'rating', 'date', 'title', 'content', 'verified', 'helpful_count']
+            # 过滤掉数据中不存在的列 (以防万一)
+            existing_cols = [col for col in cols_order if col in df.columns]
+            df_display = df[existing_cols]
+
+            st.dataframe(df_display, use_container_width=True)
+
+            # --- 2b. 下载按钮 ---
+            csv_data = convert_df_to_csv(df_display)
+            st.download_button(
+                label="下载评论 (CSV 文件)",
+                data=csv_data,
+                file_name="amazon_reviews.csv",
+                mime="text/csv",
+                key="download_csv"
+            )
+
+            # --- 2c. 简洁文本格式 ---
+            st.subheader("简洁文本版评论 (可复制)")
+            simple_reviews_text = format_reviews_simple_text(reviews_list)
+            st.text_area("评论文本:", value=simple_reviews_text, height=400, disabled=True, key="reviews_text_area")
+
+        except Exception as e:
+            st.error(f"处理评论表格时出错: {e}")
+            st.write("无法生成表格，显示原始评论数据：")
+            st.json(reviews_list)  # 作为后备，直接打印JSON
 
     else:
         st.info("未找到用户评论。")
 
 
-def format_results_for_copy(results):
-    """
-    将结果格式化为单个字符串以便复制
-    """
-    lines = []
-    lines.append("=" * 50)
-    lines.append("商品信息提取结果")
-    lines.append("=" * 50)
-    lines.append("\n")
-
-    if results['title']:
-        lines.append(f"📦 商品标题: {results['title']}")
-        lines.append("-" * 50)
-        lines.append("\n")
-
-    if results['price']:
-        lines.append(f"💰 价格: {results['price']}")
-        lines.append("-" * 50)
-        lines.append("\n")
-
-    if results['rating']:
-        rating = results['rating']
-        lines.append("⭐ 评分:")
-        if 'score' in rating:
-            lines.append(f"   - 评分: {rating['score']}/5")
-        if 'full_text' in rating:
-            lines.append(f"   - 详情: {rating['full_text']}")
-        if 'review_count' in rating:
-            lines.append(f"   - 评价数量: {rating['review_count']}")
-        lines.append("-" * 50)
-        lines.append("\n")
-
-    if results['features']:
-        lines.append("📋 商品特性:")
-        for i, feature in enumerate(results['features'], 1):
-            lines.append(f"  {i}. {feature}")
-        lines.append("-" * 50)
-
-    # 5. 添加评论到复制文本 (新增)
-    if results.get('reviews'):
-        lines.append("\n")
-        lines.append("=" * 50)
-        lines.append(f"💬 用户评论 (找到 {len(results['reviews'])} 条)")
-        lines.append("=" * 50)
-        lines.append("\n")
-
-        for i, review in enumerate(results['reviews'], 1):
-            lines.append(f"--- 评论 {i} ---")
-            lines.append(f"👤 用户名: {review.get('username', 'N/A')}")
-            lines.append(f"⭐ 评分: {review.get('rating', '?')}/5")
-            lines.append(f"📅 日期: {review.get('date', 'N/A')}")
-            lines.append(f"✍️ 标题: {review.get('title', '无标题')}")
-
-            verified_text = "是" if review.get('verified', False) else "否"
-            lines.append(f"✅ 已验证购买: {verified_text}")
-
-            if review.get('helpful_count'):
-                lines.append(f"👍 有帮助: {review.get('helpful_count')}")
-
-            lines.append("---")
-            lines.append(f"内容:\n{review.get('content', '无内容')}")
-            lines.append("\n")
-
-    return "\n".join(lines)
-
+# (此函数已被移除，功能被 format_other_info_for_display 和 format_reviews_simple_text 替代)
+# def format_results_for_copy(results):
+#     ...
 
 # --- Streamlit 应用程序界面 ---
 
@@ -386,17 +399,10 @@ if st.button("提取信息", key="extract_button", type="primary"):
                 # 提取所有信息
                 results = extract_all_product_info(html_content)
 
-                # 在页面上显示结果
+                # 在页面上显示结果 (使用修改后的函数)
                 display_streamlit_results(results)
 
-                st.markdown("\n\n---\n")
-                st.header("一键复制结果")
-
-                # 格式化用于复制的文本
-                copy_text = format_results_for_copy(results)
-
-                # 使用 st.code() 来显示文本，它自带一个复制按钮
-                st.code(copy_text, language="text")
+                # (旧的复制部分已移除)
 
                 st.success("提取完成！")
 
@@ -405,4 +411,5 @@ if st.button("提取信息", key="extract_button", type="primary"):
                 st.exception(e)
     else:
         st.warning("警告：文本框为空，请输入网页源代码。")
+
 
