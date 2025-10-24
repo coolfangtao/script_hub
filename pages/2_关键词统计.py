@@ -137,22 +137,46 @@ def plot_keyword_traffic(df: pd.DataFrame):
         st.warning("没有有效的流量数据可供展示。")
         return
 
-    # --- 新增聚合逻辑 ---
-    # 无论处理单文件还是多文件，都先按关键词聚合，以处理重复关键词（尤其是在合并数据中）
+    # 检查是否存在ASIN列
+    has_asin = 'ASIN' in df_filtered.columns
+
+    # --- 修改后的聚合逻辑 ---
     # 1. 首先计算每行的绝对流量贡献
     df_filtered["自然流量绝对占比"] = df_filtered["流量占比"] * df_filtered["自然流量占比"]
     df_filtered["广告流量绝对占比"] = df_filtered["流量占比"] * df_filtered["广告流量占比"]
 
-    # 2. 按"流量词"分组并合计相关指标
-    aggregated_df = df_filtered.groupby("流量词").agg({
-        "流量占比": "sum",
-        "自然流量绝对占比": "sum",
-        "广告流量绝对占比": "sum"
-    }).reset_index()
+    # 2. 按"流量词"分组并合计相关指标，如果有多ASIN数据则显示ASIN数量
+    if has_asin:
+        # 多ASIN情况：按流量词聚合，并计算涉及的ASIN数量
+        aggregation_config = {
+            "流量占比": "sum",
+            "自然流量绝对占比": "sum",
+            "广告流量绝对占比": "sum",
+            "ASIN": "nunique"  # 计算不同ASIN的数量
+        }
+        groupby_columns = ["流量词"]
+    else:
+        # 单ASIN情况：只聚合流量数据
+        aggregation_config = {
+            "流量占比": "sum",
+            "自然流量绝对占比": "sum",
+            "广告流量绝对占比": "sum"
+        }
+        groupby_columns = ["流量词"]
+
+    aggregated_df = df_filtered.groupby(groupby_columns).agg(aggregation_config).reset_index()
+
+    # 重命名列以便清晰显示
+    if has_asin:
+        aggregated_df = aggregated_df.rename(columns={"ASIN": "涉及ASIN数量"})
     # --- 聚合逻辑结束 ---
 
     # 从聚合后的数据中选取Top 20
     top_20_traffic = aggregated_df.sort_values(by="流量占比", ascending=False).head(20)
+
+    # 设置图表标题
+    title_suffix = " (多ASIN汇总)" if has_asin else ""
+    chart_title = f"Top 20 关键词流量分布{title_suffix}"
 
     # 融化聚合后的DataFrame以适配Plotly的格式
     plot_df = top_20_traffic.melt(
@@ -162,12 +186,21 @@ def plot_keyword_traffic(df: pd.DataFrame):
         value_name="占比"
     )
 
+    # 准备悬停数据
+    hover_data = {}
+    if has_asin:
+        # 为每个关键词添加ASIN数量信息到悬停数据
+        asin_count_map = top_20_traffic.set_index('流量词')['涉及ASIN数量'].to_dict()
+        plot_df['涉及ASIN数量'] = plot_df['流量词'].map(asin_count_map)
+        hover_data = {'涉及ASIN数量': True}
+
     fig = px.bar(
         plot_df, y="流量词", x="占比", color="流量类型", orientation='h',
-        title="Top 20 关键词流量分布",
+        title=chart_title,
         labels={"流量词": "关键词", "占比": "流量占比"},
         color_discrete_map={"自然流量绝对占比": "#636EFA", "广告流量绝对占比": "#EF553B"},
-        text="占比"
+        text="占比",
+        hover_data=hover_data
     )
 
     # 更新堆叠柱子的文本显示
@@ -176,10 +209,14 @@ def plot_keyword_traffic(df: pd.DataFrame):
     # --- 新增：在顶部添加总流量占比标注 ---
     # 为每个关键词添加总流量占比的标注
     for i, row in top_20_traffic.iterrows():
+        annotation_text = f"{row['流量占比']:.2%}"
+        if has_asin:
+            annotation_text += f" ({row['涉及ASIN数量']}个ASIN)"
+
         fig.add_annotation(
             x=row['流量占比'],  # x位置为总流量占比
             y=row['流量词'],  # y位置为关键词
-            text=f"{row['流量占比']:.2%}",  # 显示总流量占比
+            text=annotation_text,  # 显示总流量占比和ASIN数量
             showarrow=False,
             xanchor='left',
             xshift=10,  # 向右偏移一点，避免与柱子重叠
@@ -204,8 +241,31 @@ def plot_search_volume_and_purchases(df: pd.DataFrame):
         st.warning("没有有效的月搜索量数据可供展示。")
         return
 
-    top_20_search = df_filtered.sort_values(by="月搜索量", ascending=False).head(20)
+    # 检查是否存在ASIN列
+    has_asin = 'ASIN' in df_filtered.columns
+
+    # 多ASIN情况需要先按关键词聚合
+    if has_asin:
+        # 聚合多ASIN数据
+        aggregated_df = df_filtered.groupby("流量词").agg({
+            "月搜索量": "sum",
+            "购买量": "sum",
+            "购买率": "mean",  # 购买率取平均值
+            "ASIN": "nunique"  # 计算不同ASIN的数量
+        }).reset_index().rename(columns={"ASIN": "涉及ASIN数量"})
+
+        # 重新计算购买率（基于聚合后的数据）
+        aggregated_df["购买率"] = aggregated_df["购买量"] / aggregated_df["月搜索量"]
+        top_20_search = aggregated_df.sort_values(by="月搜索量", ascending=False).head(20)
+    else:
+        # 单ASIN情况直接使用原数据
+        top_20_search = df_filtered.sort_values(by="月搜索量", ascending=False).head(20).copy()
+
     top_20_search["未购买量"] = top_20_search["月搜索量"] - top_20_search["购买量"]
+
+    # 设置图表标题
+    title_suffix = " (多ASIN汇总)" if has_asin else ""
+    chart_title = f"Top 20 关键词搜索量与购买量{title_suffix}"
 
     plot_df = top_20_search.melt(
         id_vars=["流量词", "购买率"],
@@ -213,28 +273,41 @@ def plot_search_volume_and_purchases(df: pd.DataFrame):
         var_name="类型", value_name="数量"
     )
 
+    # 准备悬停数据
+    hover_data = {}
+    if has_asin:
+        asin_count_map = top_20_search.set_index('流量词')['涉及ASIN数量'].to_dict()
+        plot_df['涉及ASIN数量'] = plot_df['流量词'].map(asin_count_map)
+        hover_data = {'涉及ASIN数量': True}
+
     fig = px.bar(
         plot_df, y="流量词", x="数量", color="类型", orientation='h',
-        title="Top 20 关键词搜索量与购买量",
+        title=chart_title,
         labels={"流量词": "关键词", "数量": "月搜索量"},
-        color_discrete_map={"购买量": "#00CC96", "未购买量": "#FECB52"}
+        color_discrete_map={"购买量": "#00CC96", "未购买量": "#FECB52"},
+        hover_data=hover_data
     )
 
     # 为每个条形添加购买率标注
     annotations = []
     for _, row in top_20_search.iterrows():
         # 购买率标注（在柱子内部右侧）
+        purchase_rate_text = f"购买率: {row['购买率']:.2%}"
+        if has_asin:
+            purchase_rate_text += f" ({row['涉及ASIN数量']}个ASIN)"
+
         annotations.append(dict(
             x=row['月搜索量'] * 0.98, y=row['流量词'],
-            text=f"购买率: {row['购买率']:.2%}",
+            text=purchase_rate_text,
             showarrow=False, font=dict(color="black", size=10),
             xanchor='right'
         ))
 
         # 新增：总搜索量标注（在柱子顶端）
+        search_volume_text = f"{row['月搜索量']:,}"  # 格式化数字，添加千位分隔符
         annotations.append(dict(
             x=row['月搜索量'], y=row['流量词'],
-            text=f"{row['月搜索量']:,}",  # 格式化数字，添加千位分隔符
+            text=search_volume_text,
             showarrow=False,
             xanchor='left',
             xshift=10,  # 向右偏移一点，避免与柱子重叠
@@ -261,6 +334,25 @@ def plot_keyword_analysis(df: pd.DataFrame):
         st.warning("没有有效的搜索量和流量数据可供分析。")
         return
 
+    # 检查是否存在ASIN列
+    has_asin = 'ASIN' in df_filtered.columns
+
+    # 多ASIN情况需要先聚合数据
+    if has_asin:
+        # 聚合多ASIN数据
+        aggregated_df = df_filtered.groupby("流量词").agg({
+            "月搜索量": "sum",
+            "流量占比": "sum",
+            "购买率": "mean",
+            "自然流量占比": "mean",
+            "广告流量占比": "mean",
+            "ASIN": "nunique"
+        }).reset_index().rename(columns={"ASIN": "涉及ASIN数量"})
+
+        # 重新计算购买率（基于聚合后的数据）
+        df_filtered = aggregated_df
+        st.info("📊 当前显示多ASIN汇总数据，已按关键词聚合")
+
     # 计算指标
     df_filtered['总流量贡献'] = df_filtered['流量占比'] * 100  # 转换为百分比便于分析
 
@@ -284,14 +376,23 @@ def plot_keyword_analysis(df: pd.DataFrame):
 
     df_filtered['关键词类型'] = df_filtered.apply(classify_keyword, axis=1)
 
+    # 准备悬停数据
+    hover_data = ['流量词', '购买率', '自然流量占比', '广告流量占比']
+    if has_asin:
+        hover_data.append('涉及ASIN数量')
+
+    # 设置图表标题
+    title_suffix = " (多ASIN汇总)" if has_asin else ""
+    chart_title = f'关键词搜索量 vs 流量占比分析{title_suffix}'
+
     # 创建散点图
     fig = px.scatter(
         df_filtered,
         x='月搜索量',
         y='总流量贡献',
         color='关键词类型',
-        hover_data=['流量词', '购买率', '自然流量占比', '广告流量占比'],
-        title='关键词搜索量 vs 流量占比分析',
+        hover_data=hover_data,
+        title=chart_title,
         labels={
             '月搜索量': '月搜索量',
             '总流量贡献': '流量占比 (%)',
@@ -325,6 +426,9 @@ def plot_keyword_analysis(df: pd.DataFrame):
         st.metric("总关键词数", len(df_filtered))
         st.metric("搜索量中位数", f"{search_median:,.0f}")
         st.metric("流量占比中位数", f"{traffic_median:.2f}%")
+        if has_asin:
+            total_asin = df_filtered['涉及ASIN数量'].sum() if '涉及ASIN数量' in df_filtered.columns else 'N/A'
+            st.metric("总涉及ASIN数", total_asin)
 
     # 显示详细数据表格
     st.write("### 📋 详细数据")
@@ -340,6 +444,9 @@ def plot_keyword_analysis(df: pd.DataFrame):
 
     # 显示数据表格
     display_columns = ['流量词', '月搜索量', '流量占比', '购买率', '自然流量占比', '广告流量占比', '关键词类型']
+    if has_asin and '涉及ASIN数量' in filtered_df.columns:
+        display_columns.append('涉及ASIN数量')
+
     display_df = filtered_df[display_columns].sort_values(['月搜索量', '流量占比'], ascending=[False, False])
 
     # 格式化显示
