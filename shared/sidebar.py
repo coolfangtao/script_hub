@@ -37,6 +37,10 @@ SCRIPTS_BY_GROUP = {
             "label": "🛍️ 商品信息提取",
             "path": r"pages/4_一键提取亚马逊页面关键信息.py"
         },
+        {
+            "label": "🛍️ 商品信息提取（完整版）",
+            "path": r"pages/4_Amazon评论获取.py"
+        },
     ],
     "📝 文本处理": [
         {
