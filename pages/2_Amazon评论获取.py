@@ -6,7 +6,8 @@ import io
 import zipfile
 from urllib.parse import urlparse
 import os
-
+from shared.sidebar import create_common_sidebar
+create_common_sidebar()
 
 # --- Helper Function ---
 def convert_to_hd_url(thumbnail_url):
