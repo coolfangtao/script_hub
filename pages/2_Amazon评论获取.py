@@ -14,68 +14,87 @@ def convert_to_hd_url(thumbnail_url):
     将亚马逊缩略图URL转换为高清图URL。
     例如: .../I/71HE2s0wqhL._SY88_.jpg -> .../I/71HE2s0wqhL.jpg
     """
-    # 正则表达式匹配URL末尾的 "._..._" 部分
-    # \.   -> 匹配点 .
-    # _    -> 匹配下划线 _
-    # [A-Z0-9]+ -> 匹配一个或多个大写字母或数字 (如 SY88, AC_SL1500)
-    # _?   -> 匹配一个可选的下划线 (有些链接末尾是 ._SY88.jpg 而不是 ._SY88_.jpg)
-    # (?=\.) -> 正向先行断言，确保后面跟着一个点（文件扩展名的点）
-    pattern = r'\._[A-Z0-9_]+_\.'
-
-    # 简单的替换方法，更符合描述
-    # 找到最后一个点（扩展名前）和它之前的点
+    # 查找并移除URL中类似 '._SY88_' 的部分
+    # 这种模式通常是最后一个点（扩展名）和倒数第二个点之间
     parts = thumbnail_url.split('.')
     if len(parts) > 2 and parts[-2].startswith('_') and parts[-2].endswith('_'):
-        # 移除 `_SY88_` 这样的部分
         base_url = ".".join(parts[:-2])
         extension = parts[-1]
         return f"{base_url}.{extension}"
 
-    # 如果上面的简单方法不奏效，使用正则表达式作为备用
-    hd_url = re.sub(r'\._.*?_\.', '.', thumbnail_url)
-    if hd_url == thumbnail_url:  # 如果正则没替换成功，尝试另一种模式
+    # 作为备用方案，使用正则表达式处理其他可能的变体
+    hd_url = re.sub(r'\._[A-Z0-9_]+_\.', '.', thumbnail_url)
+    if hd_url == thumbnail_url:
         hd_url = re.sub(r'\._[A-Z0-9_]+\.', '.', thumbnail_url)
 
     return hd_url
 
 
-# --- Streamlit App ---
+# --- Streamlit App UI ---
 
 st.set_page_config(page_title="亚马逊评论分析器", layout="wide")
-
 st.title("📦 亚马逊评论图片查看与下载工具")
-st.write("上传从爬虫工具导出的JSON文件，即可查看评论详情并一键下载所有高清图片。")
+st.write("一个帮你从JSON文件中提取、展示并批量下载亚马逊评论图片的Streamlit小工具。")
 
-uploaded_file = st.file_uploader("请在这里上传您的 JSON 文件", type="json")
+# 初始化 Session State
+if 'data' not in st.session_state:
+    st.session_state.data = None
+if 'uploaded_file_name' not in st.session_state:
+    st.session_state.uploaded_file_name = None
 
-if uploaded_file is not None:
-    try:
-        # 读取并解析JSON文件
-        data = json.load(uploaded_file)
+# 创建两个标签页
+tab1, tab2 = st.tabs(["📊 评论分析器", "📖 使用教程"])
 
-        # --- 1. 展示产品总览信息 ---
-        st.header("📊 产品总览")
-        product_info = data.get("product", {})
+# --- Tab 1: 评论分析器 ---
+with tab1:
+    st.header("1. 上传评论JSON文件")
+    uploaded_file = st.file_uploader(
+        "请将通过浏览器插件导出的 JSON 文件拖拽到此处",
+        type="json",
+        key="file_uploader"
+    )
+
+    # 如果有新文件上传，则处理并存入 session state
+    if uploaded_file is not None:
+        # 检查是否是同一个文件，避免重复加载
+        if uploaded_file.name != st.session_state.uploaded_file_name:
+            try:
+                data = json.load(uploaded_file)
+                st.session_state.data = data
+                st.session_state.uploaded_file_name = uploaded_file.name
+                st.success(f"文件 '{uploaded_file.name}' 上传并解析成功！")
+            except json.JSONDecodeError:
+                st.error("上传的文件不是有效的JSON格式，请检查文件内容。")
+                st.session_state.data = None
+            except Exception as e:
+                st.error(f"处理文件时发生错误: {e}")
+                st.session_state.data = None
+
+    # 如果 session state 中有数据，则显示内容
+    if st.session_state.data is not None:
+
+        # 提供一个清除按钮
+        if st.button("清除当前数据并上传新文件"):
+            st.session_state.data = None
+            st.session_state.uploaded_file_name = None
+            # 使用 st.experimental_rerun() or st.rerun() 来刷新页面状态
+            st.rerun()
+
+        st.header("2. 产品总览")
+        product_info = st.session_state.data.get("product", {})
         title = product_info.get("title", "N/A")
         price = product_info.get("price", "N/A")
         url = product_info.get("url", "#")
-        total_reviews = data.get("totalReviewsExtracted", "N/A")
+        total_reviews = st.session_state.data.get("totalReviewsExtracted", "N/A")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**产品标题:** [{title}]({url})")
-            st.markdown(f"**产品价格:** `{price}`")
-            st.markdown(f"**已提取评论数:** `{total_reviews}`")
-        with col2:
-            # 可以在这里放产品主图，如果JSON里有的话
-            st.info("这里是产品的基本信息。")
+        st.markdown(f"**产品标题:** [{title}]({url})")
+        st.markdown(f"**产品价格:** `{price}`")
+        st.markdown(f"**已提取评论数:** `{total_reviews}`")
 
-        # --- 2. 循环展示评论和图片 ---
-        st.header("💬 评论详情")
+        st.header("3. 评论详情与图片")
+        all_images_to_download = []
 
-        all_images_to_download = []  # 存储所有高清图信息 (url, filename)
-
-        reviews = data.get("reviews", [])
+        reviews = st.session_state.data.get("reviews", [])
         if not reviews:
             st.warning("JSON文件中没有找到'reviews'列表。")
         else:
@@ -91,36 +110,27 @@ if uploaded_file is not None:
 
                 image_urls = review.get('imageUrls', [])
                 if image_urls:
-                    cols = st.columns(len(image_urls))  # 为每张图片创建一个列
+                    cols = st.columns(len(image_urls))
                     for i, thumbnail_url in enumerate(image_urls):
                         hd_url = convert_to_hd_url(thumbnail_url)
-
-                        # 为下载功能准备数据
-                        # 从URL中提取文件名，例如: 71HE2s0wqhL.jpg
                         try:
                             path = urlparse(hd_url).path
                             original_filename = os.path.basename(path)
-                            # 创建一个唯一的文件名
                             filename = f"{review_id}_{i}_{original_filename}"
                             all_images_to_download.append({"url": hd_url, "filename": filename})
                         except Exception:
-                            # 如果解析失败，给一个默认名字
                             filename = f"{review_id}_{i}.jpg"
                             all_images_to_download.append({"url": hd_url, "filename": filename})
 
                         with cols[i]:
-                            st.image(hd_url, caption=f"高清图片 (点击放大)", use_column_width=True)
+                            st.image(hd_url, caption=f"高清图片", use_column_width=True)
 
-        # --- 3. 提供一键下载所有图片的功能 ---
-        st.header("📥 下载所有图片")
+        st.header("4. 下载所有图片")
         if all_images_to_download:
             st.info(f"在所有评论中总共找到了 **{len(all_images_to_download)}** 张图片。")
 
             if st.button("打包下载所有高清图片 (ZIP)"):
-                # 创建一个内存中的二进制流
                 zip_buffer = io.BytesIO()
-
-                # 创建一个ZipFile对象
                 with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
                     progress_bar = st.progress(0)
                     status_text = st.empty()
@@ -128,35 +138,74 @@ if uploaded_file is not None:
 
                     for i, img_data in enumerate(all_images_to_download):
                         try:
-                            # 下载图片
                             response = requests.get(img_data["url"], timeout=10)
-                            response.raise_for_status()  # 如果下载失败，会抛出异常
-
-                            # 将图片数据写入zip文件
+                            response.raise_for_status()
                             zip_file.writestr(img_data["filename"], response.content)
-
-                            # 更新进度条
                             progress_percentage = (i + 1) / total_images
                             progress_bar.progress(progress_percentage)
-                            status_text.text(f"正在下载并压缩图片: {i + 1}/{total_images} ({img_data['filename']})")
-
+                            status_text.text(f"正在下载并压缩图片: {i + 1}/{total_images}...")
                         except requests.exceptions.RequestException as e:
                             st.warning(f"下载图片 {img_data['url']} 失败: {e}")
 
-                # 准备下载按钮
                 zip_buffer.seek(0)
                 st.download_button(
-                    label="✅ 点击这里下载ZIP文件",
+                    label="✅ 图片打包完成！点击这里下载",
                     data=zip_buffer,
-                    file_name=f"{title[:30]}_review_images.zip",  # 使用产品标题做文件名
+                    file_name=f"{title[:30]}_review_images.zip",
                     mime="application/zip"
                 )
-                status_text.success("图片已打包完成！")
+                status_text.success("打包成功！")
 
         else:
             st.warning("在评论中没有找到任何图片可供下载。")
 
-    except json.JSONDecodeError:
-        st.error("上传的文件不是有效的JSON格式，请检查文件内容。")
-    except Exception as e:
-        st.error(f"处理文件时发生错误: {e}")
+# --- Tab 2: 使用教程 ---
+with tab2:
+    st.header("🚀 浏览器插件使用指南")
+    st.info("本工具需要配合特定的浏览器插件使用，以下是如何获取评论数据JSON文件的步骤。")
+    st.markdown("""
+        ---
+        ### **第一步：安装浏览器插件**
+
+        1.  你需要有一个名为 `AmazonScraper` 的文件夹，这是插件的源代码。
+        2.  打开你的浏览器（以Chrome为例），进入 **扩展程序** 管理页面。
+            * 可以直接在地址栏输入 `chrome://extensions`
+            * 或者通过 `菜单 -> 更多工具 -> 扩展程序` 进入
+        3.  在页面右上角，打开 **“开发者模式”** 的开关。
+        4.  点击左上角的 **“加载已解压的扩展程序”** 按钮。
+        5.  在弹出的窗口中，选择你本地的 `AmazonScraper` **文件夹**，然后点击“确定”。
+        6.  插件安装成功后，你会在浏览器右上角的扩展程序列表中看到它。
+
+        ---
+        ### **第二步：抓取商品基本信息**
+
+        1.  用浏览器打开任意一个亚马逊**商品主页**（必须是具体的商品详情页，而不是列表页）。
+        2.  点击浏览器右上角的插件图标，打开插件面板。
+        3.  在“选择导出格式”中，确保选择的是 **JSON (完整数据结构)**。
+        4.  点击橙色的 **“开始抓取”** 按钮。
+
+        _插件会自动抓取当前页面的商品标题、价格等基本信息。_
+    """)
+    st.image("image_dbab9f.png", caption="图1：在商品主页，选择JSON格式后点击“开始抓取”")
+
+    st.markdown("""
+        ---
+        ### **第三步：抓取评论信息**
+
+        1.  在插件面板上，按钮会变为 **“再次点击启动抓取”**。
+        2.  **重要提示：** 此时，请先在亚马逊页面上找到并点击**“查看所有评论”**的链接，等待评论页面完全加载。
+        3.  评论页面加载完毕后，**再次点击插件上的“再次点击启动抓取”按钮**。
+        4.  插件会开始自动翻页并抓取所有评论。完成后，浏览器会自动下载一个JSON文件。
+
+    """)
+    st.image("image_dbfdfc.png", caption="图2：点击“查看所有评论”后，再点击插件中的按钮开始抓取评论")
+
+    st.markdown("""
+        ---
+        ### **第四步：在本页面分析并下载图片**
+
+        1.  切换回本 **“评论分析器”** 标签页。
+        2.  将刚刚下载的JSON文件，拖拽到文件上传框中。
+        3.  程序会自动解析文件，展示商品信息、所有评论以及评论中的高清图片。
+        4.  滚动到页面底部，点击 **“打包下载所有高清图片 (ZIP)”** 按钮，即可一键保存所有图片。
+    """)
