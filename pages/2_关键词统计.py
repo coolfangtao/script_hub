@@ -414,7 +414,6 @@ def main():
 
     ui.setup_page()
     # track_script_usage("页面名称")
-    create_common_sidebar()
     uploaded_files = ui.display_header_and_uploader()
 
     # ------------------ 优化后的状态管理逻辑 ------------------
