@@ -39,7 +39,7 @@ SCRIPTS_BY_GROUP = {
         },
         {
             "label": "🛍️ 商品信息提取（完整版）",
-            "path": r"pages/4_Amazon评论获取.py"
+            "path": r"pages/2_Amazon评论获取.py"
         },
     ],
     "📝 文本处理": [
