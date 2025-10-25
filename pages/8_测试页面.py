@@ -1158,12 +1158,11 @@ class KanbanUI:
             help="选择一个开始和结束日期来查看该时间段内的任务活动。"
         )
 
-        # 处理用户可能只选择一个日期的情况
         if isinstance(selected_range, tuple) and len(selected_range) == 2:
             start_date, end_date = selected_range
         elif isinstance(selected_range, list) and len(selected_range) == 2:
             start_date, end_date = selected_range
-        else:  # 如果只选择了一天，streamlit有时会返回一个元素的列表
+        else:
             start_date = end_date = selected_range[0] if isinstance(selected_range, list) else today
 
         if start_date > end_date:
@@ -1174,20 +1173,47 @@ class KanbanUI:
 
         tasks = st.session_state.get('tasks', [])
         timeline_data = []
+
+        # ==================== 修改开始 ====================
+        # 1. 定义一个阈值：时长超过30分钟的任务才显示标签
+        MIN_DURATION_FOR_LABEL_MINUTES = 30
+        # ==================== 修改结束 ====================
+
         for task in tasks:
             for segment in task.active_time_segments:
+                duration_td = segment['end_time'] - segment['start_time']
+                duration_str = format_timedelta_to_str(duration_td)
+
+                # ==================== 修改开始 ====================
+                # 2. 根据阈值决定是否显示标签
+                # 如果任务时长大于阈值，则使用时长字符串，否则使用空字符串
+                display_text = duration_str if duration_td.total_seconds() > MIN_DURATION_FOR_LABEL_MINUTES * 60 else ""
+                # ==================== 修改结束 ====================
+
                 timeline_data.append({
                     "Task": task.task_name,
                     "Start": segment['start_time'],
                     "Finish": segment['end_time'],
-                    "Type": task.task_type
+                    "Type": task.task_type,
+                    "Duration": duration_td,
+                    "Duration_Str": duration_str,  # 保留原始耗时，用于悬浮提示
+                    "Display_Duration_Str": display_text  # 新增：这个新列专门用于在图上直接显示
                 })
             if task.status == self.k_config.STATUS_DOING and task.last_start_active_time:
+                current_duration_td = datetime.now(beijing_tz) - task.last_start_active_time
+                duration_str = format_timedelta_to_str(current_duration_td)
+
+                # (对“进行中”的任务也应用相同的逻辑)
+                display_text = duration_str if current_duration_td.total_seconds() > MIN_DURATION_FOR_LABEL_MINUTES * 60 else ""
+
                 timeline_data.append({
                     "Task": task.task_name,
                     "Start": task.last_start_active_time,
                     "Finish": datetime.now(beijing_tz),
-                    "Type": "进行中"
+                    "Type": "进行中",
+                    "Duration": current_duration_td,
+                    "Duration_Str": duration_str,
+                    "Display_Duration_Str": display_text
                 })
 
         if not timeline_data:
@@ -1198,14 +1224,10 @@ class KanbanUI:
         df['Start'] = pd.to_datetime(df['Start']).dt.tz_convert(beijing_tz)
         df['Finish'] = pd.to_datetime(df['Finish']).dt.tz_convert(beijing_tz)
 
-        # 2. 根据新的日期范围来定义过滤边界
         range_start = datetime.combine(start_date, datetime.min.time(), tzinfo=beijing_tz)
-        # 结束边界应该是结束日期的最后一刻，即下一天的开始
         range_end = datetime.combine(end_date, datetime.min.time(), tzinfo=beijing_tz) + timedelta(days=1)
 
         filtered_df = df[(df['Start'] < range_end) & (df['Finish'] > range_start)].copy()
-
-        # 裁剪任务条，使其不超过视图范围
         filtered_df['Clipped_Start'] = filtered_df['Start'].clip(lower=range_start)
         filtered_df['Clipped_Finish'] = filtered_df['Finish'].clip(upper=range_end)
 
@@ -1213,7 +1235,6 @@ class KanbanUI:
             st.info(f"在 **{start_date}** 到 **{end_date}** 期间没有找到任何任务活动记录。")
             return
 
-        # 3. 创建甘特图
         title = f"任务活动甘特图 ({start_date.strftime('%Y年%m月%d日')})"
         if start_date != end_date:
             title += f" 至 ({end_date.strftime('%Y年%m月%d日')})"
@@ -1223,27 +1244,31 @@ class KanbanUI:
             x_start="Clipped_Start",
             x_end="Clipped_Finish",
             y="Task",
-            color="Type",
+            color="Task",
+            # ==================== 修改开始 ====================
+            # 3. 使用新的列来显示文本，这样短时任务的标签就是空的
+            text="Display_Duration_Str",
+            # 确保悬浮提示始终显示完整的、原始的耗时信息
+            hover_data={"Duration_Str": True, "Display_Duration_Str": False},
+            # ==================== 修改结束 ====================
             title=title
         )
         fig.update_yaxes(categoryorder='total ascending')
 
-        # 4. 循环为范围内的每一天添加标记线
+        # 保持将文本放在条的外部
+        fig.update_traces(textposition='outside')
+        # 这个布局设置现在不是主要解决方案，但保留它没有坏处
+        fig.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
+
         current_date = start_date
         while current_date <= end_date:
             day_marker = datetime.combine(current_date, datetime.min.time(), tzinfo=beijing_tz)
-
-            # 添加每日的分割线（第一天的0点线除外，因为它就是图表起点）
             if current_date != start_date:
                 fig.add_vline(x=day_marker, line_width=1.5, line_color="black")
-
-            # 添加每日的中午12点虚线
             noon_marker = day_marker.replace(hour=12)
             fig.add_vline(x=noon_marker, line_width=1, line_dash="dash", line_color="grey")
-
             current_date += timedelta(days=1)
 
-        # 5. 强制设定X轴的范围为所选的完整日期范围
         fig.update_layout(xaxis_range=[range_start, range_end])
         fig.update_xaxes(tickformat="%m月%d日<br>%H:%M")
 
