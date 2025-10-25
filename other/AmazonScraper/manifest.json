@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "亚马逊商品数据抓取器",
+  "version": "1.0",
+  "description": "从亚马逊商品页面提取详细信息和所有分页评论并下载为 JSON 文件。",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon16.png"
+  },
+"permissions": [
+    "activeTab",
+    "scripting",
+    "downloads"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.amazon.com/*",
+        "*://*.amazon.cn/*",
+        "*://*.amazon.de/*",
+        "*://*.amazon.co.uk/*",
+        "*://*.amazon.co.jp/*",
+        "*://*.amazon.ca/*",
+        "*://*.amazon.fr/*",
+        "*://*.amazon.it/*",
+        "*://*.amazon.es/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
+}
