@@ -380,6 +380,7 @@ class UIManager:
                 self.config.remove_action(action_to_remove)
                 st.rerun()
 
+    # MODIFIED: Added logic to include the element's own description in the prompt.
     def _generate_prompt_string(self, flow: Optional[Dict]) -> str:
         """Generates the prompt string for a given flow."""
         if not flow or not flow.get('steps'):
@@ -402,10 +403,24 @@ class UIManager:
             element = self.config.get_item_by_id('elements', step.get('element_id'))
             page = self.config.get_item_by_id('pages', element.get('page_id')) if element else None
             if not element or not page: continue
+
             indent_str = "    " * step.get('indent_level', 0)
+
+            # Start building the main action line
             action_line = f"{indent_str}**{step['display_order']}.** 在 **{page['name']}** 页面 **{step['action']}** “{element['name']}” 元素 (Selector: `{element['selector']}`)"
-            if step.get('description'): action_line += f" (📝 **备注**: {step['description']})"
+
+            # --- THIS IS THE NEW PART ---
+            # Check for the ELEMENT's description and add it
+            if element.get('description'):
+                action_line += f" (ℹ️ **元素说明**: {element['description']})"
+            # --- END OF NEW PART ---
+
+            # Check for the STEP's description and add it
+            if step.get('description'):
+                action_line += f" (📝 **步骤备注**: {step['description']})"
+
             prompt_lines.append(action_line)
+
         return "\n".join(prompt_lines)
 
     def render_flow_and_prompt_tab(self):
