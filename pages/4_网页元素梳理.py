@@ -156,7 +156,7 @@ class UIManager:
             step['display_order'] = '.'.join(map(str, counters))
         return steps
 
-    # MODIFIED: Improved overview tab to guide new users when data is empty.
+    # MODIFIED: Fixed the infinite loop issue after file upload.
     def render_overview_tab(self):
         st.subheader("🔎 流程与元素总览")
 
@@ -198,21 +198,31 @@ class UIManager:
         st.markdown("---")
         st.info("您可以在下方导入、导出您的所有配置数据。")
 
+        # FIX: Initialize a session state variable to track the processed file ID
+        if 'processed_file_id' not in st.session_state:
+            st.session_state.processed_file_id = None
+
         col1, col2 = st.columns(2)
         with col1:
             with st.container(border=True, height=180):
                 st.write("##### 📤 从 JSON 文件导入配置")
                 uploaded_file = st.file_uploader("上传配置文件", type="json", label_visibility="collapsed")
-                if uploaded_file:
+
+                # FIX: Check if the file is new and hasn't been processed yet to prevent loop
+                if uploaded_file is not None and uploaded_file.id != st.session_state.processed_file_id:
                     try:
                         new_data = json.load(uploaded_file)
                         if self.config.import_data(new_data):
+                            # Mark this file as processed by storing its unique ID
+                            st.session_state.processed_file_id = uploaded_file.id
                             st.success("配置已成功导入！页面将刷新。")
                             st.rerun()
                         else:
                             st.error("JSON文件格式不正确。请确保文件包含 'pages', 'elements', 和 'flows' 键。")
+                            st.session_state.processed_file_id = None  # Reset on failure
                     except json.JSONDecodeError:
                         st.error("上传的文件不是有效的JSON格式。")
+                        st.session_state.processed_file_id = None  # Reset on failure
         with col2:
             with st.container(border=True, height=180):
                 st.write("##### 📥 导出配置到 JSON")
@@ -553,7 +563,7 @@ class UIManager:
                 )
 
 
-# --- 3. 主应用 1---
+# --- 3. 主应用 ---
 def main():
     """应用的主入口函数。"""
     st.set_page_config(page_title="采神-采集流程助手", layout="wide")
