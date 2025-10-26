@@ -5,8 +5,8 @@ import uuid
 from typing import Dict, List, Any, Optional
 
 
-# from shared.sidebar import create_common_sidebar # This line is commented out as the file is not provided
-# create_common_sidebar()
+from shared.sidebar import create_common_sidebar # This line is commented out as the file is not provided
+create_common_sidebar()
 
 
 # --- 1. 配置管理类 (ConfigManager) ---
