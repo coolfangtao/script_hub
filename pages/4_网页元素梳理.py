@@ -158,78 +158,78 @@ class UIManager:
 
     # MODIFIED: Fixed the infinite loop issue after file upload.
         # MODIFIED: Fixed the AttributeError by using the correct 'file_id' attribute.
-        def render_overview_tab(self):
-            st.subheader("🔎 流程与元素总览")
+    def render_overview_tab(self):
+        st.subheader("🔎 流程与元素总览")
 
-            pages = self.config.get_pages()
-            flows = self.config.get_flows()
+        pages = self.config.get_pages()
+        flows = self.config.get_flows()
 
-            # Check for a completely empty state to guide the user.
-            if not pages and not flows:
-                st.info(
-                    """
-                    **欢迎使用采神-采集流程助手！**
+        # Check for a completely empty state to guide the user.
+        if not pages and not flows:
+            st.info(
+                """
+                **欢迎使用采神-采集流程助手！**
 
-                    看起来您还没有任何配置数据。请选择以下任一方式开始：
-                    1.  **导入配置 (推荐)**：在下方上传一个 `scraper_config.json` 文件来加载现有流程。
-                    2.  **手动创建**：前往“📄 页面与元素管理”选项卡来开始定义您的第一个页面和元素。
-                    """
-                )
-            elif not flows:
-                st.warning("当前没有配置任何流程。您可以在“⚙️ 流程与提示词”选项卡中创建新流程。")
-            else:
-                flow_names = [flow['name'] for flow in flows]
-                selected_flows = st.multiselect("筛选流程:", options=flow_names, default=flow_names)
-                overview_data = []
-                for flow in [f for f in flows if f['name'] in selected_flows]:
-                    if not flow.get('steps'): continue
-                    renumbered_steps = self.renumber_steps(flow['steps'])
-                    for step in renumbered_steps:
-                        element = self.config.get_item_by_id('elements', step['element_id'])
-                        if element:
-                            page = self.config.get_item_by_id('pages', element['page_id'])
-                            overview_data.append({
-                                "流程名称": flow['name'], "步骤": step['display_order'],
-                                "页面": page['name'] if page else "N/A", "元素名称": element['name'],
-                                "动作": step['action'], "选择器 (Selector)": element['selector']
-                            })
-                if overview_data:
-                    st.dataframe(pd.DataFrame(overview_data), use_container_width=True, hide_index=True)
+                看起来您还没有任何配置数据。请选择以下任一方式开始：
+                1.  **导入配置 (推荐)**：在下方上传一个 `scraper_config.json` 文件来加载现有流程。
+                2.  **手动创建**：前往“📄 页面与元素管理”选项卡来开始定义您的第一个页面和元素。
+                """
+            )
+        elif not flows:
+            st.warning("当前没有配置任何流程。您可以在“⚙️ 流程与提示词”选项卡中创建新流程。")
+        else:
+            flow_names = [flow['name'] for flow in flows]
+            selected_flows = st.multiselect("筛选流程:", options=flow_names, default=flow_names)
+            overview_data = []
+            for flow in [f for f in flows if f['name'] in selected_flows]:
+                if not flow.get('steps'): continue
+                renumbered_steps = self.renumber_steps(flow['steps'])
+                for step in renumbered_steps:
+                    element = self.config.get_item_by_id('elements', step['element_id'])
+                    if element:
+                        page = self.config.get_item_by_id('pages', element['page_id'])
+                        overview_data.append({
+                            "流程名称": flow['name'], "步骤": step['display_order'],
+                            "页面": page['name'] if page else "N/A", "元素名称": element['name'],
+                            "动作": step['action'], "选择器 (Selector)": element['selector']
+                        })
+            if overview_data:
+                st.dataframe(pd.DataFrame(overview_data), use_container_width=True, hide_index=True)
 
-            st.markdown("---")
-            st.info("您可以在下方导入、导出您的所有配置数据。")
+        st.markdown("---")
+        st.info("您可以在下方导入、导出您的所有配置数据。")
 
-            # FIX: Initialize a session state variable to track the processed file ID
-            if 'processed_file_id' not in st.session_state:
-                st.session_state.processed_file_id = None
+        # FIX: Initialize a session state variable to track the processed file ID
+        if 'processed_file_id' not in st.session_state:
+            st.session_state.processed_file_id = None
 
-            col1, col2 = st.columns(2)
-            with col1:
-                with st.container(border=True, height=180):
-                    st.write("##### 📤 从 JSON 文件导入配置")
-                    uploaded_file = st.file_uploader("上传配置文件", type="json", label_visibility="collapsed")
+        col1, col2 = st.columns(2)
+        with col1:
+            with st.container(border=True, height=180):
+                st.write("##### 📤 从 JSON 文件导入配置")
+                uploaded_file = st.file_uploader("上传配置文件", type="json", label_visibility="collapsed")
 
-                    # FIX: Check if the file is new using the correct 'file_id' attribute
-                    if uploaded_file is not None and uploaded_file.file_id != st.session_state.processed_file_id:
-                        try:
-                            new_data = json.load(uploaded_file)
-                            if self.config.import_data(new_data):
-                                # Mark this file as processed by storing its unique file_id
-                                st.session_state.processed_file_id = uploaded_file.file_id
-                                st.success("配置已成功导入！页面将刷新。")
-                                st.rerun()
-                            else:
-                                st.error("JSON文件格式不正确。请确保文件包含 'pages', 'elements', 和 'flows' 键。")
-                                st.session_state.processed_file_id = None  # Reset on failure
-                        except json.JSONDecodeError:
-                            st.error("上传的文件不是有效的JSON格式。")
+                # FIX: Check if the file is new using the correct 'file_id' attribute
+                if uploaded_file is not None and uploaded_file.file_id != st.session_state.processed_file_id:
+                    try:
+                        new_data = json.load(uploaded_file)
+                        if self.config.import_data(new_data):
+                            # Mark this file as processed by storing its unique file_id
+                            st.session_state.processed_file_id = uploaded_file.file_id
+                            st.success("配置已成功导入！页面将刷新。")
+                            st.rerun()
+                        else:
+                            st.error("JSON文件格式不正确。请确保文件包含 'pages', 'elements', 和 'flows' 键。")
                             st.session_state.processed_file_id = None  # Reset on failure
-            with col2:
-                with st.container(border=True, height=180):
-                    st.write("##### 📥 导出配置到 JSON")
-                    json_data = json.dumps(self.config.get_data(), indent=2, ensure_ascii=False)
-                    st.download_button(label="下载当前配置", data=json_data, file_name="scraper_config.json",
-                                       mime="application/json", use_container_width=True, disabled=not (pages or flows))
+                    except json.JSONDecodeError:
+                        st.error("上传的文件不是有效的JSON格式。")
+                        st.session_state.processed_file_id = None  # Reset on failure
+        with col2:
+            with st.container(border=True, height=180):
+                st.write("##### 📥 导出配置到 JSON")
+                json_data = json.dumps(self.config.get_data(), indent=2, ensure_ascii=False)
+                st.download_button(label="下载当前配置", data=json_data, file_name="scraper_config.json",
+                                   mime="application/json", use_container_width=True, disabled=not (pages or flows))
 
     def render_page_and_element_manager_tab(self):
         st.subheader("📄 页面与元素管理")
