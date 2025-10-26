@@ -4,84 +4,29 @@ import json
 import uuid
 from typing import Dict, List, Any, Optional
 
-
-from shared.sidebar import create_common_sidebar # This line is commented out as the file is not provided
-create_common_sidebar()
+# from shared.sidebar import create_common_sidebar # This line is commented out as the file is not provided
+# create_common_sidebar()
 
 
 # --- 1. 配置管理类 (ConfigManager) ---
-# This class remains unchanged.
+# MODIFIED: Removed all mock data and starts with a clean, empty structure.
 class ConfigManager:
     """负责所有数据的状态管理、加载、保存和修改。"""
-    _MOCK_DATA = {
-        "actions": ["点击", "采集文本", "采集图像", "输入文本"],
-        "pages": [
-            {"id": "page_1", "name": "商城主页"},
-            {"id": "page_2", "name": "榜单页面"},
-            {"id": "page_3", "name": "商品主页"},
-            {"id": "page_4", "name": "搜索结果页"},
-            {"id": "page_5", "name": "顾客评论页"}
-        ],
-        "elements": [
-            {"id": "elem_2", "page_id": "page_1", "name": "榜单Tab", "selector": ".ranking-tab",
-             "description": "主页上进入榜单页面的Tab"},
-            {"id": "elem_3", "page_id": "page_1", "name": "搜索框", "selector": "input#search-bar",
-             "description": "主页的搜索输入框"},
-            {"id": "elem_4", "page_id": "page_1", "name": "搜索提交按钮", "selector": "button.search-submit",
-             "description": "点击后执行搜索"},
-            {"id": "elem_5", "page_id": "page_2", "name": "榜单商品链接", "selector": ".ranking-item > a",
-             "description": "榜单页的单个商品链接"},
-            {"id": "elem_6", "page_id": "page_4", "name": "搜索结果商品链接", "selector": ".s-result-item .s-link",
-             "description": "搜索结果列表中的商品链接"},
-            {"id": "elem_7", "page_id": "page_4", "name": "搜索结果下一页", "selector": ".pagination .next-page",
-             "description": "搜索结果列表的翻页按钮"},
-            {"id": "elem_8", "page_id": "page_3", "name": "商品标题", "selector": "h1#productTitle",
-             "description": "商品详情页的主标题"},
-            {"id": "elem_9", "page_id": "page_3", "name": "商品价格", "selector": ".price .a-offscreen",
-             "description": "商品详情页的价格"},
-            {"id": "elem_11", "page_id": "page_3", "name": "品牌名称", "selector": "a#bylineInfo",
-             "description": "商品的品牌链接或名称"},
-            {"id": "elem_13", "page_id": "page_3", "name": "查看全部评论按钮",
-             "selector": "a[data-hook='see-all-reviews-link-foot']", "description": "跳转到顾客评论页的链接"},
-            {"id": "elem_15", "page_id": "page_5", "name": "评论者名称", "selector": ".a-profile-name",
-             "description": "评论发布者的用户名"},
-            {"id": "elem_16", "page_id": "page_5", "name": "评论内容", "selector": "span[data-hook='review-body']",
-             "description": "评论的正文部分"},
-            {"id": "elem_17", "page_id": "page_5", "name": "评论页下一页", "selector": "li.a-last > a",
-             "description": "评论列表的翻页按钮"}
-        ],
-        "flows": [
-            {
-                "id": "flow_1", "name": "按榜单采集",
-                "steps": [
-                    {"element_id": "elem_2", "action": "点击", "description": "进入新品榜或热销榜页面", "indent_level": 0},
-                    {"element_id": "elem_5", "action": "点击", "description": "这是一个循环步骤，需要遍历页面上所有商品", "indent_level": 0},
-                    {"element_id": "elem_8", "action": "采集文本", "description": "", "indent_level": 1},
-                    {"element_id": "elem_9", "action": "采集文本", "description": "注意价格可能存在多种格式", "indent_level": 1},
-                    {"element_id": "elem_11", "action": "采集文本", "description": "", "indent_level": 1}
-                ]
-            },
-            {
-                "id": "flow_2", "name": "采集指定商品所有评论（带循环）",
-                "steps": [
-                    {"element_id": "elem_13", "action": "点击", "description": "从商品主页跳转到评论页", "indent_level": 0},
-                    {"element_id": "elem_17", "action": "点击", "description": "循环点击，直到'下一页'按钮不可点击为止", "indent_level": 0},
-                    {"element_id": "elem_15", "action": "采集文本", "description": "在每次点击下一页前，采集本页所有评论者",
-                     "indent_level": 1},
-                    {"element_id": "elem_16", "action": "采集文本", "description": "在每次点击下一页前，采集本页所有评论内容",
-                     "indent_level": 1}
-                ]
-            }
-        ]
-    }
 
     def __init__(self, state):
         self._state = state
         if 'data' not in self._state:
-            self._state.data = self._MOCK_DATA
+            # Initialize with an empty but valid structure instead of mock data.
+            self._state.data = {
+                "actions": ["点击", "采集文本", "采集图像", "输入文本"],
+                "pages": [],
+                "elements": [],
+                "flows": []
+            }
         self._migrate_data()
 
     def _migrate_data(self):
+        """Ensures data structure compatibility, useful for imported files."""
         data = self._state.data
         if 'actions' not in data:
             data['actions'] = ["点击", "采集文本", "采集图像", "输入文本"]
@@ -97,9 +42,12 @@ class ConfigManager:
         return self._state.data
 
     def import_data(self, new_data: Dict):
-        if 'pages' in new_data and 'elements' in new_data and 'flows' in new_data:
+        # Basic validation for the imported data structure
+        if ('pages' in new_data and isinstance(new_data['pages'], list) and
+                'elements' in new_data and isinstance(new_data['elements'], list) and
+                'flows' in new_data and isinstance(new_data['flows'], list)):
             self._state.data = new_data
-            self._migrate_data()
+            self._migrate_data()  # Ensure compatibility of imported data
             return True
         return False
 
@@ -195,9 +143,6 @@ class UIManager:
 
     def __init__(self, config_manager: ConfigManager):
         self.config = config_manager
-        # ## MODIFIED: Removed obsolete session_state ##
-        # if 'generated_prompt' not in st.session_state:
-        #     st.session_state.generated_prompt = ""
 
     @staticmethod
     def renumber_steps(steps: List[Dict]) -> List[Dict]:
@@ -211,30 +156,44 @@ class UIManager:
             step['display_order'] = '.'.join(map(str, counters))
         return steps
 
-    ## MODIFIED: Overview tab layout improved ##
+    # MODIFIED: Improved overview tab to guide new users when data is empty.
     def render_overview_tab(self):
         st.subheader("🔎 流程与元素总览")
+
+        pages = self.config.get_pages()
         flows = self.config.get_flows()
-        if not flows:
-            st.warning("当前没有配置任何流程。");
-            return
-        flow_names = [flow['name'] for flow in flows]
-        selected_flows = st.multiselect("筛选流程:", options=flow_names, default=flow_names)
-        overview_data = []
-        for flow in [f for f in flows if f['name'] in selected_flows]:
-            if not flow.get('steps'): continue
-            renumbered_steps = self.renumber_steps(flow['steps'])
-            for step in renumbered_steps:
-                element = self.config.get_item_by_id('elements', step['element_id'])
-                if element:
-                    page = self.config.get_item_by_id('pages', element['page_id'])
-                    overview_data.append({
-                        "流程名称": flow['name'], "步骤": step['display_order'],
-                        "页面": page['name'] if page else "N/A", "元素名称": element['name'],
-                        "动作": step['action'], "选择器 (Selector)": element['selector']
-                    })
-        if overview_data:
-            st.dataframe(pd.DataFrame(overview_data), use_container_width=True, hide_index=True)
+
+        # Check for a completely empty state to guide the user.
+        if not pages and not flows:
+            st.info(
+                """
+                **欢迎使用采神-采集流程助手！**
+
+                看起来您还没有任何配置数据。请选择以下任一方式开始：
+                1.  **导入配置 (推荐)**：在下方上传一个 `scraper_config.json` 文件来加载现有流程。
+                2.  **手动创建**：前往“📄 页面与元素管理”选项卡来开始定义您的第一个页面和元素。
+                """
+            )
+        elif not flows:
+            st.warning("当前没有配置任何流程。您可以在“⚙️ 流程与提示词”选项卡中创建新流程。")
+        else:
+            flow_names = [flow['name'] for flow in flows]
+            selected_flows = st.multiselect("筛选流程:", options=flow_names, default=flow_names)
+            overview_data = []
+            for flow in [f for f in flows if f['name'] in selected_flows]:
+                if not flow.get('steps'): continue
+                renumbered_steps = self.renumber_steps(flow['steps'])
+                for step in renumbered_steps:
+                    element = self.config.get_item_by_id('elements', step['element_id'])
+                    if element:
+                        page = self.config.get_item_by_id('pages', element['page_id'])
+                        overview_data.append({
+                            "流程名称": flow['name'], "步骤": step['display_order'],
+                            "页面": page['name'] if page else "N/A", "元素名称": element['name'],
+                            "动作": step['action'], "选择器 (Selector)": element['selector']
+                        })
+            if overview_data:
+                st.dataframe(pd.DataFrame(overview_data), use_container_width=True, hide_index=True)
 
         st.markdown("---")
         st.info("您可以在下方导入、导出您的所有配置数据。")
@@ -248,10 +207,10 @@ class UIManager:
                     try:
                         new_data = json.load(uploaded_file)
                         if self.config.import_data(new_data):
-                            st.success("配置已成功导入并兼容！")
+                            st.success("配置已成功导入！页面将刷新。")
                             st.rerun()
                         else:
-                            st.error("JSON文件格式不正确。")
+                            st.error("JSON文件格式不正确。请确保文件包含 'pages', 'elements', 和 'flows' 键。")
                     except json.JSONDecodeError:
                         st.error("上传的文件不是有效的JSON格式。")
         with col2:
@@ -259,9 +218,8 @@ class UIManager:
                 st.write("##### 📥 导出配置到 JSON")
                 json_data = json.dumps(self.config.get_data(), indent=2, ensure_ascii=False)
                 st.download_button(label="下载当前配置", data=json_data, file_name="scraper_config.json",
-                                   mime="application/json", use_container_width=True)
+                                   mime="application/json", use_container_width=True, disabled=not (pages or flows))
 
-    ## MODIFIED: Added confirmation dialogs for deletion ##
     def render_page_and_element_manager_tab(self):
         st.subheader("📄 页面与元素管理")
         st.info("在这里管理所有页面及其包含的元素。页面按三列进行展示。")
@@ -269,8 +227,10 @@ class UIManager:
         pages = self.config.get_pages()
         all_elements = self.config.get_elements()
 
-        cols = st.columns(3)
+        if not pages:
+            st.warning("目前没有任何页面。请在下方添加一个新页面开始。")
 
+        cols = st.columns(3)
         for index, page in enumerate(pages):
             with cols[index % 3]:
                 with st.expander(f"**页面: {page['name']}**", expanded=True):
@@ -292,7 +252,6 @@ class UIManager:
                                     st.session_state[edit_form_visible_key] = True
                                     st.rerun()
 
-                            # --- NEW: Deletion confirmation for elements ---
                             confirm_delete_key = f"confirm_delete_elem_{elem['id']}"
                             if st.session_state.get(confirm_delete_key, False):
                                 st.warning(f"确定要删除元素 “{elem['name']}” 吗？")
@@ -359,7 +318,6 @@ class UIManager:
                                     st.session_state[f"editing_page_{page['id']}"] = True
                                     st.rerun()
 
-                        # --- NEW: Deletion confirmation for pages ---
                         with page_col2:
                             confirm_delete_page_key = f"confirm_delete_page_{page['id']}"
                             if st.session_state.get(confirm_delete_page_key, False):
@@ -401,17 +359,16 @@ class UIManager:
                 new_action = st.text_input("添加新动作")
                 if st.form_submit_button("➕ 添加"):
                     if new_action and new_action not in actions:
-                        self.config.add_action(new_action);
+                        self.config.add_action(new_action)
                         st.rerun()
                     else:
                         st.warning("动作不能为空或已存在。")
         with col2:
             action_to_remove = st.selectbox("选择要删除的动作", options=[""] + actions)
             if st.button("❌ 删除选中动作", disabled=(not action_to_remove)):
-                self.config.remove_action(action_to_remove);
+                self.config.remove_action(action_to_remove)
                 st.rerun()
 
-    ## NEW: Helper method to generate prompt string ##
     def _generate_prompt_string(self, flow: Optional[Dict]) -> str:
         """Generates the prompt string for a given flow."""
         if not flow or not flow.get('steps'):
@@ -440,7 +397,6 @@ class UIManager:
             prompt_lines.append(action_line)
         return "\n".join(prompt_lines)
 
-    ## THIS IS THE CORRECT, NEW METHOD THAT REPLACES THE OLD ONES ##
     def render_flow_and_prompt_tab(self):
         """渲染“流程与提示词”选项卡，集成了流程编排和实时提示词生成。"""
 
@@ -468,7 +424,8 @@ class UIManager:
                         st.warning("流程名称不能为空或已存在。")
 
             selected_flow_name = st.radio(
-                "选择要编辑的流程:", flow_names, key="flow_selector", on_change=_clear_page_selection
+                "选择要编辑的流程:", flow_names, key="flow_selector", on_change=_clear_page_selection,
+                disabled=not flow_names
             )
             st.divider()
             st.write("**添加新步骤** (将添加至列表末尾)")
@@ -497,7 +454,7 @@ class UIManager:
                 with st.form("add_step_submit_form", clear_on_submit=True):
                     action_type = st.selectbox("选择动作", options=self.config.get_actions())
                     step_description = st.text_input("步骤说明 (可选)")
-                    submitted = st.form_submit_button("✔️ 添加步骤", disabled=not selected_element_name)
+                    submitted = st.form_submit_button("✔️ 添加步骤", disabled=(not selected_element_name or not selected_flow_name))
                     if submitted:
                         selected_flow = next((f for f in flows if f['name'] == selected_flow_name), None)
                         selected_element = next((e for e in elements_on_page if e['name'] == selected_element_name),
@@ -510,12 +467,11 @@ class UIManager:
         with left_col:
             st.subheader("📝 流程编排与提示词")
             if not selected_flow_name:
-                st.info("请在右侧选择一个流程进行编排。")
+                st.info("请在右侧选择或创建一个流程进行编排。")
                 return
 
             selected_flow = next((f for f in self.config.get_flows() if f['name'] == selected_flow_name), None)
             st.write(f"#### 正在编排: **{selected_flow_name}**")
-
 
             if selected_flow and selected_flow.get('steps'):
                 steps = selected_flow['steps']
@@ -596,6 +552,7 @@ class UIManager:
                     file_name=f"prompt_{selected_flow_name.replace(' ', '_')}.txt", mime="text/plain"
                 )
 
+
 # --- 3. 主应用 ---
 def main():
     """应用的主入口函数。"""
@@ -605,8 +562,7 @@ def main():
     config = ConfigManager(st.session_state)
     ui = UIManager(config)
 
-    ## MODIFIED: Tab structure updated ##
-    tab_titles = ["📊 总览", "📄 页面与元素管理", "⚙️ 流程与提示词", "🔧 动作管理"]
+    tab_titles = ["📊 总览与导入导出", "📄 页面与元素管理", "⚙️ 流程与提示词", "🔧 动作管理"]
     tab1, tab2, tab3, tab4 = st.tabs(tab_titles)
 
     with tab1:
@@ -617,7 +573,6 @@ def main():
         ui.render_flow_and_prompt_tab()
     with tab4:
         ui.render_action_manager_tab()
-
 
 
 if __name__ == "__main__":
