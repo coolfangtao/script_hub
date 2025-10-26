@@ -553,7 +553,7 @@ class UIManager:
                 )
 
 
-# --- 3. 主应用 ---
+# --- 3. 主应用 1---
 def main():
     """应用的主入口函数。"""
     st.set_page_config(page_title="采神-采集流程助手", layout="wide")
