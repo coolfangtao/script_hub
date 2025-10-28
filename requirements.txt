@@ -19,3 +19,6 @@ google-api-python-client
 youtube-transcript-api
 beautifulsoup4
 requests
+calplot
+streamlit-paste-button
+streamlit_jodit
