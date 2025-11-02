@@ -21,11 +21,6 @@ class GlobalConfig:
         # --- 运行模式 ---
         self.RUN_MODE = get_run_mode()  # "local" or "cloud"
 
-        # --- 本地文件路径配置 (仅在 local 模式下有意义) ---
-        self.LOCAL_DATA_FILE_PATH = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), '..', 'local_tasks_data.json')
-        )
-
         self.IMAGE_PATH_IN_REPO = st.secrets.get("IMAGE_PATH_IN_REPO", "images")
         # 添加数据文件路径
         self.USAGE_DATA_FILE = "script_usage_data.json"
