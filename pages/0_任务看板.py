@@ -803,8 +803,62 @@ class KanbanUI:
                                     st.rerun()
 
     def _render_task_comments_section(self, task):
-        st.subheader("任务评论", divider='rainbow')
-        # ... (implementation is the same as your original)
+        header_cols = st.columns([2, 1])
+        with header_cols[0]:
+            st.subheader(self.config.T_CARD_COMMENTS_HEADER, divider='rainbow')
+        with header_cols[1]:
+            with st.popover(f"{self.config.T_POPOVER_CREATE_COMMENT}", use_container_width=True):
+                with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
+                    ctype = st.selectbox(self.config.T_COMMENT_TYPE_LABEL, self.config.COMMENT_TYPES)
+                    content = st.text_area(self.config.T_COMMENT_CONTENT_LABEL, height=100)
+                    if st.form_submit_button(self.config.T_COMMENT_SUBMIT_BUTTON):
+                        if content:
+                            task.add_comment(content, ctype)
+                            self.data_manager.sync_state()
+                            st.rerun()
+                        else:
+                            st.warning(self.config.T_WARN_EMPTY_COMMENT)
+        problems = [c for c in task.task_comments if c['type'] == '问题']
+        other_comments = [c for c in task.task_comments if c['type'] != '问题']
+
+        def on_status_change(t, c_id, key):
+            comment = next((c for c in t.task_comments if c.get('id') == c_id), None)
+            if comment:
+                comment['status'] = st.session_state[key]
+                self.data_manager.sync_state()
+
+        if problems:
+            unsolved_count = len([p for p in problems if p.get('status', '未解决') == '未解决'])
+            st.markdown(f"**待解决问题 ({unsolved_count})**")
+            for p in sorted(problems, key=lambda c: c['time']):
+                with st.container(border=True):
+                    comment_id = p.get('id', str(p['time'].timestamp()))
+                    st.markdown(p['content'])
+                    footer_cols = st.columns([3, 2])
+                    with footer_cols[0]:
+                        st.caption(f"记录于: {p['time'].strftime('%Y-%m-%d %H:%M')}")
+                    with footer_cols[1]:
+                        options = ["未解决", "已解决"]
+                        current_status = p.get('status', '未解决')
+                        try:
+                            current_index = options.index(current_status)
+                        except ValueError:
+                            current_index = 0
+                        st.selectbox("状态", options=options, index=current_index,
+                                     key=f"status_select_{comment_id}_card", on_change=on_status_change,
+                                     args=(task, comment_id, f"status_select_{comment_id}_card"),
+                                     label_visibility="collapsed")
+            st.markdown("---")
+        if other_comments:
+            st.markdown("**其他评论记录 (备注/心得)**")
+            container_height = 150 if problems else 250
+            with st.container(height=container_height):
+                for c in reversed(other_comments):
+                    icon = self.config.COMMENT_ICON_MAP.get(c['type'], "💬")
+                    color = self.config.COMMENT_COLOR_MAP.get(c['type'], "gray")
+                    with st.chat_message(name=c['type'], avatar=icon):
+                        st.markdown(f":{color}[{c['content']}]")
+                        st.caption(f"_{c['time'].strftime('%Y-%m-%d %H:%M')}_")
 
     def _render_task_management_popover(self, task, existing_types):
         st.divider()
