@@ -805,19 +805,19 @@ class KanbanUI:
     def _render_task_comments_section(self, task):
         header_cols = st.columns([2, 1])
         with header_cols[0]:
-            st.subheader(self.config.T_CARD_COMMENTS_HEADER, divider='rainbow')
+            st.subheader("任务评论", divider='rainbow')
         with header_cols[1]:
-            with st.popover(f"{self.config.T_POPOVER_CREATE_COMMENT}", use_container_width=True):
+            with st.popover("💬 创建评论", use_container_width=True):
                 with st.form(key=f"comment_form_{task.task_id}", clear_on_submit=True):
-                    ctype = st.selectbox(self.config.T_COMMENT_TYPE_LABEL, self.config.COMMENT_TYPES)
-                    content = st.text_area(self.config.T_COMMENT_CONTENT_LABEL, height=100)
-                    if st.form_submit_button(self.config.T_COMMENT_SUBMIT_BUTTON):
+                    ctype = st.selectbox("评论类型", self.config.COMMENT_TYPES)
+                    content = st.text_area("评论内容...", height=100)
+                    if st.form_submit_button("提交"):
                         if content:
                             task.add_comment(content, ctype)
                             self.data_manager.sync_state()
                             st.rerun()
                         else:
-                            st.warning(self.config.T_WARN_EMPTY_COMMENT)
+                            st.warning("评论内容不能为空")
         problems = [c for c in task.task_comments if c['type'] == '问题']
         other_comments = [c for c in task.task_comments if c['type'] != '问题']
 
