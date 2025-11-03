@@ -382,7 +382,6 @@ class PhoneticsApp:
 
         # --- Tab 1: 分析工具 ---
         with tab1:
-            st.markdown("请按照以下步骤操作，如果句子太长，最终生成的图表下方会出现滚动条。")
 
             # 初始化会话状态
             if 'prompt_generated' not in st.session_state:
@@ -394,7 +393,7 @@ class PhoneticsApp:
 
             # 步骤1: 输入句子
             sentence = st.text_input(
-                "1. 输入需要分析的句子",
+                "1. Step 1: 输入需要分析的句子",
                 value="",
                 placeholder="例如: What are you going to do about it?"
             )
@@ -412,7 +411,7 @@ class PhoneticsApp:
 
             # 步骤3: 粘贴AI输出
             markdown_input = st.text_area(
-                "3. 在此粘贴AI输出的Markdown格式答案",
+                "3. Step 2: 在此粘贴AI输出的Markdown格式答案",
                 height=300,
                 value="",
                 placeholder="请在此处粘贴AI返回的完整Markdown文本...",
