@@ -406,7 +406,7 @@ class PhoneticsApp:
 
             # 显示提示词
             if st.session_state.prompt_generated:
-                with st.expander("2. 为AI生成的提示词 (点击可复制)", expanded=True):
+                with st.expander("2. 为AI生成的提示词 (点击右上角可复制)", expanded=True):
                     st.code(st.session_state.prompt, language="markdown", height=300)
 
             # 步骤3: 粘贴AI输出
