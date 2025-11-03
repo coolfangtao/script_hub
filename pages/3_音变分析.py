@@ -33,7 +33,7 @@ class Config:
         "连读 (Linking)": "mediumseagreen",
         "失爆 (Incomplete Plosion)": "darkorange",
         "省略 (Elision)": "crimson",
-        "同化 (Assimilation)": "mediumorchid",
+        "同化 (Assimilation)": "teal",
         "闪音/弹音 (Flapping)": "goldenrod",
         "口语缩合 (Contraction)": "darkviolet"
     }
@@ -408,7 +408,7 @@ class PhoneticsApp:
             # 显示提示词
             if st.session_state.prompt_generated:
                 with st.expander("2. 为AI生成的提示词 (点击可复制)", expanded=True):
-                    st.code(st.session_state.prompt, language="markdown")
+                    st.code(st.session_state.prompt, language="markdown", height=300)
 
             # 步骤3: 粘贴AI输出
             markdown_input = st.text_area(
