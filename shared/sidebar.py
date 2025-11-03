@@ -12,8 +12,12 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/7_AI_对话页面.py"
         },
         {
-            "label": "🎵 语句分析",
+            "label": "🎵 语句分析（已废弃）",
             "path": r"pages/3_英语句子语音现象分析.py"
+        },
+        {
+            "label": "🎵 音变分析",
+            "path": r"pages/3_音变分析.py"
         },
         {
             "label": "📈 杂质统计",
