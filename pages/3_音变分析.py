@@ -398,7 +398,7 @@ class PlotlyVisualizerV5:
         return self.fig
 
     def _draw_text_rows_with_labels(self):
-        labels = ["原始句子   ", "日常口语发音   ", "独立发音   "]
+        labels = ["原始句子   ", "日常口语发音(IPA)   ", "独立发音(IPA格式)   "]
         y_coords = [self.y_levels['sentence'], self.y_levels['connected_ipa'], self.y_levels['strong_ipa']]
         for label, y in zip(labels, y_coords):
             self.fig.add_annotation(x=0, y=y, text=f"<b>{label}</b>", showarrow=False, xanchor='left',
@@ -652,7 +652,7 @@ class PhoneticsApp:
                 st.session_state.sentence_for_prompt = ""
 
             sentence = st.text_input(
-                "1. Step 1: 输入需要分析的句子",
+                "1. Step 1: 输入需要分析的句子（输入完成后点击输入框外即可点击按钮）",
                 value="",
                 placeholder="例如: What are you going to do about it?"
             )
