@@ -1,17 +1,12 @@
 import streamlit as st
-import pandas as pd  # 注意：Pandas 现在已经不需要了
 import re
-from io import StringIO  # 注意：StringIO 现在已经不需要了
 import plotly.graph_objects as go
 import textwrap
 import json  # 确保导入 json
-
-
-# 假设的 sidebar 模块，在实际运行中您需要这个文件
 from shared.sidebar import create_common_sidebar
 create_common_sidebar()
 
-# --- 配置类 (V4 - 美化修正版) ---
+# --- 配置类---
 class Config:
     """存放所有配置参数和模板"""
 
@@ -32,7 +27,7 @@ class Config:
 
     # 统一管理所有字体颜色
     FONT_COLORS = {
-        'row_label': '#555555',  # 用于 "原始句子" 等标签 (更深的灰色)
+        'row_label': '#555555',  # 用于 "原始句子" 等标签
         'strong_ipa': 'dimgray',  # 独立发音
         'connected_ipa': 'royalblue',  # 口语发音
         'phenom_details': 'dimgray'  # 现象详情
@@ -42,7 +37,6 @@ class Config:
     LINE_COLOR = "rgba(211, 211, 211, 0.8)"
 
     # 美化配置
-    # !! 移除 PHENOM_BOX_CORNERRADIUS !!
     SPANNING_BOX_OPACITY = 0.8   # 跨词框(连读)填充透明度
     SPANNING_BOX_LINE_WIDTH = 1.5  # 跨词框(连读)边框宽度
 
@@ -162,7 +156,7 @@ What are you going to do about it?
 """
 
 
-# --- 解析器类 (V6 - 修复缩合词查找Bug) ---
+# --- 解析器类---
 class JsonParser:
     """解析AI输出的JSON文本 (V6)"""
 
@@ -274,10 +268,6 @@ class JsonParser:
                 # 检查这个现象是否属于 "顶部条"
                 if phenomenon_name in self.config.SPANNING_PHENOMENA_NAMES:
                     # 1. 这是 "连读" 或 "口语缩合"
-
-                    # !! 核心逻辑修改 (V6) !!
-                    #
-                    # 步骤 1: 尝试按原样查找 (e.g., 查找 ["who", "had"])
                     indices = self._find_sequential_indices(involved_words_list)
 
                     if not indices:
@@ -350,7 +340,7 @@ class JsonParser:
         }
 
 
-# --- 可视化类 (V5 - 修复多词现象逻辑) ---
+# --- 可视化类 ---
 class PlotlyVisualizerV5:
     """使用Plotly生成高级可视化图表 (V5)"""
 
@@ -376,7 +366,6 @@ class PlotlyVisualizerV5:
         words = self.data["original_sentence"].split()
         self._draw_text_rows_with_labels()
 
-        # !! 修改点: 调用新的绘图方法 !!
         # 绘制 "底部" 的所有现象 (方框和条)
         num_phenom_rows = self._draw_bottom_annotations()
         # 绘制 "顶部" 的连读/缩合
@@ -437,7 +426,6 @@ class PlotlyVisualizerV5:
 
     def _draw_bottom_annotations(self):
         """
-        !! 核心逻辑重构 !!
         此方法现在绘制所有 "底部" 现象, 包括:
         1. 单单词实例 (如弱读) -> 绘制为 [方框]
         2. 多单词实例 (如失爆) -> 绘制为 [水平条]
@@ -460,12 +448,11 @@ class PlotlyVisualizerV5:
 
         line_y_start = self.y_levels['strong_ipa'] - 0.3
 
-        # --- (V6 优化) 添加追踪器以解决重叠问题 ---
+        # --- 添加追踪器以解决重叠问题 ---
         last_word_index_for_row = {}
         last_offset_used_for_row = {}
         # 定义一个垂直偏移量，用于错开相邻的同类现象
         ADJACENT_OFFSET = 1.0
-        # --- V6 优化结束 ---
 
         # --- 1. 绘制所有 "单单词" 实例 (方框) ---
         for i in range(len(self.word_positions)):
@@ -478,7 +465,7 @@ class PlotlyVisualizerV5:
                 row_index = phenom_to_row_map[p['name']]
                 y_pos_box_base = self.y_levels['phenomena_start'] - (row_index * ROW_HEIGHT)
 
-                # --- (V6 优化) 解决相邻同类现象重叠 ---
+                # --- 解决相邻同类现象重叠 ---
                 current_offset = 0.0
                 last_used_idx = last_word_index_for_row.get(row_index, -99)
                 last_offset = last_offset_used_for_row.get(row_index, 0.0)
@@ -491,7 +478,6 @@ class PlotlyVisualizerV5:
                 y_pos_box = y_pos_box_base - current_offset
                 y_pos_details = y_pos_box - DETAILS_OFFSET  # 详情自动跟随 y_pos_box 下移
                 line_y_end_this_box = y_pos_box + 0.35  # 连接线也跟随下移
-                # --- V6 优化结束 ---
 
                 color = self.config.PHENOMENON_COLORS.get(p["name"], "grey")
                 name_short = p["name"].split(" ")[0]
@@ -499,28 +485,27 @@ class PlotlyVisualizerV5:
 
                 self.fig.add_shape(type="line",
                                    x0=x_center, y0=line_y_start,
-                                   x1=x_center, y1=line_y_end_this_box,  # (V6 优化) 使用偏移后的y
+                                   x1=x_center, y1=line_y_end_this_box,
                                    line=dict(color=self.config.LINE_COLOR, width=1.5, dash='dot'))
 
                 self.fig.add_annotation(
-                    x=x_center, y=y_pos_box, text=name_short,  # (V6 优化) 使用偏移后的y
+                    x=x_center, y=y_pos_box, text=name_short,
                     showarrow=False,
                     font=dict(color="white", size=self.config.FONT_SIZES['phenomenon_name']),
                     bgcolor=color, borderpad=5, bordercolor=color, borderwidth=1.5
                 )
 
                 self.fig.add_annotation(
-                    x=x_center, y=y_pos_details, text=details_wrapped,  # (V6 优化) 使用偏移后的y
+                    x=x_center, y=y_pos_details, text=details_wrapped,
                     showarrow=False,
                     font=dict(color=self.config.FONT_COLORS['phenom_details'],
                               size=self.config.FONT_SIZES['phenomenon_details']),
                     align="center", yanchor='top'
                 )
 
-                # --- (V6 优化) 更新偏移追踪器 ---
+                # --- 更新偏移追踪器 ---
                 last_word_index_for_row[row_index] = i
                 last_offset_used_for_row[row_index] = current_offset
-                # --- V6 优化结束 ---
 
         # --- 2. 绘制所有 "多单词" 实例 (水平条) ---
         for event in multi_word_data:
@@ -535,7 +520,6 @@ class PlotlyVisualizerV5:
             if len(valid_indices) < 1:
                 continue
 
-            # !! 修改点: Y轴位置来自 phenom_to_row_map !!
             row_index = phenom_to_row_map[phenom_full_name]
             y_level = self.y_levels['phenomena_start'] - (row_index * ROW_HEIGHT)
 
@@ -585,7 +569,7 @@ class PlotlyVisualizerV5:
         !! 修改点: 此方法现在只绘制 "顶部" 现象 !!
         (原 _draw_spanning_annotations)
         """
-        # !! 修改点: 获取新的数据源 !!
+        # 获取新的数据源
         spanning_events = self.data["top_spanning_phenomena"]
 
         y_levels_map = {
@@ -593,7 +577,6 @@ class PlotlyVisualizerV5:
             "口语缩合 (Contraction)": {"y_level": self.y_levels['contraction_box'], "title": "口语缩合"}
         }
 
-        # ( ... 此方法其余所有代码保持不变 ... )
         for event in spanning_events:
             phenom_full_name = event["name"]
             indices = event["indices"]
@@ -643,7 +626,7 @@ class PlotlyVisualizerV5:
                                     align="center")
 
 
-# --- Streamlit 主应用类 (V3) ---
+# --- Streamlit 主应用类---
 class PhoneticsApp:
     def __init__(self):
         self.config = Config()
@@ -688,10 +671,10 @@ class PhoneticsApp:
 
             if st.session_state.prompt_generated:
                 with st.expander("2. 为AI生成的提示词 (点击右上角可复制)", expanded=True):
-                    # !! 修改点: 提示词语言改为 json !!
+                    # 提示词语言改为 json
                     st.code(st.session_state.prompt, language="json", height=300)
 
-            # !! 修改点: 提示文本修改 !!
+            # 提示文本修改
             json_input = st.text_area(
                 "3. Step 2: 在此粘贴AI输出的JSON格式答案",
                 height=300,
@@ -707,7 +690,7 @@ class PhoneticsApp:
             ):
                 with st.spinner("正在解析数据并生成图表..."):
                     try:
-                        # !! 修改点: 调用 JsonParser 并传入 config !!
+                        # 调用 JsonParser 并传入 config
                         parser = JsonParser(json_input, st.session_state.sentence_for_prompt, self.config)
                         parsed_data = parser.parse_all()
 
@@ -762,19 +745,5 @@ class PhoneticsApp:
 
 # 程序入口
 if __name__ == "__main__":
-    # 模拟 sidebar 模块
-    class MockSidebar:
-        def create_common_sidebar(self):
-            pass
-
-
-    # st.set_page_config 必须是第一个 Streamlit 命令
-    # app = PhoneticsApp()
-    # app.run()
-
-    # 由于我们不能在后端运行 create_common_sidebar，
-    # 我们将直接运行 App。
-    # 在您的环境中，请取消注释 create_common_sidebar() 的调用。
-
     app = PhoneticsApp()
     app.run()
