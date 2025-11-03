@@ -399,7 +399,7 @@ class PhoneticsApp:
             )
 
             # 步骤2: 生成提示词按钮
-            if st.button("生成提示词", disabled=not sentence):
+            if st.button("生成提示词", type="primary", disabled=not sentence):
                 st.session_state.prompt = self.config.PROMPT_TEMPLATE.format(sentence=sentence)
                 st.session_state.prompt_generated = True
                 st.session_state.sentence_for_prompt = sentence
