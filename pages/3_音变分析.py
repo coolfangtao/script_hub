@@ -95,7 +95,7 @@ class Config:
       {{"involved_words": ["[单词B]"], "details": "[关于单词B的弱读描述]"}}
     ],
     "连读 (Linking)": [
-      {{"involved_words": ["[单词C]", "[单词D]"], "details": "[关于单词C和D连读的描述]"}}
+      {{"involved_words": ["[单词C]", "[单词D]"], "details": "[关于单词C和D连读的描述, 包括连读前后的IPA注音]"}}
     ],
     "失爆 (Incomplete Plosion)": [
       {{"involved_words": ["[单词E]"], "details": "[关于单词E失爆的描述]"}}
