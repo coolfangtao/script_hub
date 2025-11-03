@@ -20,7 +20,7 @@ class Config:
 
     # 统一管理所有字体大小
     FONT_SIZES = {
-        'row_label': 14,
+        'row_label': 20,
         'sentence': 22,
         'ipa': 22,
         'connected_ipa': 22,
