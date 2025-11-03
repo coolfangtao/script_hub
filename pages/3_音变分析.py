@@ -78,8 +78,8 @@ class Config:
     * `value` 必须是一个**数组 (array)**。
     * 如果某个现象未出现，其 `value` 必须是一个**空数组 `[]`**。
     * 如果某个现象出现，`value` 数组中必须包含一个或多个对象，每个对象代表一个实例。
-    * 每个实例对象必须包含 `involved_words` (一个单词字符串数组) 和 `details` (一个解释字符串)。
-    * 不要拆开任何缩写，比如let's不要拆分成let us，让缩写成为involved_words中一个完整的元素。
+    * 每个实例对象必须包含 `involved_words` (一个单词字符串数组) 和 `details` (一个解释字符串，最好用中文解释)。
+    * 不要拆开任何缩略形式（如let's），让缩略形式成为involved_words。
 
 # JSON Output Format
 {{
