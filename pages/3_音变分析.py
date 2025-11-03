@@ -398,7 +398,7 @@ class PlotlyVisualizerV5:
         return self.fig
 
     def _draw_text_rows_with_labels(self):
-        labels = ["原始句子", "日常口语发音", "独立发音"]
+        labels = ["原始句子   ", "日常口语发音   ", "独立发音   "]
         y_coords = [self.y_levels['sentence'], self.y_levels['connected_ipa'], self.y_levels['strong_ipa']]
         for label, y in zip(labels, y_coords):
             self.fig.add_annotation(x=0, y=y, text=f"<b>{label}</b>", showarrow=False, xanchor='left',
