@@ -159,7 +159,7 @@ class FundDashboardUI:
             with cols[i % 3], st.container(border=True):
                 # 1. 准备数据和样式
                 change_percent = data['涨跌幅(%)']
-                color = "green" if change_percent >= 0 else "red"
+                color = "red" if change_percent >= 0 else "green"
                 arrow = "↑" if change_percent >= 0 else "↓"
                 delta_text = f"{arrow} {change_percent:.2f}% ( {data['涨跌额']} )"
 
