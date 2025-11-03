@@ -383,7 +383,7 @@ class PlotlyVisualizerV5:
         self._draw_top_spanning_annotations()
 
         fig_width = max(800, len(words) * 150)
-        min_y_range = self.y_levels['phenomena_start'] - (num_phenom_rows * 2.2) - 1.0
+        min_y_range = self.y_levels['phenomena_start'] - (num_phenom_rows * 2.2) - 2.0
 
         self.fig.update_layout(
             width=fig_width,
@@ -398,7 +398,7 @@ class PlotlyVisualizerV5:
         return self.fig
 
     def _draw_text_rows_with_labels(self):
-        labels = ["原始句子   ", "日常口语发音(IPA)   ", "独立发音(IPA格式)   "]
+        labels = ["原始句子   ", "日常口语发音(IPA格式)   ", "独立发音(IPA格式)   "]
         y_coords = [self.y_levels['sentence'], self.y_levels['connected_ipa'], self.y_levels['strong_ipa']]
         for label, y in zip(labels, y_coords):
             self.fig.add_annotation(x=0, y=y, text=f"<b>{label}</b>", showarrow=False, xanchor='left',
@@ -407,7 +407,7 @@ class PlotlyVisualizerV5:
 
         words = self.data["original_sentence"].split()
         strong_forms = self.data["strong_forms"]
-        current_x = 15.0
+        current_x = 30
 
         for word in words:
             ipa = strong_forms.get(word.strip(".,?!"), "")
@@ -442,14 +442,12 @@ class PlotlyVisualizerV5:
         1. 单单词实例 (如弱读) -> 绘制为 [方框]
         2. 多单词实例 (如失爆) -> 绘制为 [水平条]
         """
-        # !! 修改点: 获取新的数据源 !!
         single_word_data = self.data["bottom_single_word_phenomena"]
         multi_word_data = self.data["bottom_multi_word_phenomena"]
 
         ROW_HEIGHT = 2.2
         DETAILS_OFFSET = 0.6
 
-        # !! 修改点: 从两个数据源构建Y轴 !!
         all_phenomena_names = set()
         for i in range(len(self.word_positions)):
             for p in single_word_data.get(i, []):
@@ -462,41 +460,67 @@ class PlotlyVisualizerV5:
 
         line_y_start = self.y_levels['strong_ipa'] - 0.3
 
+        # --- (V6 优化) 添加追踪器以解决重叠问题 ---
+        last_word_index_for_row = {}
+        last_offset_used_for_row = {}
+        # 定义一个垂直偏移量，用于错开相邻的同类现象
+        ADJACENT_OFFSET = 1.0
+        # --- V6 优化结束 ---
+
         # --- 1. 绘制所有 "单单词" 实例 (方框) ---
         for i in range(len(self.word_positions)):
             x_center = self.word_positions[i]['center']
-            word_phenomena = single_word_data.get(i, [])  # 只获取单单词
+            word_phenomena = single_word_data.get(i, [])
             if not word_phenomena:
                 continue
 
             for p in word_phenomena:
                 row_index = phenom_to_row_map[p['name']]
-                y_pos_box = self.y_levels['phenomena_start'] - (row_index * ROW_HEIGHT)
-                y_pos_details = y_pos_box - DETAILS_OFFSET
+                y_pos_box_base = self.y_levels['phenomena_start'] - (row_index * ROW_HEIGHT)
+
+                # --- (V6 优化) 解决相邻同类现象重叠 ---
+                current_offset = 0.0
+                last_used_idx = last_word_index_for_row.get(row_index, -99)
+                last_offset = last_offset_used_for_row.get(row_index, 0.0)
+
+                # 如果这个现象与前一个单词的 *同一个* 现象行相邻
+                if i == last_used_idx + 1:
+                    # 切换偏移量: 如果上一个是0, 这次就用OFFSET; 如果上次是OFFSET, 这次就用0
+                    current_offset = ADJACENT_OFFSET if last_offset == 0.0 else 0.0
+
+                y_pos_box = y_pos_box_base - current_offset
+                y_pos_details = y_pos_box - DETAILS_OFFSET  # 详情自动跟随 y_pos_box 下移
+                line_y_end_this_box = y_pos_box + 0.35  # 连接线也跟随下移
+                # --- V6 优化结束 ---
+
                 color = self.config.PHENOMENON_COLORS.get(p["name"], "grey")
                 name_short = p["name"].split(" ")[0]
-                details_wrapped = self._wrap_text(p['details'], width=15)  # 保持较窄宽度
+                details_wrapped = self._wrap_text(p['details'], width=15)
 
-                line_y_end_this_box = y_pos_box + 0.35
                 self.fig.add_shape(type="line",
                                    x0=x_center, y0=line_y_start,
-                                   x1=x_center, y1=line_y_end_this_box,
+                                   x1=x_center, y1=line_y_end_this_box,  # (V6 优化) 使用偏移后的y
                                    line=dict(color=self.config.LINE_COLOR, width=1.5, dash='dot'))
 
                 self.fig.add_annotation(
-                    x=x_center, y=y_pos_box, text=name_short,
+                    x=x_center, y=y_pos_box, text=name_short,  # (V6 优化) 使用偏移后的y
                     showarrow=False,
                     font=dict(color="white", size=self.config.FONT_SIZES['phenomenon_name']),
                     bgcolor=color, borderpad=5, bordercolor=color, borderwidth=1.5
                 )
 
                 self.fig.add_annotation(
-                    x=x_center, y=y_pos_details, text=details_wrapped,
+                    x=x_center, y=y_pos_details, text=details_wrapped,  # (V6 优化) 使用偏移后的y
                     showarrow=False,
                     font=dict(color=self.config.FONT_COLORS['phenom_details'],
                               size=self.config.FONT_SIZES['phenomenon_details']),
                     align="center", yanchor='top'
                 )
+
+                # --- (V6 优化) 更新偏移追踪器 ---
+                last_word_index_for_row[row_index] = i
+                last_offset_used_for_row[row_index] = current_offset
+                # --- V6 优化结束 ---
 
         # --- 2. 绘制所有 "多单词" 实例 (水平条) ---
         for event in multi_word_data:
