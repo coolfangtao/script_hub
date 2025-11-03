@@ -420,11 +420,11 @@ class PhoneticsApp:
 
             # 步骤4: 生成图表按钮
             if st.button(
-                    "生成高级可视化图表",
+                    "生成可视化图表",
                     type="primary",
                     disabled=not (st.session_state.prompt_generated and markdown_input)
             ):
-                with st.spinner("正在解析数据并生成高级图表..."):
+                with st.spinner("正在解析数据并生成图表..."):
                     try:
                         parser = MarkdownParser(markdown_input, st.session_state.sentence_for_prompt)
                         parsed_data = parser.parse_all()
@@ -463,7 +463,7 @@ class PhoneticsApp:
                 -   回到本工具的 **分析工具** Tab 页，将其粘贴到标有“在此粘贴AI输出的Markdown格式答案”的文本区域中。
 
             5.  **生成图表**:
-                -   点击“生成高级可视化图表”按钮。
+                -   点击“生成可视化图表”按钮。
                 -   如果一切顺利，下方就会渲染出详细的音变分析图。
             """)
 
