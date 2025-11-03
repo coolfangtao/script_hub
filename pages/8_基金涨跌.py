@@ -160,8 +160,8 @@ class FundDashboardUI:
                 # 1. 准备数据和样式
                 change_percent = data['涨跌幅(%)']
                 color = "red" if change_percent >= 0 else "green"
-                arrow = "↑" if change_percent >= 0 else "↓"
-                delta_text = f"{arrow} {change_percent:.2f}% ( {data['涨跌额']} )"
+                arrow = "↓" if change_percent >= 0 else "↑"
+                delta_text = f"{arrow} {change_percent*10:.2f}% ( {data['涨跌额']} )"
 
                 # 2. 渲染基金名称和代码
                 st.markdown(f"**{data['基金名称']} ({data['基金代码']})**")
