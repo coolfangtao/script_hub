@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import textwrap
 import json  # 确保导入 json
 from shared.sidebar import create_common_sidebar
-create_common_sidebar()
+create_common_sidebar(current_label="🎵 音变分析")
 
 # --- 配置类---
 class Config:

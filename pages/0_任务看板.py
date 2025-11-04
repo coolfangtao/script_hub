@@ -379,7 +379,7 @@ class KanbanUI:
         st.title(f"{self.config.PAGE_ICON} {self.config.PAGE_TITLE}")
         st.markdown("---")
         st_autorefresh(interval=self.config.AUTO_REFRESH_INTERVAL_MS, key="clock_refresher")
-        create_common_sidebar()
+        create_common_sidebar(current_label="✅ 任务看板")
 
     def render_main_layout(self):
         """渲染主应用布局，包括所有标签页及其内容。"""

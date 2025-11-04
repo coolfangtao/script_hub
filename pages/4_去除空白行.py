@@ -1,13 +1,9 @@
 import streamlit as st
-# from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
-# track_script_usage("🧹 去除空行")
-create_common_sidebar()
+create_common_sidebar(current_label="🧹 去除空行")
 
 
 # --- 1. 核心逻辑 (Model) ---
-# 这部分保持不变，它已经是纯函数，非常棒。
-
 def remove_blank_lines(text: str) -> str:
     """
     从给定的文本字符串中移除所有空白行。

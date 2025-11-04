@@ -1,6 +1,5 @@
 import streamlit as st
 import google.generativeai as genai
-# from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
 from shared.config import GlobalConfig
 
@@ -17,9 +16,7 @@ def setup_page_and_sidebar():
         page_icon="🤖",
         layout="wide"
     )
-    # 注意：侧边栏仍然会创建，但API输入框不会出现在那里
-    # track_script_usage("💬 AI对话")
-    create_common_sidebar()
+    create_common_sidebar(current_label="💬 AI对话")
 
 
 # --- 核心优化部分：API配置 ---

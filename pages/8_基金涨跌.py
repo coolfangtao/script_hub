@@ -229,8 +229,7 @@ def main():
     """主函数，组织页面逻辑"""
     ui = FundDashboardUI()
     ui.setup_page()
-    # track_script_usage("📈 基金盯盘")
-    create_common_sidebar()
+    create_common_sidebar(current_label="📈 基金盯盘")
     ui.render_header()
 
     # 手动刷新按钮

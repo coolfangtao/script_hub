@@ -5,8 +5,7 @@ from datetime import datetime
 from typing import List, Tuple, Dict
 # from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar  # 导入公共侧边栏函数
-# track_script_usage("📚 读书笔记")
-create_common_sidebar()
+create_common_sidebar(current_label="📚 读书笔记转换")
 
 
 def remove_suffix(text):

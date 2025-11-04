@@ -4,13 +4,8 @@ import asyncio
 from io import BytesIO
 from langdetect import detect, LangDetectException
 from typing import List, Dict, Any, Optional
-
-
-# 假设您的侧边栏文件位于项目的 "shared" 文件夹中
-# from shared.usage_tracker import track_script_usage
 from shared.sidebar import create_common_sidebar
-# track_script_usage("🔊 文字转语音")
-create_common_sidebar()
+create_common_sidebar(current_label="🔊 文字转语音")
 
 # --- 1. 配置类 (Config) ---
 # 将所有硬编码的常量和配置集中管理

@@ -122,8 +122,7 @@ st.set_page_config(
 )
 
 # 加载共享侧边栏
-# track_script_usage("📝 Listing生成")
-create_common_sidebar()
+create_common_sidebar(current_label="📝 Listing生成")
 
 
 # --- 主要功能函数 (部分已修改) ---
