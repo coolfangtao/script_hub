@@ -131,24 +131,44 @@ PATH_TO_LABEL = _get_path_to_label_map()
 
 def _get_current_page_label():
     """
+    (调试版本)
     使用Streamlit的内部上下文来获取当前正在运行的脚本路径，
     并将其转换为 "标签"。
     """
     try:
-        # 获取当前脚本的运行上下文
         ctx = st.runtime.scriptrunner.get_script_run_ctx()
         if ctx is None:
+            st.sidebar.error("调试: ctx is None")
             return None
 
-        # page_script_name 属性包含脚本路径 (例如 "pages/7_AI_对话页面.py")
         current_path = ctx.page_script_name
+
+        # 调试: 打印从 Streamlit 获取的原始路径
+        st.sidebar.info(f"调试: 原始路径 (ctx.page_script_name): \n`{current_path}`")
+
         normalized_current_path = os.path.normpath(current_path)
 
-        # 从我们的映射中查找标签
-        return PATH_TO_LABEL.get(normalized_current_path)
-    except Exception:
-        # 出错时安全返回
+        # 调试: 打印我们用于查找的规范化路径
+        st.sidebar.info(f"调试: 规范化路径 (用于查找): \n`{normalized_current_path}`")
+
+        # 调试: 打印出 PATH_TO_LABEL 字典的全部内容
+        st.sidebar.error("调试: 字典内容 (PATH_TO_LABEL):")
+        st.sidebar.json(PATH_TO_LABEL)
+
+        # 尝试查找
+        label = PATH_TO_LABEL.get(normalized_current_path)
+
+        if label is None:
+            st.sidebar.error("调试: 在字典中未找到该路径!")
+
+        return label
+
+    except Exception as e:
+        st.sidebar.error(f"调试: _get_current_page_label 发生异常: {e}")
         return None
+
+
+# --- 替换结束 ---
 
 def create_common_sidebar():
     """
