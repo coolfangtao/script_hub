@@ -22,3 +22,4 @@ requests
 calplot
 streamlit-paste-button
 streamlit_jodit
+streamlit_extras

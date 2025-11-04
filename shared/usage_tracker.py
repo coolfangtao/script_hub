@@ -4,6 +4,32 @@ import streamlit as st
 import datetime
 from shared.config import GlobalConfig
 from shared.github_handler import get_private_data_handler
+from streamlit import runtime
+from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+
+def _get_client_ip() -> str:
+    """
+    (新方案)
+    使用Streamlit的内部API获取客户端IP地址。
+    """
+    try:
+        ctx = get_script_run_ctx()
+        if ctx is None:
+            return "Unknown"  # 在某些情况下 (如测试) ctx 可能是 None
+
+        session_info = runtime.get_instance().get_client(ctx.session_id)
+        if session_info is None:
+            return "Unknown"
+
+        if session_info.request is None:
+            return "Unknown"
+
+        return session_info.request.remote_ip or "Unknown"
+
+    except Exception as e:
+        # 捕获所有可能的异常
+        return f"Error: {e}"
 
 
 # --- (get_usage_stats 保持不变) ---
@@ -37,6 +63,8 @@ def _record_visit_to_github(script_label):
     if st.session_state.get(session_key, False):
         return True  # 已经记录过了
 
+    ip_address = _get_client_ip()
+
     # 2. 获取 handler 和 config
     handler = get_private_data_handler()
     if not handler or not handler.is_ready():
@@ -58,6 +86,11 @@ def _record_visit_to_github(script_label):
     if "visits" not in data[script_label]:
         data[script_label]["visits"] = []
 
+    visit_data = {
+        "time": timestamp,
+        "ip": ip_address
+    }
+    data[script_label]["visits"].append(visit_data)
     data[script_label]["count"] = data[script_label].get("count", 0) + 1
     data[script_label]["visits"].append(timestamp)
     data[script_label]["last_visited"] = timestamp
