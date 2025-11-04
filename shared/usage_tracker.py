@@ -3,7 +3,7 @@
 import streamlit as st
 import datetime
 from shared.config import GlobalConfig
-from shared.github_handler import get_private_data_handler  # <-- 导入新的处理函数
+from shared.github_handler import get_private_data_handler
 
 
 # --- 公共接口函数 ---
