@@ -31,9 +31,9 @@ def get_usage_stats():
 
 def track_page_visit(script_label):
     """
-    (已更新)
+    (已确认 v2)
     跟踪一次页面访问。
-    现在会将会话追加到 "visits" 列表中，并更新 "last_visited"。
+    追加到 "visits" 列表，并更新 "last_visited"。
     """
     session_key = f"page_tracked_{script_label}"
 
@@ -52,9 +52,9 @@ def track_page_visit(script_label):
     # 3. 获取最新数据
     data, sha = handler.read_json_file(file_path)
     if data is None:
-        data = {}  # 文件不存在，初始化为空字典
+        data = {}
 
-    # 4. 更新数据
+        # 4. 更新数据
     timestamp = datetime.datetime.now(config.APP_TIMEZONE).isoformat()
 
     # 4.1 确保脚本条目存在
@@ -84,6 +84,6 @@ def track_page_visit(script_label):
         # 7. 清除 get_usage_stats 的缓存
         st.cache_data.clear()
 
-        st.toast(f"'{script_label}' 访问记录成功!", icon="✅")
+        st.toast(f"'{script_label}' 记录成功!", icon="✅")
     else:
-        st.toast(f"记录 '{script_label}' 访问失败。", icon="❌")
+        st.toast(f"记录 '{script_label}' 失败。", icon="❌")

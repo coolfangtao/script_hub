@@ -209,7 +209,7 @@ def main():
     应用主函数，负责渲染整个页面。
     """
     # --- 1. 渲染侧边栏和初始化 ---
-    create_common_sidebar()
+    create_common_sidebar(current_label="🏠 主页")
     setup_database()
 
     # --- 2. 页面主体内容渲染 ---

@@ -106,83 +106,22 @@ SCRIPTS_BY_GROUP = {
     ],
 }
 
-
-# --- 辅助函数，用于反向查找标签 ---
-@st.cache_data
-def _get_path_to_label_map():
-    """
-    创建一个从 "路径" 到 "标签" 的映射字典。
-    统一使用正斜杠 (/) 作为路径分隔符，以实现跨平台兼容。
-    """
-    path_map = {}
-    for group, scripts_in_group in SCRIPTS_BY_GROUP.items():
-        for script in scripts_in_group:
-            # 统一使用正斜杠
-            normalized_path = script["path"].replace("\\", "/")
-            path_map[normalized_path] = script["label"]
-
-    # 添加主页
-    path_map["streamlit_app.py".replace("\\", "/")] = "🏠 主页"
-    return path_map
-
-
-PATH_TO_LABEL = _get_path_to_label_map()
-
-
-def _get_current_page_label():
-    """
-    (已修复)
-    使用Streamlit的内部上下文来获取当前正在运行的脚本路径，
-    并将其转换为 "标签"。
-    """
-    try:
-        ctx = st.runtime.scriptrunner.get_script_run_ctx()
-        if ctx is None:
-            return None
-
-        current_path = None
-        try:
-            # 1. 尝试获取子页面的路径
-            current_path = ctx.page_script_name
-        except AttributeError:
-            # 2. 如果失败 (AttributeError)，说明我们在主页上
-            current_path = "streamlit_app.py"
-
-        if current_path is None:
-            return None
-
-        # 3. 规范化路径 (统一使用 /) 并从字典中查找
-        normalized_current_path = current_path.replace("\\", "/")
-        label = PATH_TO_LABEL.get(normalized_current_path)
-
-        if label is None:
-            # 调试: 仅在查找失败时显示错误
-            st.sidebar.error(f"调试: 路径 `{normalized_current_path}` 未在字典中找到。")
-
-        return label
-
-    except Exception as e:
-        # 捕获其他意外错误
-        st.sidebar.error(f"调试: _get_current_page_label 发生异常: {e}")
-        return None
-
-
-# --- 替换结束 ---
-
-def create_common_sidebar():
+def create_common_sidebar(current_label=None):
     """
     在Streamlit应用的侧边栏中创建一个可折叠的公共分组导航。
+
+    :param current_label: (str, 可选) 当前页面的标签。
+                          如果提供了，将触发页面访问跟踪。
     """
 
     # --- 页面访问跟踪 ---
-    # 自动获取当前页面的标签
-    current_label = _get_current_page_label()
     if current_label:
-        st.sidebar.caption(f"🔍 正在检测页面: {current_label}")
-    else:
-        st.sidebar.caption("🔍 未检测到页面标签")
-    if current_label:
+        # 仅在提供了标签时才跟踪
+        st.sidebar.caption(f"当前页面: {current_label}")
         track_page_visit(current_label)
+    else:
+        # 如果没有提供标签 (例如在某个不希望被跟踪的页面)
+        st.sidebar.caption("未跟踪当前页面")
 
     # 1. 注入CSS以隐藏默认的Streamlit导航 (保持不变)
     st.markdown("""
