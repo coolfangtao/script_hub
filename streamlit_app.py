@@ -111,7 +111,7 @@ def display_core_features():
 
 def display_usage_stats():
     """
-    显示脚本使用统计数据。
+    显示脚本使用统计数据。(已修复切片错误)
     """
     st.header("📊 脚本使用统计")
 
@@ -124,14 +124,34 @@ def display_usage_stats():
 
     # 将数据转换为 Pandas DataFrame 以便显示
     try:
-        # 提取需要的数据
+        # 1. 提取用于图表的数据 (例如: {"🏠 主页": 1, "💬 AI对话": 5})
         chart_data = {
             label: d.get("count", 0)
             for label, d in usage_data.items()
+            if d.get("count", 0) > 0  # 确保只显示有访问的
         }
-        # 按访问次数排序
+
+        # 2. 按访问次数（value）排序
         sorted_chart_data = dict(sorted(chart_data.items(), key=lambda item: item[1], reverse=True))
 
+        # 3. 显示柱状图
+        st.subheader("访问次数 Top 10")
+
+        # ---
+        # 修复点：
+        # 错误：不能对字典 dict 使用 [:10] 切片
+        # 修正：先将字典的 .items() 转为 list，对 list 切片，再转回 dict
+        # ---
+        top_10_items = list(sorted_chart_data.items())[:10]
+        top_10_data = dict(top_10_items)
+
+        if not top_10_data:
+            st.info("暂无统计数据。")
+        else:
+            st.bar_chart(top_10_data, use_container_width=True)
+
+        # 4. 显示详细数据表格
+        st.subheader("详细统计")
         df_data = [
             {
                 "脚本名称": label,
@@ -143,18 +163,12 @@ def display_usage_stats():
 
         df = pd.DataFrame(df_data)
         df = df.sort_values(by="访问次数", ascending=False).reset_index(drop=True)
-
-        # 1. 显示柱状图
-        st.subheader("访问次数 Top 10")
-        top_10_data = {k: v for k, v in sorted_chart_data.items() if v > 0}[:10]
-        st.bar_chart(top_10_data, use_container_width=True)
-
-        # 2. 显示详细数据表格
-        st.subheader("详细统计")
         st.dataframe(df, use_container_width=True, hide_index=True)
 
     except Exception as e:
+        # 捕获新的未知错误
         st.error(f"渲染统计数据时出错: {e}")
+        st.error("原始数据：")
         st.json(usage_data)  # 调试用：显示原始数据
 
 
