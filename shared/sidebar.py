@@ -1,10 +1,10 @@
 # 文件路径: shared/sidebar.py
 import streamlit as st
 from shared.elements import shin_chan_animation
-# from shared.usage_tracker import show_usage_stats
+from shared.usage_tracker import track_page_visit
+import os
 
 # --- 核心数据结构: 统一管理所有脚本和分组 ---
-# (这部分数据结构保持不变)
 SCRIPTS_BY_GROUP = {
     "🤖 AI工具": [
         {
@@ -106,6 +106,49 @@ SCRIPTS_BY_GROUP = {
     ],
 }
 
+
+# --- 辅助函数，用于反向查找标签 ---
+@st.cache_data
+def _get_path_to_label_map():
+    """
+    创建一个从 "路径" 到 "标签" 的映射字典。
+    使用 @st.cache_data 缓存这个字典。
+    """
+    path_map = {}
+    for group, scripts_in_group in SCRIPTS_BY_GROUP.items():
+        for script in scripts_in_group:
+            # 规范化路径以进行可靠的比较
+            normalized_path = os.path.normpath(script["path"])
+            path_map[normalized_path] = script["label"]
+
+    # 添加主页
+    path_map[os.path.normpath("streamlit_app.py")] = "🏠 主页"
+    return path_map
+
+
+PATH_TO_LABEL = _get_path_to_label_map()
+
+
+def _get_current_page_label():
+    """
+    使用Streamlit的内部上下文来获取当前正在运行的脚本路径，
+    并将其转换为 "标签"。
+    """
+    try:
+        # 获取当前脚本的运行上下文
+        ctx = st.runtime.scriptrunner.get_script_run_ctx()
+        if ctx is None:
+            return None
+
+        # page_script_name 属性包含脚本路径 (例如 "pages/7_AI_对话页面.py")
+        current_path = ctx.page_script_name
+        normalized_current_path = os.path.normpath(current_path)
+
+        # 从我们的映射中查找标签
+        return PATH_TO_LABEL.get(normalized_current_path)
+    except Exception:
+        # 出错时安全返回
+        return None
 
 def create_common_sidebar():
     """

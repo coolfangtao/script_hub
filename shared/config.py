@@ -22,14 +22,14 @@ class GlobalConfig:
         self.RUN_MODE = get_run_mode()  # "local" or "cloud"
 
         self.IMAGE_PATH_IN_REPO = st.secrets.get("IMAGE_PATH_IN_REPO", "images")
-        # 添加数据文件路径
-        self.USAGE_DATA_FILE = "script_usage_data.json"
 
 
         # 从 Streamlit secrets 加载密钥
         self.GITHUB_TOKEN = st.secrets.get("github_data_token")
         self.GITHUB_PRIVATE_REPO = st.secrets.get("github_data_repo")
         self.GITHUB_PUBLIC_REPO = st.secrets.get("github_data_public_repo")
+        # 添加数据文件路径
+        self.USAGE_DATA_FILE = "script_usage_data.json"
 
         self.GEMINI_API_KEY = "gemini_api_key"
 

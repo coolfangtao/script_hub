@@ -4,7 +4,8 @@ import streamlit as st
 from shared.sidebar import create_common_sidebar
 from shared.update_log import show_changelog
 from shared.feedback import setup_database, show_feedback_module
-# from shared.usage_tracker import usage_tracker
+from shared.usage_tracker import get_usage_stats
+import pandas as pd
 
 # --- 页面基础设置 (必须是第一个st命令) ---
 st.set_page_config(
@@ -107,6 +108,57 @@ def display_core_features():
     st.divider()
 
 
+# --- 显示使用统计的函数 ---
+
+def display_usage_stats():
+    """
+    显示脚本使用统计数据。
+    """
+    st.header("📊 脚本使用统计")
+
+    # 从 tracker 获取缓存的数据
+    usage_data = get_usage_stats()
+
+    if not usage_data:
+        st.info("暂无使用数据。")
+        return
+
+    # 将数据转换为 Pandas DataFrame 以便显示
+    try:
+        # 提取需要的数据
+        chart_data = {
+            label: d.get("count", 0)
+            for label, d in usage_data.items()
+        }
+        # 按访问次数排序
+        sorted_chart_data = dict(sorted(chart_data.items(), key=lambda item: item[1], reverse=True))
+
+        df_data = [
+            {
+                "脚本名称": label,
+                "访问次数": d.get("count", 0),
+                "最近访问": d.get("last_visited", "N/A").split("T")[0]  # 只显示日期
+            }
+            for label, d in usage_data.items()
+        ]
+
+        df = pd.DataFrame(df_data)
+        df = df.sort_values(by="访问次数", ascending=False).reset_index(drop=True)
+
+        # 1. 显示柱状图
+        st.subheader("访问次数 Top 10")
+        top_10_data = {k: v for k, v in sorted_chart_data.items() if v > 0}[:10]
+        st.bar_chart(top_10_data, use_container_width=True)
+
+        # 2. 显示详细数据表格
+        st.subheader("详细统计")
+        st.dataframe(df, use_container_width=True, hide_index=True)
+
+    except Exception as e:
+        st.error(f"渲染统计数据时出错: {e}")
+        st.json(usage_data)  # 调试用：显示原始数据
+
+
 def display_friendly_links():
     """显示友情链接模块。"""
     st.header("🔗 友情链接")
@@ -143,6 +195,11 @@ def main():
     display_welcome_banner()
     display_core_features()
     # show_global_usage_stats()
+
+    # --- 新增：调用统计显示函数 ---
+    display_usage_stats()
+    st.divider()
+
 
     # 更新日志
     show_changelog()
