@@ -99,8 +99,8 @@ def _record_visit_to_github(script_label):
         data[script_label]["visits"] = []
 
     visit_data = {
-        "time": timestamp,
-        "ip": ip_address
+        "time": timestamp
+        # "ip": ip_address
     }
     data[script_label]["visits"].append(visit_data)
     data[script_label]["count"] = data[script_label].get("count", 0) + 1
