@@ -111,7 +111,7 @@ def display_core_features():
 
 def display_usage_stats():
     """
-    显示脚本使用统计数据。(已修复切片错误)
+    显示脚本使用统计数据。(使用 st.metric)
     """
     st.header("📊 脚本使用统计")
 
@@ -122,35 +122,43 @@ def display_usage_stats():
         st.info("暂无使用数据。")
         return
 
-    # 将数据转换为 Pandas DataFrame 以便显示
     try:
-        # 1. 提取用于图表的数据 (例如: {"🏠 主页": 1, "💬 AI对话": 5})
-        chart_data = {
-            label: d.get("count", 0)
-            for label, d in usage_data.items()
-            if d.get("count", 0) > 0  # 确保只显示有访问的
-        }
+        # --- 1. 计算关键指标 ---
 
-        # 2. 按访问次数（value）排序
-        sorted_chart_data = dict(sorted(chart_data.items(), key=lambda item: item[1], reverse=True))
+        # 指标1: 总访问次数
+        total_views = sum(d.get("count", 0) for d in usage_data.values())
 
-        # 3. 显示柱状图
-        st.subheader("访问次数 Top 10")
+        # 指标2: 最受欢迎的脚本
+        # (确保 usage_data 不为空)
+        most_popular_item = max(
+            usage_data.items(),
+            key=lambda item: item[1].get("count", 0),
+            default=(None, {})
+        )
+        most_popular_label = most_popular_item[0] if most_popular_item[0] else "N/A"
+        most_popular_count = most_popular_item[1].get("count", 0)
 
-        # ---
-        # 修复点：
-        # 错误：不能对字典 dict 使用 [:10] 切片
-        # 修正：先将字典的 .items() 转为 list，对 list 切片，再转回 dict
-        # ---
-        top_10_items = list(sorted_chart_data.items())[:10]
-        top_10_data = dict(top_10_items)
+        # 指标3: 已跟踪脚本数
+        unique_scripts = len(usage_data)
 
-        if not top_10_data:
-            st.info("暂无统计数据。")
-        else:
-            st.bar_chart(top_10_data, use_container_width=True)
+        # --- 2. 使用 st.metric 在列中显示指标 ---
+        col1, col2, col3 = st.columns(3)
 
-        # 4. 显示详细数据表格
+        with col1:
+            st.metric(label="总访问次数", value=total_views)
+
+        with col2:
+            # 我们用 value 显示脚本名, 用 delta 显示它的次数
+            st.metric(label="最受欢迎的脚本",
+                      value=most_popular_label,
+                      delta=f"{most_popular_count} 次访问")
+
+        with col3:
+            st.metric(label="已跟踪脚本数", value=unique_scripts)
+
+        st.divider()  # 在指标和表格之间添加分隔线
+
+        # --- 3. 显示详细数据表格 (保持不变) ---
         st.subheader("详细统计")
         df_data = [
             {
