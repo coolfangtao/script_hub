@@ -45,7 +45,7 @@ def track_page_visit(script_label):
     handler = get_private_data_handler()
     if not handler or not handler.is_ready():
         # 不显示错误，以免打扰用户，但在需要时可以取消注释
-        # st.error("GitHub handler not ready. Cannot track visit.")
+        st.error("GitHub handler not ready. Cannot track visit.")
         return
 
     config = GlobalConfig()
