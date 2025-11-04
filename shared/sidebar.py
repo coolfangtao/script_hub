@@ -112,17 +112,17 @@ SCRIPTS_BY_GROUP = {
 def _get_path_to_label_map():
     """
     创建一个从 "路径" 到 "标签" 的映射字典。
-    使用 @st.cache_data 缓存这个字典。
+    统一使用正斜杠 (/) 作为路径分隔符，以实现跨平台兼容。
     """
     path_map = {}
     for group, scripts_in_group in SCRIPTS_BY_GROUP.items():
         for script in scripts_in_group:
-            # 规范化路径以进行可靠的比较
-            normalized_path = os.path.normpath(script["path"])
+            # 统一使用正斜杠
+            normalized_path = script["path"].replace("\\", "/")
             path_map[normalized_path] = script["label"]
 
     # 添加主页
-    path_map[os.path.normpath("streamlit_app.py")] = "🏠 主页"
+    path_map["streamlit_app.py".replace("\\", "/")] = "🏠 主页"
     return path_map
 
 
@@ -142,24 +142,22 @@ def _get_current_page_label():
 
         current_path = None
         try:
-            # 1. 尝试获取子页面的路径 (例如 "pages/7_AI_对话页面.py")
+            # 1. 尝试获取子页面的路径
             current_path = ctx.page_script_name
         except AttributeError:
             # 2. 如果失败 (AttributeError)，说明我们在主页上
-            #    主页的脚本路径就是 "streamlit_app.py"
             current_path = "streamlit_app.py"
 
         if current_path is None:
             return None
 
-        # 3. 规范化路径并从字典中查找
-        normalized_current_path = os.path.normpath(current_path)
+        # 3. 规范化路径 (统一使用 /) 并从字典中查找
+        normalized_current_path = current_path.replace("\\", "/")
         label = PATH_TO_LABEL.get(normalized_current_path)
 
         if label is None:
-            # 调试: 仅在查找失败时显示错误，帮助排查路径不匹配
+            # 调试: 仅在查找失败时显示错误
             st.sidebar.error(f"调试: 路径 `{normalized_current_path}` 未在字典中找到。")
-            # st.sidebar.json(PATH_TO_LABEL) # 如果需要，取消此行注释以查看字典
 
         return label
 
