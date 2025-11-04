@@ -14,20 +14,20 @@ def create_common_sidebar(current_label=None):
 
     if current_label == "🏠 主页":
         # 1. 如果是主页，只设置一个待办标记
-        st.sidebar.caption(f"当前页面: {current_label}")
+        # st.sidebar.caption(f"当前页面: {current_label}")
 
         # --- 新增的调试信息 ---
-        st.sidebar.warning("延迟跟踪已激活 (v5)")
+        # st.sidebar.warning("延迟跟踪已激活 (v5)")
         # --- 调试结束 ---
 
         st.session_state["pending_home_visit"] = True
 
     elif current_label:
         # 2. 如果是任何其他子页面 (证明是人类)
-        st.sidebar.caption(f"当前页面: {current_label}")
+        # st.sidebar.caption(f"当前页面: {current_label}")
 
         # --- 新增的调试信息 ---
-        st.sidebar.success("子页面跟踪已激活 (v5)")
+        # st.sidebar.success("子页面跟踪已激活 (v5)")
         # --- 调试结束 ---
 
         # 我们调用跟踪函数，它会智能处理“待办”的主页访问
