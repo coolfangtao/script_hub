@@ -41,10 +41,10 @@ SCRIPTS_BY_GROUP = {
             "label": "🛍️ 商品信息提取",
             "path": r"pages/4_一键提取亚马逊页面关键信息.py"
         },
-        {
-            "label": "👬 群成员名称提取",
-            "path": r"pages/4_提取掌上大学群成员名称.py"
-        },
+        # {
+        #     "label": "👬 群成员名称提取",
+        #     "path": r"pages/4_提取掌上大学群成员名称.py"
+        # },
         {
             "label": "📦 商品信息提取（完整版）",
             "path": r"pages/2_Amazon评论获取.py"
