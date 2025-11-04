@@ -155,6 +155,14 @@ def create_common_sidebar():
     在Streamlit应用的侧边栏中创建一个可折叠的公共分组导航。
     """
 
+    # --- 页面访问跟踪 ---
+    # 自动获取当前页面的标签
+    current_label = _get_current_page_label()
+    if current_label:
+        # 尝试跟踪此页面的访问
+        # (函数内部有session_state保护，防止重复跟踪)
+        track_page_visit(current_label)
+
     # 1. 注入CSS以隐藏默认的Streamlit导航 (保持不变)
     st.markdown("""
         <style>
@@ -179,8 +187,6 @@ def create_common_sidebar():
             for script in scripts_in_group:
                 st.page_link(script["path"], label=script["label"])
 
-    # 4. 添加使用统计信息
-    # show_usage_stats()
 
     # 5. 小新动画
     shin_chan_animation()
