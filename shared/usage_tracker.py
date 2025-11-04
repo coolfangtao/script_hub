@@ -136,12 +136,13 @@ def track_page_visit(script_label):
         if home_success:
             # 清除标记，防止重复补录
             st.session_state["pending_home_visit"] = False
-            st.toast("'🏠 主页' (真实访问) 记录成功!", icon="🏠")
+            # st.toast("'🏠 主页' (真实访问) 记录成功!", icon="🏠")
 
     # 2. (旧) 记录当前子页面的访问
     page_success = _record_visit_to_github(script_label)
 
     if page_success:
-        st.toast(f"'{script_label}' 记录成功!", icon="✅")
+        # st.toast(f"'{script_label}' 记录成功!", icon="✅")
+        pass
     else:
         st.toast(f"记录 '{script_label}' 失败。", icon="❌")
