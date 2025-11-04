@@ -159,8 +159,10 @@ def create_common_sidebar():
     # 自动获取当前页面的标签
     current_label = _get_current_page_label()
     if current_label:
-        # 尝试跟踪此页面的访问
-        # (函数内部有session_state保护，防止重复跟踪)
+        st.sidebar.caption(f"🔍 正在检测页面: {current_label}")
+    else:
+        st.sidebar.caption("🔍 未检测到页面标签")
+    if current_label:
         track_page_visit(current_label)
 
     # 1. 注入CSS以隐藏默认的Streamlit导航 (保持不变)

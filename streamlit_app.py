@@ -63,13 +63,12 @@ def create_feature_card(icon, title, description, button_key, target_page):
 def display_welcome_banner():
     """显示页面的欢迎横幅。"""
     st.title("🚀 欢迎来到 TF 的脚本中心")
-    st.markdown("一个集成了运营维护、文本处理和图像处理等多种高效工具的在线平台。")
     # --- 新增的座右铭 ---
     # 使用 Markdown 和一点 HTML/CSS 来美化样式，使其居中、斜体并带有灰色调
     st.markdown(
         """
         <p style='text-align: center; font-style: italic; color: #888;'>
-            做难事必有所得，在混乱中创造秩序。
+            在混乱中创造秩序。
         </p>
         """,
         unsafe_allow_html=True
