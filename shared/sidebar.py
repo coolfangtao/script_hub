@@ -114,13 +114,19 @@ def create_common_sidebar(current_label=None):
                           如果提供了，将触发页面访问跟踪。
     """
 
-    # --- 页面访问跟踪 ---
-    if current_label:
-        # 仅在提供了标签时才跟踪
-        # st.sidebar.caption(f"当前页面: {current_label}")
+    if current_label == "🏠 主页":
+        # 1. 如果是主页，只设置一个待办标记
+        # 我们假设这可能是个机器人，暂不记录
+        st.sidebar.caption(f"当前页面: {current_label}")
+        st.session_state["pending_home_visit"] = True
+
+    elif current_label:
+        # 2. 如果是任何其他子页面 (证明是人类)
+        st.sidebar.caption(f"当前页面: {current_label}")
+        # 我们调用跟踪函数，它会智能处理“待办”的主页访问
         track_page_visit(current_label)
+
     else:
-        # 如果没有提供标签 (例如在某个不希望被跟踪的页面)
         st.sidebar.caption("未跟踪当前页面")
 
     # 1. 注入CSS以隐藏默认的Streamlit导航 (保持不变)
