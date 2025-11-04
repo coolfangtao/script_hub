@@ -117,7 +117,7 @@ def create_common_sidebar(current_label=None):
     # --- 页面访问跟踪 ---
     if current_label:
         # 仅在提供了标签时才跟踪
-        st.sidebar.caption(f"当前页面: {current_label}")
+        # st.sidebar.caption(f"当前页面: {current_label}")
         track_page_visit(current_label)
     else:
         # 如果没有提供标签 (例如在某个不希望被跟踪的页面)
