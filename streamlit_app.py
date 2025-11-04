@@ -68,7 +68,7 @@ def display_welcome_banner():
     st.markdown(
         """
         <p style='text-align: center; font-style: italic; color: #888;'>
-            一步一个脚印，慢慢来。
+            做难事必有所得，在混乱中创造秩序。
         </p>
         """,
         unsafe_allow_html=True
