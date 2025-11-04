@@ -10,25 +10,37 @@ from streamlit.runtime.scriptrunner import get_script_run_ctx
 
 def _get_client_ip() -> str:
     """
-    (新方案)
+    (已修复 v2)
     使用Streamlit的内部API获取客户端IP地址。
+
+    优先检查 X-Forwarded-For Header，这对于部署在
+    Streamlit Cloud 或其他反向代理后面的应用至关重要。
     """
     try:
         ctx = get_script_run_ctx()
         if ctx is None:
-            return "Unknown"  # 在某些情况下 (如测试) ctx 可能是 None
+            return "Unknown (ctx is None)"
 
         session_info = runtime.get_instance().get_client(ctx.session_id)
         if session_info is None:
-            return "Unknown"
+            return "Unknown (session_info is None)"
 
         if session_info.request is None:
-            return "Unknown"
+            return "Unknown (request is None)"
 
+        # --- 关键修复 ---
+        # 1. 检查 X-Forwarded-For (用于部署环境)
+        headers = session_info.request.headers
+        forwarded_for = headers.get("X-Forwarded-For")
+        if forwarded_for:
+            # "X-Forwarded-For" 可能是 "client_ip, proxy1_ip, proxy2_ip"
+            # 我们只取第一个 (真正的客户端)
+            return forwarded_for.split(",")[0].strip()
+
+        # 2. 回退到 remote_ip (用于本地开发)
         return session_info.request.remote_ip or "Unknown"
 
     except Exception as e:
-        # 捕获所有可能的异常
         return f"Error: {e}"
 
 
