@@ -24,7 +24,6 @@ class AppConfig:
             try:
                 return Image.open(icon_path)
             except Exception as e:
-                # 隐藏日志，保持整洁
                 # print(f"[Warning] 无法加载图标: {icon_path}. 错误: {e}")
                 return None
         else:
@@ -74,20 +73,31 @@ class BasePlatformParser:
 class Parser1688(BasePlatformParser):
     """
     专门用于 1688.com 的解析器。
-    (已修改 parse_titles 函数)
+    (已新增 re_offer_id_json 并更新 parse_category_list)
     """
 
+    # --- (已修改) ---
     def __init__(self):
         super().__init__(base_url="https://detail.1688.com/")
         self.product_link_pattern = r"detail\.1688\.com/offer/(\d+)\.html"
         self.offer_url_template = "https://detail.1688.com/offer/{offer_id}.html"
 
-        # (无变动)
+        # 格式 (榜单文件): offerId@844634586387
         self.re_offer_id_at = re.compile(r"offerId@(\d+)")
+
+        # 格式 (类目文件): offerId=980010203849
         self.re_offer_id_equals = re.compile(r"offerId=(\d+)")
+
+        # 格式 (榜单/类目): object_id@635461774648
         self.re_object_id_at = re.compile(r"object_id@(\d+)")
-        self.re_offer_id_json = re.compile(r"&quot;offerId&quot;:&quot;(\d+)&quot;")
+
+        # 格式 (类目文件备用): data-renderkey="..._635461774648"
         self.re_render_key = re.compile(r"_(\d+)$")
+
+        # --- (已新增) ---
+        # 格式 (data-extra json): &quot;offerId&quot;:&quot;847029251739&quot;
+        self.re_offer_id_json = re.compile(r"&quot;offerId&quot;:&quot;(\d+)&quot;")
+        # --- (新增结束) ---
 
     def _find_ids_by_attr_regex(self, soup, attr_name, id_regex_compiled):
         # (无变动)
@@ -101,41 +111,32 @@ class Parser1688(BasePlatformParser):
                 found_ids.add(match.group(1))
         return found_ids
 
-    # --- (已修改) ---
     def parse_titles(self, html_content):
-        """
-        (已更新) 解析商品标题 (不去重)。
-        此方法必须使用 BeautifulSoup，因为它需要正确处理 <font> 等嵌套标签。
-        """
+        # (无变动, 保持不去重)
         titles = []
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
-
-            # 查找所有 class="title-text" 的 div
             title_divs = soup.find_all("div", class_="title-text")
-
             for div in title_divs:
-                # .get_text(strip=True) 会自动处理所有子标签 (如<font>)
                 title = div.get_text(strip=True)
                 if title:
                     titles.append(title)
         except Exception as e:
-            # 即使解析标题失败，也不应阻止链接解析
             print(f"Error parsing titles: {e}")
-
-        # (已修改) 直接返回原始列表，不去重，以保证与链接的对应关系
         return titles
-    # --- (修改结束) ---
 
     def parse_beauty_ranking_list(self, html_content):
         # (无变动)
         found_ids = set()
-
         try:
             ids_from_offer_at = set(self.re_offer_id_at.findall(html_content))
             found_ids.update(ids_from_offer_at)
             ids_from_object_at = set(self.re_object_id_at.findall(html_content))
             found_ids.update(ids_from_object_at)
+
+            # (新增) 匹配 data-extra json 格式
+            ids_from_json = set(self.re_offer_id_json.findall(html_content))
+            found_ids.update(ids_from_json)
         except Exception:
             pass
 
@@ -158,41 +159,62 @@ class Parser1688(BasePlatformParser):
         final_links = {self.offer_url_template.format(offer_id=offer_id) for offer_id in found_ids}
         return sorted(list(final_links))
 
+    # --- (已修改) ---
     def parse_category_list(self, html_content):
-        # (无变动)
+        """
+        (已更新 V10) 类目文件 Tab -
+        策略 1: (极快) 纯文本搜索所有已知正则模式
+        策略 2: (兜底) 启动BeautifulSoup查找 data-renderkey 和 a 标签
+        """
         found_ids = set()
+
+        # --- 策略 1: 快速纯文本搜索 ---
         try:
+            # 格式 (类目文件): offerId=980010203849
             ids_from_equals = set(self.re_offer_id_equals.findall(html_content))
             found_ids.update(ids_from_equals)
+
+            # 格式 (榜单文件): offerId@844634586387
             ids_from_offer_at = set(self.re_offer_id_at.findall(html_content))
             found_ids.update(ids_from_offer_at)
+
+            # 格式 (榜单/类目): object_id@635461774648
             ids_from_object_at = set(self.re_object_id_at.findall(html_content))
             found_ids.update(ids_from_object_at)
+
+            # (新增) 格式 (data-extra json): &quot;offerId&quot;:&quot;847029251739&quot;
             ids_from_json = set(self.re_offer_id_json.findall(html_content))
             found_ids.update(ids_from_json)
+
         except Exception:
+            # 即使正则失败，也继续执行策略2 (BeautifulSoup)
             pass
-        if not found_ids:
-            try:
-                soup = BeautifulSoup(html_content, 'html.parser')
-                tags_renderkey = soup.find_all(attrs={"data-renderkey": self.re_render_key})
-                for tag in tags_renderkey:
-                    match = self.re_render_key.search(str(tag['data-renderkey']))
-                    if match:
-                        found_ids.add(match.group(1))
-                ids_from_aplus_obj = self._find_ids_by_attr_regex(
-                    soup,
-                    attr_name="data-aplus-report",
-                    id_regex_compiled=self.re_object_id_at
-                )
-                found_ids.update(ids_from_aplus_obj)
-                links_from_generic_parser = self.generic_parse_links(html_content, self.product_link_pattern)
-                for link in links_from_generic_parser:
-                    match = re.search(self.product_link_pattern, link)
-                    if match:
-                        found_ids.add(match.group(1))
-            except Exception:
-                pass
+        # --- 策略1结束 ---
+
+        # --- (已修改) 策略 2: BeautifulSoup 兜底 ---
+        # 移除 'if not found_ids:' 检查，始终运行 BS 解析来捕获 re_render_key
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            # 策略 2a: 查找 data-renderkey="..._123456"
+            # (这个格式在某些卡片上是唯一ID，必须运行)
+            tags_renderkey = soup.find_all(attrs={"data-renderkey": self.re_render_key})
+            for tag in tags_renderkey:
+                match = self.re_render_key.search(str(tag['data-renderkey']))
+                if match:
+                    found_ids.add(match.group(1))
+
+            # 策略 2b: (兜底) 查找 <a> 标签
+            links_from_generic_parser = self.generic_parse_links(html_content, self.product_link_pattern)
+            for link in links_from_generic_parser:
+                match = re.search(self.product_link_pattern, link)
+                if match:
+                    found_ids.add(match.group(1))
+        except Exception:
+            # 即使BeautifulSoup解析失败，也继续
+            pass
+        # --- 策略2结束 ---
+
         final_links = {self.offer_url_template.format(offer_id=offer_id) for offer_id in found_ids}
         return sorted(list(final_links))
 
@@ -228,20 +250,15 @@ class AppUI:
         self.parser_taobao = self.parsers.get("Taobao")
 
     def _display_results(self, links_list, titles_list):
-        """
-        (无变动) 同时显示链接和标题
-        """
         if not links_list and not titles_list:
             st.warning("在您上传的HTML文件中没有找到匹配的商品链接或标题。请检查：\n1. 文件是否正确？\n2. 解析器是否为最新？")
             return
 
         st.success(f"🎉 成功解析出 {len(links_list)} 个链接 和 {len(titles_list)} 个标题！")
 
-        # 增加一个智能告警
         if len(links_list) != len(titles_list) and links_list and titles_list:
             st.warning(f"注意：链接数量 ({len(links_list)}) 与标题数量 ({len(titles_list)}) 不匹配。请核对。")
 
-        # 使用列布局并排显示
         col1, col2 = st.columns(2)
 
         with col1:
@@ -256,23 +273,18 @@ class AppUI:
             st.markdown("### 采集结果 (标题)")
             if titles_list:
                 titles_text = "\n".join(titles_list)
-                st.code(titles_text, language="markdown")  # 使用code以便复制
+                st.code(titles_text, language="markdown")
             else:
                 st.info("未找到标题。")
 
         st.toast("解析完成!")
 
     def _build_1688_tab(self):
-        """
-        (无变动)
-        """
-
         tab_rank_list, tab_category_list = st.tabs([
             "榜单文件上传",
             "类目文件上传"
         ])
 
-        # --- 模块: 榜单文件 (无变动) ---
         with tab_rank_list:
             st.subheader("采集模块：榜单文件上传")
             st.markdown("""
@@ -292,13 +304,13 @@ class AppUI:
                     with st.spinner(f"正在解析文件: {uploaded_file_rank.name} ..."):
                         html_content = uploaded_file_rank.getvalue().decode("utf-8")
 
+                        # (已修改) 同时调用两个解析器
                         links = self.parser_1688.parse_beauty_ranking_list(html_content)
                         titles = self.parser_1688.parse_titles(html_content)
                         self._display_results(links, titles)
                 else:
                     st.error("请先上传一个HTML文件。")
 
-        # --- 模块: 类目列表 (无变动) ---
         with tab_category_list:
             st.subheader("采集模块：通用类目列表 (文件上传)")
             st.markdown("""
@@ -318,6 +330,7 @@ class AppUI:
                     with st.spinner(f"正在解析文件: {uploaded_file_cat.name} ... (可能需要几十秒)"):
                         html_content = uploaded_file_cat.getvalue().decode("utf-8")
 
+                        # (已修改) 同时调用两个解析器
                         links = self.parser_1688.parse_category_list(html_content)
                         titles = self.parser_1688.parse_titles(html_content)
                         self._display_results(links, titles)
@@ -325,20 +338,17 @@ class AppUI:
                     st.error("请先上传一个HTML文件。")
 
     def _build_amazon_tab(self):
-        # (无变动)
         pass
 
     def _build_taobao_tab(self):
-        # (无变动)
         pass
 
     def render(self):
-        # (无变动)
         create_common_sidebar(current_label="️🛍️ 妙手链接采集")
         st.title("商品链接采集器")
         st.caption("粘贴HTML元素或上传HTML文件，快速提取商品链接以便导入“妙手”等工具。")
 
-        tab1688, tab_amazon, tab_taobao = st.tabs([
+        tab1688, tab_amazon, tab_TAOBAO = st.tabs([
             " [ 1688 ] ",
             " [ 亚马逊 Amazon ] (占位) ",
             " [ 淘宝 Taobao ] (占位) "
@@ -347,7 +357,7 @@ class AppUI:
             self._build_1688_tab()
         with tab_amazon:
             self._build_amazon_tab()
-        with tab_taobao:
+        with tab_TAOBAO:
             self._build_taobao_tab()
 
 
