@@ -87,6 +87,10 @@ SCRIPTS_BY_GROUP = {
             "label": "🔗 在线图床",
             "path": r"pages/6_生成图片在线地址.py"
         },
+        {
+            "label": "🎬 视频压缩",
+            "path": r"pages/6_视频压缩.py"
+        },
     ],
     "🧩 其他工具": [
         {
