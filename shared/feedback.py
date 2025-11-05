@@ -155,7 +155,6 @@ def show_feedback_module():
     这个函数将被主应用导入和调用。
     """
     # --- 首先显示历史反馈 ---
-    st.header("✍️ 用户反馈")
     feedback_df = load_feedback()
 
     if feedback_df.empty:
