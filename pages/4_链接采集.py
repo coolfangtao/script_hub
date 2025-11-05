@@ -155,21 +155,33 @@ class Parser1688(BasePlatformParser):
 
     def parse_category_list(self, html_content):
         """
-        (无变动) 类目文件 Tab -
-        首选策略: (极快) 纯文本搜索 `offerId=...`
+        (已更新 V8) 类目文件 Tab -
+        首选策略: (极快) 纯文本搜索 `offerId=...`, `offerId@...`, 和 `object_id@...`
         备用策略: (较慢) 仅在首选失败时，才启动BeautifulSoup查找其他模式
         """
         found_ids = set()
 
-        # 策略 1: (首选 - 速度极快) 直接在原始 HTML 文本中查找 'offerId=...'
+        # --- (已修改) ---
+        # 策略 1: (首选 - 速度极快) 直接在原始 HTML 文本中查找所有已知模式
         try:
-            ids_from_raw_text = set(self.re_offer_id_equals.findall(html_content))
-            if ids_from_raw_text:
-                found_ids.update(ids_from_raw_text)
-        except Exception:
-            # 即使正则失败，也继续执行策略2
-            pass
+            # 格式 (类目文件): offerId=980010203849
+            ids_from_equals = set(self.re_offer_id_equals.findall(html_content))
+            found_ids.update(ids_from_equals)
 
+            # 格式 (榜单文件): offerId@844634586387 (类目文件也可能混用)
+            ids_from_offer_at = set(self.re_offer_id_at.findall(html_content))
+            found_ids.update(ids_from_offer_at)
+
+            # 格式 (榜单/类目): object_id@635461774648
+            ids_from_object_at = set(self.re_object_id_at.findall(html_content))
+            found_ids.update(ids_from_object_at)
+
+        except Exception:
+            # 即使正则失败，也继续执行策略2 (BeautifulSoup)
+            pass
+        # --- (修改结束) ---
+
+        # (无变动)
         # 只有当快速策略找不到任何ID时，才启动昂贵的BeautifulSoup解析
         if not found_ids:
             try:
