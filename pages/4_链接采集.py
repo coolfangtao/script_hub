@@ -73,7 +73,6 @@ class BasePlatformParser:
 class Parser1688(BasePlatformParser):
     """
     专门用于 1688.com 的解析器。
-    (已修改 parse_titles 函数)
     """
 
     def __init__(self):
@@ -100,34 +99,25 @@ class Parser1688(BasePlatformParser):
                 found_ids.add(match.group(1))
         return found_ids
 
-    # --- (已修改) ---
     def parse_titles(self, html_content):
         """
-        (已更新) 解析商品标题 (不去重)。
+        (无变动) 解析商品标题 (不去重)。
         同时查找 class="title-text" 和 class="offer-title"
         """
         titles = []
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
-
-            # (已修改) 使用 select 查找两种可能的标题类名
             # 'div.title-text' -> 用于类目页
             # 'span.offer-title' -> 用于榜单页
             title_elements = soup.select('div.title-text, span.offer-title')
 
             for element in title_elements:
-                # .get_text(strip=True) 会自动处理所有子标签 (如<font>)
                 title = element.get_text(strip=True)
                 if title:
                     titles.append(title)
         except Exception as e:
-            # 即使解析标题失败，也不应阻止链接解析
             print(f"Error parsing titles: {e}")
-
-        # (无变动) 直接返回原始列表，不去重
         return titles
-
-    # --- (修改结束) ---
 
     def parse_beauty_ranking_list(self, html_content):
         # (无变动)
@@ -160,7 +150,7 @@ class Parser1688(BasePlatformParser):
         return sorted(list(final_links))
 
     def parse_category_list(self, html_content):
-        # (无变动, 保持V10的逻辑)
+        # (无变动)
         found_ids = set()
         try:
             ids_from_equals = set(self.re_offer_id_equals.findall(html_content))
@@ -221,17 +211,9 @@ class AppUI:
         self.parser_amazon = self.parsers.get("Amazon")
         self.parser_taobao = self.parsers.get("Taobao")
 
-    # --- (已修改) ---
     def _generate_ai_prompt(self, titles_list):
-        """
-        (已更新) 生成一个高质量的、用于提取违禁词的AI提示词
-        现在这个函数会把标题列表直接合并到提示词中
-        """
-
-        # 将标题列表转换为一个换行分隔的字符串
+        # (无变动)
         titles_string = "\n".join(titles_list)
-
-        # (已更新) 提示词现在包含了完整的上下文和数据
         prompt = f"""
 你是一个专业的商品数据清洗专家。你的任务是分析我提供的这份【商品标题列表】。
 这份列表源自1688，我需要将其清洗，以便安全地发布在TikTok平台上。
@@ -262,13 +244,13 @@ class AppUI:
 3.  **每个词汇占一行**。
 4.  不要包含任何解释、编号、星号(*)或Markdown格式。
 """
-        # .strip() 是为了去除首尾的额外换行
         return prompt.strip()
 
     # --- (已修改) ---
-    def _display_results(self, links_list, titles_list):
+    def _display_results(self, links_list, titles_list, context_key):
         """
         (已更新) 同时显示链接、标题，并新增AI提示词生成器
+        (已新增) context_key 参数，用于为下载按钮创建唯一的key
         """
         if not links_list and not titles_list:
             st.warning("在您上传的HTML文件中没有找到匹配的商品链接或标题。请检查：\n1. 文件是否正确？\n2. 解析器是否为最新？")
@@ -299,7 +281,6 @@ class AppUI:
 
         st.toast("解析完成!")
 
-        # --- (已修改) AI 提示词生成器 ---
         if titles_list:
             st.markdown("---")
             st.subheader("🤖 AI 违禁词提取 - 提示词生成器")
@@ -310,25 +291,27 @@ class AppUI:
                 """
             )
 
-            # (已修改) 将标题列表传入，生成一个完整的提示词
             ai_prompt = self._generate_ai_prompt(titles_list)
 
             st.text_area("**(1) 完整AI提示词 (请复制)**", value=ai_prompt, height=450)
 
-            # (已修改) 更新了下载按钮的标签，使其更清晰
+            # --- (已修改) ---
+            # (新增了唯一的 key 属性来修复报错)
             st.download_button(
                 label="**(2) 仅下载标题列表 (TXT)**",
                 data="\n".join(titles_list).encode('utf-8'),
                 file_name="parsed_titles.txt",
                 mime="text/plain",
-                help="下载一个只包含标题的TXT文件，可用于“妙手”或其他工具。"
+                help="下载一个只包含标题的TXT文件，可用于“妙手”或其他工具。",
+                key=f"download_titles_{context_key}"  # <-- 修复点
             )
+            # --- (修改结束) ---
 
     # --- (已修改) ---
     def _build_1688_tab(self):
         """
         (私有) 构建1688平台的主Tab内容。
-        (已修改: 采用 st.session_state 存储结果)
+        (已修改: 增加 context_key 到 _display_results 的调用)
         """
 
         tab_rank_list, tab_category_list = st.tabs([
@@ -356,18 +339,17 @@ class AppUI:
                     with st.spinner(f"正在解析文件: {uploaded_file_rank.name} ..."):
                         html_content = uploaded_file_rank.getvalue().decode("utf-8")
 
-                        # (已修改) 解析并存入 session_state
                         links = self.parser_1688.parse_beauty_ranking_list(html_content)
                         titles = self.parser_1688.parse_titles(html_content)
                         st.session_state.ranking_results = (links, titles)
-                        st.session_state.category_results = ([], [])  # 清空另一个tab的状态
+                        st.session_state.category_results = ([], [])
                 else:
                     st.error("请先上传一个HTML文件。")
 
-            # (已新增) 始终从 session_state 读取并显示结果
+            # (已修改) 传递 context_key
             links, titles = st.session_state.ranking_results
             if links or titles:
-                self._display_results(links, titles)
+                self._display_results(links, titles, context_key="ranking")
 
         # --- 模块: 类目列表 (已修改) ---
         with tab_category_list:
@@ -389,18 +371,17 @@ class AppUI:
                     with st.spinner(f"正在解析文件: {uploaded_file_cat.name} ... (可能需要几十秒)"):
                         html_content = uploaded_file_cat.getvalue().decode("utf-8")
 
-                        # (已修改) 解析并存入 session_state
                         links = self.parser_1688.parse_category_list(html_content)
                         titles = self.parser_1688.parse_titles(html_content)
                         st.session_state.category_results = (links, titles)
-                        st.session_state.ranking_results = ([], [])  # 清空另一个tab的状态
+                        st.session_state.ranking_results = ([], [])
                 else:
                     st.error("请先上传一个HTML文件。")
 
-            # (已新增) 始终从 session_state 读取并显示结果
+            # (已修改) 传递 context_key
             links, titles = st.session_state.category_results
             if links or titles:
-                self._display_results(links, titles)
+                self._display_results(links, titles, context_key="category")
 
     def _build_amazon_tab(self):
         # (无变动)
@@ -429,7 +410,7 @@ class AppUI:
             self._build_taobao_tab()
 
 
-# --- 4. (新) 应用主入口 (已修改) ---
+# --- 4. (新) 应用主入口 (无变动) ---
 @st.cache_resource
 def get_all_parsers():
     return {
@@ -442,9 +423,8 @@ def get_all_parsers():
 def main():
     st.set_page_config(page_title="链接采集器", layout="wide")
 
-    # (已新增) 初始化 session_state
+    # (无变动)
     if 'ranking_results' not in st.session_state:
-        # 结果将存储为 (links_list, titles_list) 的元组
         st.session_state.ranking_results = ([], [])
     if 'category_results' not in st.session_state:
         st.session_state.category_results = ([], [])
