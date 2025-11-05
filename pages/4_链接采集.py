@@ -86,6 +86,7 @@ class Parser1688(BasePlatformParser):
         self.re_offer_id_at = re.compile(r"offerId@(\d+)")
         self.re_offer_id_equals = re.compile(r"offerId=(\d+)")
         self.re_object_id_at = re.compile(r"object_id@(\d+)")
+        self.re_offer_id_json = re.compile(r"&quot;offerId&quot;:&quot;(\d+)&quot;")
         self.re_render_key = re.compile(r"_(\d+)$")
 
     def _find_ids_by_attr_regex(self, soup, attr_name, id_regex_compiled):
@@ -167,6 +168,8 @@ class Parser1688(BasePlatformParser):
             found_ids.update(ids_from_offer_at)
             ids_from_object_at = set(self.re_object_id_at.findall(html_content))
             found_ids.update(ids_from_object_at)
+            ids_from_json = set(self.re_offer_id_json.findall(html_content))
+            found_ids.update(ids_from_json)
         except Exception:
             pass
         if not found_ids:
