@@ -6,6 +6,7 @@ import io
 import zipfile
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
+from shared.sidebar import create_common_sidebar
 
 
 # --- 1. 配置类 ---
@@ -151,6 +152,7 @@ class VideoCompressorUI:
         * 系统将使用 FFMPEG (CRF={self.config.FFMPEG_CRF}, Preset={self.config.FFMPEG_PRESET}) 逐个压缩它们。
         * 处理大文件可能需要几分钟时间，请耐心等待。
         """)
+        create_common_sidebar(current_label="🎬 视频压缩")
 
     def display_uploader(self) -> Optional[List[st.runtime.uploaded_file_manager.UploadedFile]]:
         """
