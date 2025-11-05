@@ -74,7 +74,7 @@ class BasePlatformParser:
 class Parser1688(BasePlatformParser):
     """
     专门用于 1688.com 的解析器。
-    (已新增 parse_titles 函数)
+    (已修改 parse_titles 函数)
     """
 
     def __init__(self):
@@ -100,10 +100,10 @@ class Parser1688(BasePlatformParser):
                 found_ids.add(match.group(1))
         return found_ids
 
-    # --- (已新增) ---
+    # --- (已修改) ---
     def parse_titles(self, html_content):
         """
-        (新增) 解析商品标题。
+        (已更新) 解析商品标题 (不去重)。
         此方法必须使用 BeautifulSoup，因为它需要正确处理 <font> 等嵌套标签。
         """
         titles = []
@@ -111,12 +111,10 @@ class Parser1688(BasePlatformParser):
             soup = BeautifulSoup(html_content, 'html.parser')
 
             # 查找所有 class="title-text" 的 div
-            # (CSS选择器 `div.title-text` 也可以，但 `find_all` 更直观)
             title_divs = soup.find_all("div", class_="title-text")
 
             for div in title_divs:
                 # .get_text(strip=True) 会自动处理所有子标签 (如<font>)
-                # 并将文本拼接起来，然后去除首尾空白
                 title = div.get_text(strip=True)
                 if title:
                     titles.append(title)
@@ -124,11 +122,9 @@ class Parser1688(BasePlatformParser):
             # 即使解析标题失败，也不应阻止链接解析
             print(f"Error parsing titles: {e}")
 
-            # 使用字典保持顺序并去重，以匹配链接解析器的去重行为
-        ordered_titles = list(dict.fromkeys(titles))
-        return ordered_titles
-
-    # --- (新增结束) ---
+        # (已修改) 直接返回原始列表，不去重，以保证与链接的对应关系
+        return titles
+    # --- (修改结束) ---
 
     def parse_beauty_ranking_list(self, html_content):
         # (无变动)
@@ -218,7 +214,7 @@ class ParserTaobao(BasePlatformParser):
         return self.generic_parse_links(html_content, self.product_link_pattern)
 
 
-# --- 3. 界面UI封装类 (已修改) ---
+# --- 3. 界面UI封装类 (无变动) ---
 
 class AppUI:
     def __init__(self, parsers: dict, config: AppConfig):
@@ -228,10 +224,9 @@ class AppUI:
         self.parser_amazon = self.parsers.get("Amazon")
         self.parser_taobao = self.parsers.get("Taobao")
 
-    # --- (已修改) ---
     def _display_results(self, links_list, titles_list):
         """
-        (已更新) 同时显示链接和标题
+        (无变动) 同时显示链接和标题
         """
         if not links_list and not titles_list:
             st.warning("在您上传的HTML文件中没有找到匹配的商品链接或标题。请检查：\n1. 文件是否正确？\n2. 解析器是否为最新？")
@@ -266,8 +261,7 @@ class AppUI:
 
     def _build_1688_tab(self):
         """
-        (私有) 构建1688平台的主Tab内容。
-        (已修改: button点击逻辑)
+        (无变动)
         """
 
         tab_rank_list, tab_category_list = st.tabs([
@@ -275,7 +269,7 @@ class AppUI:
             "类目文件上传"
         ])
 
-        # --- 模块: 榜单文件 (已修改) ---
+        # --- 模块: 榜单文件 (无变动) ---
         with tab_rank_list:
             st.subheader("采集模块：榜单文件上传")
             st.markdown("""
@@ -295,15 +289,13 @@ class AppUI:
                     with st.spinner(f"正在解析文件: {uploaded_file_rank.name} ..."):
                         html_content = uploaded_file_rank.getvalue().decode("utf-8")
 
-                        # --- (已修改) ---
                         links = self.parser_1688.parse_beauty_ranking_list(html_content)
                         titles = self.parser_1688.parse_titles(html_content)
                         self._display_results(links, titles)
-                        # --- (修改结束) ---
                 else:
                     st.error("请先上传一个HTML文件。")
 
-        # --- 模块: 类目列表 (已修改) ---
+        # --- 模块: 类目列表 (无变动) ---
         with tab_category_list:
             st.subheader("采集模块：通用类目列表 (文件上传)")
             st.markdown("""
@@ -323,11 +315,9 @@ class AppUI:
                     with st.spinner(f"正在解析文件: {uploaded_file_cat.name} ... (可能需要几十秒)"):
                         html_content = uploaded_file_cat.getvalue().decode("utf-8")
 
-                        # --- (已修改) ---
                         links = self.parser_1688.parse_category_list(html_content)
                         titles = self.parser_1688.parse_titles(html_content)
                         self._display_results(links, titles)
-                        # --- (修改结束) ---
                 else:
                     st.error("请先上传一个HTML文件。")
 
