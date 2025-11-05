@@ -78,15 +78,15 @@ class Parser1688(BasePlatformParser):
 
     def __init__(self):
         super().__init__(base_url="https://detail.1688.com/")
-        self.product_link_pattern = r"detail\.1688\.com/offer/(\d+)\.html"
+        self.product_link_pattern = r"detail\.1688\.com/offer/(\d+)\\.html"
         self.offer_url_template = "https://detail.1688.com/offer/{offer_id}.html"
 
         # (无变动)
-        self.re_offer_id_at = re.compile(r"offerId@(\d+)")
-        self.re_offer_id_equals = re.compile(r"offerId=(\d+)")
-        self.re_object_id_at = re.compile(r"object_id@(\d+)")
-        self.re_render_key = re.compile(r"_(\d+)$")
-        self.re_offer_id_json = re.compile(r"&quot;offerId&quot;:&quot;(\d+)&quot;")
+        self.re_offer_id_at = re.compile(r"offerId@(\\d+)")
+        self.re_offer_id_equals = re.compile(r"offerId=(\\d+)")
+        self.re_object_id_at = re.compile(r"object_id@(\\d+)")
+        self.re_render_key = re.compile(r"_(\\d+)$")
+        self.re_offer_id_json = re.compile(r"&quot;offerId&quot;:&quot;(\\d+)&quot;")
 
     def _find_ids_by_attr_regex(self, soup, attr_name, id_regex_compiled):
         # (无变动)
@@ -160,7 +160,7 @@ class Parser1688(BasePlatformParser):
         return sorted(list(final_links))
 
     def parse_category_list(self, html_content):
-        # (无变动)
+        # (无变动, 保持V10的逻辑)
         found_ids = set()
         try:
             ids_from_equals = set(self.re_offer_id_equals.findall(html_content))
@@ -195,7 +195,7 @@ class ParserAmazon(BasePlatformParser):
     # (无变动)
     def __init__(self):
         super().__init__(base_url="https://www.amazon.com/")
-        self.product_link_pattern = r"amazon\.com/(gp/product|dp)/\w+"
+        self.product_link_pattern = r"amazon\\.com/(gp/product|dp)/\\w+"
 
     def parse_search_results(self, html_content):
         return self.generic_parse_links(html_content, self.product_link_pattern)
@@ -205,13 +205,13 @@ class ParserTaobao(BasePlatformParser):
     # (无变动)
     def __init__(self):
         super().__init__(base_url="https://item.taobao.com/")
-        self.product_link_pattern = r"item\.taobao\.com/item\.htm"
+        self.product_link_pattern = r"item\\.taobao\\.com/item\\.htm"
 
     def parse_search_results(self, html_content):
         return self.generic_parse_links(html_content, self.product_link_pattern)
 
 
-# --- 3. 界面UI封装类 (无变动) ---
+# --- 3. 界面UI封装类 (已修改) ---
 
 class AppUI:
     def __init__(self, parsers: dict, config: AppConfig):
@@ -221,14 +221,58 @@ class AppUI:
         self.parser_amazon = self.parsers.get("Amazon")
         self.parser_taobao = self.parsers.get("Taobao")
 
+    # --- (已新增) ---
+    def _generate_ai_prompt(self):
+        """
+        生成一个高质量的、用于提取违禁词的AI提示词
+        """
+        # (我们使用 f-string 的三重引号来构建这个多行字符串)
+        prompt = f"""
+你是一个专业的商品数据清洗专家。你的任务是分析我稍后将提供的一份【商品标题列表】。
+这份列表源自1688，我需要将其清洗，以便安全地发布在TikTok平台上。
+
+请你从【商品标题列表】中，识别并提取所有不适合在TikTok上展示的“平台词”、“营销词”或“供应链词汇”。
+
+请重点关注以下几类词汇：
+1.  **平台词汇**：明确提及其他电商平台或社交媒体。
+    例如: 亚马逊, 跨境, 抖音, 小红书, 拼多多, TEMU, 1688, 淘宝, 跨境外贸, 跨境爆款, 亚马逊热销, 跨境专供
+2.  **供应链词汇**：暴露了货源、工厂、批发等信息。
+    例如: 厂家直供, 厂家批发, 工厂直销, 平度, 青岛, 批发, 代发, 一件代发, 货源
+3.  **夸大营销词汇**：过于夸张的宣传用语。
+    例如: 爆款, 网红, 热销, 抖音同款, 爆款
+4.  **服务性词汇**：(如果存在) 提及与TikTok平台无关的服务。
+    例如: 包邮, 现货, OEM, 定制
+
+**你的任务**：
+分析我接下来提供的【商品标题列表】，然后返回一个所有你需要删除的【违禁词列表】。
+
+**输出要求**：
+1.  你**只**需要返回【违禁词列表】。
+2.  列表中**不要有重复**的词。
+3.  **每个词汇占一行**。
+4.  不要包含任何解释、编号、星号(*)或Markdown格式。
+
+准备好后，请回复"准备就绪"，我将立即提供【商品标题列表】。
+"""
+        # .strip() 是为了去除首尾的额外换行
+        return prompt.strip()
+
+    # --- (已修改) ---
     def _display_results(self, links_list, titles_list):
+        """
+        (已更新) 同时显示链接、标题，并新增AI提示词生成器
+        """
         if not links_list and not titles_list:
             st.warning("在您上传的HTML文件中没有找到匹配的商品链接或标题。请检查：\n1. 文件是否正确？\n2. 解析器是否为最新？")
             return
+
         st.success(f"🎉 成功解析出 {len(links_list)} 个链接 和 {len(titles_list)} 个标题！")
+
         if len(links_list) != len(titles_list) and links_list and titles_list:
             st.warning(f"注意：链接数量 ({len(links_list)}) 与标题数量 ({len(titles_list)}) 不匹配。请核对。")
+
         col1, col2 = st.columns(2)
+
         with col1:
             st.markdown("### 采集结果 (链接)")
             if links_list:
@@ -236,6 +280,7 @@ class AppUI:
                 st.code(links_text, language="markdown")
             else:
                 st.info("未找到链接。")
+
         with col2:
             st.markdown("### 采集结果 (标题)")
             if titles_list:
@@ -243,9 +288,36 @@ class AppUI:
                 st.code(titles_text, language="markdown")
             else:
                 st.info("未找到标题。")
+
         st.toast("解析完成!")
 
+        # --- (已新增) AI 提示词生成器 ---
+        if titles_list:
+            st.markdown("---")
+            st.subheader("🤖 AI 违禁词提取 - 提示词生成器")
+            st.markdown(
+                """
+                您可以复制下方的 **(1) AI提示词**，将其发送给AI (如 Kimi, ChatGPT, 豆包等)。
+
+                当AI回复“准备就绪”后，您再复制上方的 **(2) 采集结果 (标题)** 列表并发送给AI。
+
+                AI 将会返回一个干净的、可用于“妙手”等工具批量删除的违禁词列表。
+                """
+            )
+
+            ai_prompt = self._generate_ai_prompt()
+            st.text_area("**(1) AI提示词 (请复制)**", value=ai_prompt, height=450)
+
+            # (新增) 生成一个按钮，允许用户直接下载词汇列表，供妙手使用
+            st.download_button(
+                label="**(3) 下载妙手格式(TXT)**",
+                data="\n".join(titles_list).encode('utf-8'),
+                file_name="parsed_titles_for_miaoshou.txt",
+                mime="text/plain"
+            )
+
     def _build_1688_tab(self):
+        # (无变动)
         tab_rank_list, tab_category_list = st.tabs([
             "榜单文件上传",
             "类目文件上传"
@@ -302,6 +374,7 @@ class AppUI:
         pass
 
     def render(self):
+        # (无变动)
         create_common_sidebar(current_label="️🛍️ 妙手链接采集")
         st.title("商品链接采集器")
         st.caption("粘贴HTML元素或上传HTML文件，快速提取商品链接以便导入“妙手”等工具。")
