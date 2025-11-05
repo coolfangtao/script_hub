@@ -40,8 +40,12 @@ SCRIPTS_BY_GROUP = {
         #     "path": r"pages/4_提取掌上大学群成员名称.py"
         # },
         {
-            "label": "📦 商品信息提取（完整版）",
+            "label": "📦 Amazon评论提取",
             "path": r"pages/2_Amazon评论获取.py"
+        },
+        {
+            "label": "🛍️ 妙手链接采集器",
+            "path": r"pages/4_链接采集.py"
         },
         {
             "label": "🕸️ 浏览器抓取编排",

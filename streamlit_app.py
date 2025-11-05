@@ -164,7 +164,7 @@ def display_usage_stats():
             {
                 "脚本名称": label,
                 "访问次数": d.get("count", 0),
-                "最近访问": d.get("last_visited", "N/A").split("T")[0]  # 只显示日期
+                "最近访问": d.get("last_visited", "N/A")
             }
             for label, d in usage_data.items()
         ]
