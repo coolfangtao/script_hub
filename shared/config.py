@@ -39,8 +39,8 @@ class GlobalConfig:
             "gemini-2.0-flash-lite",  # 可用，9.62秒
             "gemini-2.5-flash",  # 可用，6.74秒
             "gemini-robotics-er-1.5-preview",  # 可用，8.73秒
-            "gemini-2.0-flash-preview-image-generation",
-            "gemini-2.5-flash-image"
+            # "gemini-2.0-flash-preview-image-generation",
+            # "gemini-2.5-flash-image"
         ]
 
         # 定义时区
