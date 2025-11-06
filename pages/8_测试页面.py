@@ -49,7 +49,7 @@ class GeminiImageEditor:
     def remove_text(self, image: Image.Image, prompt: str, model_name: str):
         """
         调用 Gemini API 去除图片文字。
-        注意：这依赖于所选模型是否支持返回图像。
+        尝试适配不同的模型能力（部分模型可能需要特定的 generation_config）。
         """
         if not self.is_configured:
             return None, "API未配置"
@@ -57,46 +57,77 @@ class GeminiImageEditor:
         model = genai.GenerativeModel(model_name)
 
         try:
-            with st.spinner(f"正在请求 {model_name} 进行AI修图，请耐心等待..."):
-                # 记录开始时间
+            with st.spinner(f"正在请求 {model_name} 进行AI修图..."):
                 start_time = time.time()
 
-                # 发送请求：提示词 + 图片
-                # 注意：不同的Gemini SDK版本对图像输入的支持方式可能略有差异，
-                # 这里使用最通用的列表方式 [text_prompt, image_object]
-                response = model.generate_content([prompt, image])
+                # --- 关键修改尝试 ---
+                # 针对预览版生图模型，可能需要显式告知我们接受的媒体类型可能不仅仅是文本。
+                # 目前 SDK 没有非常明确的文档说明如何为 generate_content 设置 response_modalities，
+                # 但我们可以尝试不带额外配置的标准请求，如果失败，这通常意味着模型本身不支持“图生图”任务。
+
+                # 备选方案：如果你确认该模型是纯“文生图”模型（不支持输入图片），
+                # 那么它就无法完成你的“修图”任务。
+                # 许多标有 "image-generation" 的模型只接受文本提示词。
+
+                # 我们先按标准尝试发送 [prompt, image]
+                # 如果你确定这是一个支持指令编辑的模型，它应该能工作。
+                response = model.generate_content(
+                    [prompt, image],
+                    # 某些新模型可能需要这个安全设置才能进行图像编辑
+                    safety_settings={
+                        'HARM_CATEGORY_HARASSMENT': 'BLOCK_NONE',
+                        'HARM_CATEGORY_HATE_SPEECH': 'BLOCK_NONE',
+                        'HARM_CATEGORY_SEXUALLY_EXPLICIT': 'BLOCK_NONE',
+                        'HARM_CATEGORY_DANGEROUS_CONTENT': 'BLOCK_NONE'
+                    }
+                )
 
                 end_time = time.time()
                 elapsed_time = end_time - start_time
 
-            # 处理响应
-            # 检查响应中是否包含图像部分
-            # 注意：标准Gemini API如果返回图片，通常在 parts 中会有 inline_data 或类似结构，
-            # 或者整个 response 结构需要特定解析。
-            # 这里尝试一种通用的解析方式，如果失败则返回调试信息。
+            # --- 解析响应 (增强版) ---
 
+            # 1. 检查是否有直接的图像部分 (parts)
+            if response.parts:
+                for part in response.parts:
+                    # 检查是否包含内联数据 (通常是图像)
+                    if hasattr(part, 'inline_data') and part.inline_data:
+                        img_data = part.inline_data.data
+                        processed_image = Image.open(io.BytesIO(img_data))
+                        return processed_image, f"处理成功 (耗时: {elapsed_time:.2f}s)"
+                    # 检查是否有可执行代码返回了图像 (某些高级模型会用代码画图)
+                    if hasattr(part, 'executable_code'):
+                        # 这里比较复杂，暂时略过，通常修图不会用这个
+                        pass
+
+            # 2. 检查 candidates 中的其他图像结构 (针对某些预览版 API)
+            # 有时图像藏在 response.candidates[0].content.parts 里
             try:
-                # 尝试直接获取返回的第一个图像部分（如果模型支持直接返回图像）
-                # 这部分代码可能需要根据实际Gemini版本返回的数据结构进行微调
-                # 如果是纯文本模型，这里会报错或返回None
-                if response.parts and hasattr(response.parts[0], 'inline_data'):
-                    img_data = response.parts[0].inline_data.data
-                    processed_image = Image.open(io.BytesIO(img_data))
-                    return processed_image, f"处理成功 (耗时: {elapsed_time:.2f}s)"
+                if response.candidates and response.candidates[0].content.parts:
+                    for part in response.candidates[0].content.parts:
+                        if hasattr(part, 'inline_data') and part.inline_data:
+                            img_data = part.inline_data.data
+                            processed_image = Image.open(io.BytesIO(img_data))
+                            return processed_image, f"处理成功 (耗时: {elapsed_time:.2f}s)"
+            except Exception:
+                pass
 
-                # 如果通过标准属性没拿到，尝试检查是否有文本内容的兜底（有时模型会拒绝并返回文本原因）
-                if response.text:
-                    return None, f"模型未返回图像，而是返回了文本信息 (可能模型不支持此功能或拒绝了请求):\n{response.text}"
+            # 3. 如果都没有，只有文本
+            if response.text:
+                return None, f"模型仅返回了文本 (它可能不支持直接修图):\n{response.text}"
 
-            except Exception as e_parse:
-                # 最后的尝试：有时response本身可以直接被视为某种多媒体对象，视具体SDK版本而定
-                # 如果上述失败，打印原始 response 以便调试
-                print(f"Debug Response: {response}")
-                return None, f"解析模型返回结果失败。请检查所选模型是否支持图像输出。\n错误信息: {e_parse}"
-
-            return None, "未知错误：模型响应中未找到图像数据。"
+            return None, "模型返回了空结果 (Finish Reason可能为STOP，但没有内容)。"
 
         except Exception as e:
+            # 针对你刚才遇到的 400 错误进行专门提示
+            error_str = str(e)
+            if "400" in error_str and "modalities" in error_str:
+                return None, (
+                    f"API调用失败 (400 模态错误): {e}\n\n"
+                    "**原因分析**：你选择的模型 (`{model_name}`) 似乎是一个**纯文生图**模型，"
+                    "它可能**不支持**输入一张图片进行编辑 (Image-to-Image)，只能通过纯文本提示词生成全新的图片。\n"
+                    "**建议**：请寻找明确支持 'Instruction-based Image Editing' 或 'Inpainting' 的模型。"
+                )
             return None, f"API调用过程出错: {e}"
 
 
