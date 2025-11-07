@@ -453,6 +453,7 @@ class PromptUI:
 
 def main():
     st.set_page_config(page_title="提示词管理器", layout="wide")
+    create_common_sidebar(current_label="📄 提示词收纳")
 
     # 1. 初始化配置
     try:
