@@ -39,6 +39,11 @@ SCRIPTS_BY_GROUP = {
             "description": "高效记录并管理日常任务，清晰掌握工作进度，提升个人时间管理效率。"
         },
         {
+            "label": "📄 提示词收纳",
+            "path": r"pages/2_常用提示词收纳.py",
+            "description": "收纳提示词"
+        },
+        {
             "label": "🛍️ 商品信息提取",
             "path": r"pages/4_一键提取亚马逊页面关键信息.py",
             "description": None

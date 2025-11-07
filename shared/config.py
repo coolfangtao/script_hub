@@ -17,8 +17,11 @@ class GlobalConfig:
     def __init__(self):
         # --- 运行模式 ---
         self.RUN_MODE = get_run_mode()  # "local" or "cloud"
+        # 云端模式下用于验证身份的密码
+        self.APP_PASSWORD = st.secrets.get("app_password")
 
         self.IMAGE_PATH_IN_REPO = st.secrets.get("IMAGE_PATH_IN_REPO", "images")
+
 
 
         # 从 Streamlit secrets 加载密钥
