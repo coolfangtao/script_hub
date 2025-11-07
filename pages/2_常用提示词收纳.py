@@ -335,13 +335,16 @@ class PromptUI:
             return False  # 未认证
 
         # 本地模式或已认证的云端模式
-        if not st.session_state.authenticated:
+        if self.config.RUN_MODE == "local" and not st.session_state.authenticated:
             st.session_state.authenticated = True  # 本地模式自动认证
         return True  # 已认证
 
-    @contextmanager
+    # ↓↓↓ 错误已修复：删除了 @contextmanager 装饰器 ↓↓↓
     def _prompt_form(self, p_id=None):
-        """一个用于新增或编辑的表单"""
+        """
+        一个用于新增或编辑的表单。
+        这是一个生成器，仅在表单提交时 yield 数据。
+        """
         if p_id:
             # 编辑模式
             prompt = self.data_manager.data["prompts"][p_id]
@@ -374,25 +377,21 @@ class PromptUI:
     def display_add_form(self):
         """显示"新增提示词"的折叠表单"""
         with st.expander("✚ 新增提示词"):
-            try:
-                for name, content in self._prompt_form():
-                    # 当表单提交时，
-                    self.data_manager.add_prompt(name, content)
-                    st.rerun()
-            except StopIteration:
-                pass  # 表单未提交
+            # ↓↓↓ 修复：移除了 try...except StopIteration ↓↓↓
+            for name, content in self._prompt_form():
+                # 当表单提交时，
+                self.data_manager.add_prompt(name, content)
+                st.rerun()
 
     def display_edit_form(self, p_id):
         """在容器内显示编辑表单"""
         st.info("正在编辑...")
-        try:
-            for name, content in self._prompt_form(p_id=p_id):
-                # 当表单提交时
-                self.data_manager.update_prompt(p_id, name, content)
-                st.session_state.editing_prompt_id = None  # 关闭编辑状态
-                st.rerun()
-        except StopIteration:
-            pass  # 表单未提交
+        # ↓↓↓ 修复：移除了 try...except StopIteration ↓↓↓
+        for name, content in self._prompt_form(p_id=p_id):
+            # 当表单提交时
+            self.data_manager.update_prompt(p_id, name, content)
+            st.session_state.editing_prompt_id = None  # 关闭编辑状态
+            st.rerun()
 
     def display_prompt_list(self):
         """(需求 4) 显示所有提示词列表"""
@@ -434,7 +433,6 @@ class PromptUI:
     def run(self):
         """运行整个 UI"""
         st.title("🤖 AI 提示词管理器")
-        create_common_sidebar(current_label="📄 提示词收纳")
 
         # 1. 处理认证
         if not self.display_auth():
