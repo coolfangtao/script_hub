@@ -1,4 +1,4 @@
-# pages/Prompts.py
+# pages/Prompts.py (已优化)
 
 import streamlit as st
 import os
@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 import base64
 from github import Github, GithubException
-from contextlib import contextmanager
+# from contextlib import contextmanager # 已不再需要
 
 # 导入你的配置类
 # 假设 pages 目录和 shared 目录同级，需要调整 Python 路径
@@ -18,7 +18,7 @@ try:
     from shared.config import GlobalConfig
     from shared.sidebar import create_common_sidebar
 except ImportError:
-    st.error("无法导入 `shared.config`。请确保 `shared/config.py` 文件存在。")
+    st.error("无法导入 `shared.config` 或 `shared.sidebar`。请确保文件存在。")
     st.stop()
 
 
@@ -34,8 +34,9 @@ class PromptConfig(GlobalConfig):
         self.LOCAL_PROMPT_FILE = os.path.join("private_data", "prompts.json")
         self.GITHUB_PROMPT_FILE = "prompts.json"  # 在 GitHub 仓库中的路径
 
+
 # ---------------------------------------------------------------------
-# 1. GitHub 数据管理器
+# 1. GitHub 数据管理器 (无变化)
 # ---------------------------------------------------------------------
 
 class GitHubDataManager:
@@ -171,7 +172,7 @@ class PromptData:
                 commit_message
             )
             if success:
-                # 成功后，需要重新获取 sha
+                # S 成功后，需要重新获取 sha
                 _, self.remote_sha = self.github_manager.get_file(self.remote_path)
         except Exception as e:
             st.error(f"保存到 GitHub 失败: {e}")
@@ -181,11 +182,10 @@ class PromptData:
         (核心逻辑更新)
         根据运行模式（local/cloud）加载数据
         """
-        st.info(f"正在 {self.config.RUN_MODE} 模式下检查数据同步...")
+        # st.info(f"正在 {self.config.RUN_MODE} 模式下检查数据同步...") # Spinner 启动时会显示
 
         if self.config.RUN_MODE == "cloud":
             # --- 云端模式 ---
-            # 只从 GitHub 加载。不关心本地文件。
             st.info("云端模式：从 GitHub 加载数据。")
             remote_data = self._load_remote_data()
             if remote_data:
@@ -195,11 +195,9 @@ class PromptData:
                 # GitHub 没数据，初始化
                 st.warning("GitHub 中未找到数据文件。如果登录，将创建新文件。")
                 self.data = {"last_modified": self.get_utc_now_iso(), "prompts": {}}
-                # (注意：只有在认证后，第一次保存时才会真的创建文件)
 
         else:
             # --- 本地模式 ---
-            # 执行原有的“比对-同步”逻辑
             st.info("本地模式：正在同步本地与 GitHub 数据...")
             local_data = self._load_local_data()
             remote_data = self._load_remote_data()
@@ -209,33 +207,29 @@ class PromptData:
 
             if local_time and remote_time:
                 if local_time >= remote_time:
-                    # 本地最新或相同
                     self.data = local_data
                     if local_time > remote_time:
                         st.warning("本地数据较新，正在同步到云端...")
                         self._save_remote_data("Sync: local to remote (load)")
                 else:
-                    # 远程最新
                     st.warning("云端数据较新，正在更新本地...")
                     self.data = remote_data
-                    self._save_local_data()  # 只更新本地
+                    self._save_local_data()
             elif local_data:
-                # 只有本地
                 st.info("仅找到本地数据，正在同步到云端...")
                 self.data = local_data
                 self._save_remote_data("Sync: Initial upload (local)")
             elif remote_data:
-                # 只有远程
                 st.info("仅找到云端数据，正在同步到本地...")
                 self.data = remote_data
-                self._save_local_data()  # 只保存到本地
+                self._save_local_data()
             else:
-                # 两边都没有，创建新数据
                 st.info("未找到数据，正在创建新的配置文件...")
-                self._save_all("Sync: Initial create")  # _save_all 会处理双端保存
+                self._save_all("Sync: Initial create")
 
             st.success("数据同步完成。")
 
+    # ↓↓↓ 优化点 1：为 _save_all 添加 st.spinner ↓↓↓
     def _save_all(self, commit_message):
         """
         (核心逻辑更新)
@@ -247,26 +241,24 @@ class PromptData:
 
         if self.config.RUN_MODE == "local":
             # --- 本地模式 ---
-            # 保存到两处
-            self._save_local_data()
-            self._save_remote_data(commit_message)
+            with st.spinner("正在保存到本地..."):
+                self._save_local_data()
+            with st.spinner(f"正在同步到 GitHub: {commit_message}..."):
+                self._save_remote_data(commit_message)
 
         else:
             # --- 云端模式 ---
-            # 只保存到远程，且必须已认证
             if st.session_state.get("authenticated", False):
-                self._save_remote_data(commit_message)
+                with st.spinner(f"正在保存到 GitHub: {commit_message}..."):
+                    self._save_remote_data(commit_message)
             else:
                 # 理论上 UI 会阻止未认证的保存，但作为双重保险
                 st.error("未认证，无法在云端模式下保存。")
 
-    # --- CRUD (增删改查) 方法保持不变 ---
-    # 它们调用 _save_all()，所以会自动适配新逻辑
-
+    # --- CRUD (增删改查) 方法 ---
     def get_all_prompts(self):
         """获取所有提示词，按名称排序"""
         prompts = self.data.get("prompts", {})
-        # 按名称排序
         sorted_items = sorted(prompts.items(), key=lambda item: item[1].get('name', ''))
         return dict(sorted_items)
 
@@ -301,7 +293,7 @@ class PromptData:
 
 
 # ---------------------------------------------------------------------
-# 3. Streamlit UI 界面类
+# 3. Streamlit UI 界面类 (已优化布局)
 # ---------------------------------------------------------------------
 
 class PromptUI:
@@ -339,7 +331,6 @@ class PromptUI:
             st.session_state.authenticated = True  # 本地模式自动认证
         return True  # 已认证
 
-    # ↓↓↓ 错误已修复：删除了 @contextmanager 装饰器 ↓↓↓
     def _prompt_form(self, p_id=None):
         """
         一个用于新增或编辑的表单。
@@ -377,7 +368,6 @@ class PromptUI:
     def display_add_form(self):
         """显示"新增提示词"的折叠表单"""
         with st.expander("✚ 新增提示词"):
-            # ↓↓↓ 修复：移除了 try...except StopIteration ↓↓↓
             for name, content in self._prompt_form():
                 # 当表单提交时，
                 self.data_manager.add_prompt(name, content)
@@ -386,15 +376,44 @@ class PromptUI:
     def display_edit_form(self, p_id):
         """在容器内显示编辑表单"""
         st.info("正在编辑...")
-        # ↓↓↓ 修复：移除了 try...except StopIteration ↓↓↓
         for name, content in self._prompt_form(p_id=p_id):
             # 当表单提交时
             self.data_manager.update_prompt(p_id, name, content)
             st.session_state.editing_prompt_id = None  # 关闭编辑状态
             st.rerun()
 
+    # ↓↓↓ 优化点 2：新增一个私有方法用于渲染单个卡片 ↓↓↓
+    def _display_prompt_card(self, p_id, prompt):
+        """在一个容器中显示单个提示词卡片（用于多栏布局）"""
+
+        # 如果当前条目处于编辑状态，显示编辑表单
+        if st.session_state.editing_prompt_id == p_id:
+            with st.container(border=True):
+                self.display_edit_form(p_id)
+            return  # 确保不会显示下面的 expander
+
+        # 否则，显示折叠容器
+        with st.expander(prompt.get("name", "未命名")):
+            st.markdown(f"**提示词 ID：** `{p_id}`")
+
+            st.markdown("**提示词内容：**")
+            st.code(prompt.get("content", ""), language=None)
+
+            col1, col2, _ = st.columns([1, 1, 5])
+
+            # 编辑按钮
+            if col1.button("编辑", key=f"edit_{p_id}"):
+                st.session_state.editing_prompt_id = p_id
+                st.rerun()
+
+            # 删除按钮
+            if col2.button("删除", key=f"delete_{p_id}", type="primary"):
+                self.data_manager.delete_prompt(p_id)
+                st.rerun()
+
+    # ↓↓↓ 优化点 2：display_prompt_list 使用多栏布局 ↓↓↓
     def display_prompt_list(self):
-        """(需求 4) 显示所有提示词列表"""
+        """(需求 4) 显示所有提示词列表，采用多栏布局"""
         prompts = self.data_manager.get_all_prompts()
 
         if not prompts:
@@ -403,32 +422,15 @@ class PromptUI:
 
         st.header("提示词列表")
 
-        for p_id, prompt in prompts.items():
+        # 将提示词分配到多栏
+        num_columns = 3  # <-- 你可以在这里修改栏目数 (例如 2 或 3)
+        cols = st.columns(num_columns)
+        prompt_items = list(prompts.items())
 
-            # 如果当前条目处于编辑状态，显示编辑表单
-            if st.session_state.editing_prompt_id == p_id:
-                with st.container(border=True):
-                    self.display_edit_form(p_id)
-                continue
-
-            # 否则，显示折叠容器
-            with st.expander(prompt.get("name", "未命名")):
-                st.markdown(f"**提示词 ID：** `{p_id}`")
-
-                st.markdown("**提示词内容：**")
-                st.code(prompt.get("content", ""), language=None)
-
-                col1, col2, _ = st.columns([1, 1, 5])
-
-                # 编辑按钮
-                if col1.button("编辑", key=f"edit_{p_id}"):
-                    st.session_state.editing_prompt_id = p_id
-                    st.rerun()
-
-                # 删除按钮
-                if col2.button("删除", key=f"delete_{p_id}", type="primary"):
-                    self.data_manager.delete_prompt(p_id)
-                    st.rerun()
+        for i, (p_id, prompt) in enumerate(prompt_items):
+            col_index = i % num_columns
+            with cols[col_index]:
+                self._display_prompt_card(p_id, prompt)
 
     def run(self):
         """运行整个 UI"""
@@ -471,7 +473,8 @@ def main():
     # 3. 初始化数据管理器 (核心逻辑在此)
     # 使用 session_state 缓存数据管理器，防止重复加载和同步
     if "prompt_data_manager" not in st.session_state:
-        with st.spinner("正在初始化数据..."):
+        # 初始加载时也显示 Spinner
+        with st.spinner("正在初始化数据，请稍候..."):
             st.session_state.prompt_data_manager = PromptData(config, github_manager)
 
     data_manager = st.session_state.prompt_data_manager
