@@ -106,6 +106,7 @@ class GitHubDataManager:
 class PromptData:
     """
     管理所有提示词模板数据（本地/远程的 CRUD 和同步）
+    根据运行模式（local/cloud）采用不同的读写策略
     """
 
     def __init__(self, config: PromptConfig, github_manager: GitHubDataManager):
@@ -114,12 +115,14 @@ class PromptData:
         self.local_path = config.LOCAL_PROMPT_FILE
         self.remote_path = config.GITHUB_PROMPT_FILE
 
-        # 确保本地目录存在
+        # 确保本地目录存在（仅在本地模式下有意义，但在云端运行也无害）
         os.makedirs(os.path.dirname(self.local_path), exist_ok=True)
 
         self.data = {"last_modified": self.get_utc_now_iso(), "prompts": {}}
         self.remote_sha = None
-        self.sync_data()
+
+        # 调用新的同步/加载逻辑
+        self.load_data_based_on_mode()
 
     def get_utc_now_iso(self):
         return datetime.now(timezone.utc).isoformat()
@@ -161,70 +164,104 @@ class PromptData:
         """将当前数据保存到 GitHub"""
         try:
             content = json.dumps(self.data, indent=4, ensure_ascii=False)
-            self.github_manager.save_file(
+            success = self.github_manager.save_file(
                 self.remote_path,
                 content,
                 self.remote_sha,
                 commit_message
             )
-            # 成功后，需要重新获取 sha
-            _, self.remote_sha = self.github_manager.get_file(self.remote_path)
+            if success:
+                # 成功后，需要重新获取 sha
+                _, self.remote_sha = self.github_manager.get_file(self.remote_path)
         except Exception as e:
             st.error(f"保存到 GitHub 失败: {e}")
 
-    def sync_data(self):
+    def load_data_based_on_mode(self):
         """
-        核心同步逻辑（需求 6）
-        加载时比对本地和远程的最后修改时间，取最新的一份。
+        (核心逻辑更新)
+        根据运行模式（local/cloud）加载数据
         """
-        st.info("正在检查数据同步...")
-        local_data = self._load_local_data()
-        remote_data = self._load_remote_data()
+        st.info(f"正在 {self.config.RUN_MODE} 模式下检查数据同步...")
 
-        local_time = local_data.get("last_modified") if local_data else None
-        remote_time = remote_data.get("last_modified") if remote_data else None
-
-        if local_time and remote_time:
-            if local_time >= remote_time:
-                # 本地最新或相同
-                self.data = local_data
-                if local_time > remote_time:
-                    st.warning("本地数据较新，正在同步到云端...")
-                    self._save_remote_data("Sync: local to remote (load)")
-            else:
-                # 远程最新
-                st.warning("云端数据较新，正在更新本地...")
+        if self.config.RUN_MODE == "cloud":
+            # --- 云端模式 ---
+            # 只从 GitHub 加载。不关心本地文件。
+            st.info("云端模式：从 GitHub 加载数据。")
+            remote_data = self._load_remote_data()
+            if remote_data:
                 self.data = remote_data
-                self._save_local_data()
-        elif local_data:
-            # 只有本地
-            st.info("仅找到本地数据，正在同步到云端...")
-            self.data = local_data
-            self._save_remote_data("Sync: Initial upload (local)")
-        elif remote_data:
-            # 只有远程
-            st.info("仅找到云端数据，正在同步到本地...")
-            self.data = remote_data
-            self._save_local_data()
-        else:
-            # 两边都没有，创建新数据
-            st.info("未找到数据，正在创建新的配置文件...")
-            self._save_all("Sync: Initial create")
+                st.success("成功从 GitHub 加载数据。")
+            else:
+                # GitHub 没数据，初始化
+                st.warning("GitHub 中未找到数据文件。如果登录，将创建新文件。")
+                self.data = {"last_modified": self.get_utc_now_iso(), "prompts": {}}
+                # (注意：只有在认证后，第一次保存时才会真的创建文件)
 
-        st.success("数据同步完成。")
+        else:
+            # --- 本地模式 ---
+            # 执行原有的“比对-同步”逻辑
+            st.info("本地模式：正在同步本地与 GitHub 数据...")
+            local_data = self._load_local_data()
+            remote_data = self._load_remote_data()
+
+            local_time = local_data.get("last_modified") if local_data else None
+            remote_time = remote_data.get("last_modified") if remote_data else None
+
+            if local_time and remote_time:
+                if local_time >= remote_time:
+                    # 本地最新或相同
+                    self.data = local_data
+                    if local_time > remote_time:
+                        st.warning("本地数据较新，正在同步到云端...")
+                        self._save_remote_data("Sync: local to remote (load)")
+                else:
+                    # 远程最新
+                    st.warning("云端数据较新，正在更新本地...")
+                    self.data = remote_data
+                    self._save_local_data()  # 只更新本地
+            elif local_data:
+                # 只有本地
+                st.info("仅找到本地数据，正在同步到云端...")
+                self.data = local_data
+                self._save_remote_data("Sync: Initial upload (local)")
+            elif remote_data:
+                # 只有远程
+                st.info("仅找到云端数据，正在同步到本地...")
+                self.data = remote_data
+                self._save_local_data()  # 只保存到本地
+            else:
+                # 两边都没有，创建新数据
+                st.info("未找到数据，正在创建新的配置文件...")
+                self._save_all("Sync: Initial create")  # _save_all 会处理双端保存
+
+            st.success("数据同步完成。")
 
     def _save_all(self, commit_message):
         """
-        (核心需求 3) 当数据发生变动时，同时更新本地和远程
+        (核心逻辑更新)
+        当数据发生变动时，根据模式更新。
+        - local: 更新本地 + 远程
+        - cloud: (需认证) 仅更新远程
         """
         self.data["last_modified"] = self.get_utc_now_iso()
-        self._save_local_data()
-        if self.config.RUN_MODE == "local" or st.session_state.get("authenticated", False):
-            # 本地模式始终同步
-            # 云端模式只有在认证后才同步
+
+        if self.config.RUN_MODE == "local":
+            # --- 本地模式 ---
+            # 保存到两处
+            self._save_local_data()
             self._save_remote_data(commit_message)
+
         else:
-            st.info("在云端模式下，需验证密码才能同步到 GitHub。")
+            # --- 云端模式 ---
+            # 只保存到远程，且必须已认证
+            if st.session_state.get("authenticated", False):
+                self._save_remote_data(commit_message)
+            else:
+                # 理论上 UI 会阻止未认证的保存，但作为双重保险
+                st.error("未认证，无法在云端模式下保存。")
+
+    # --- CRUD (增删改查) 方法保持不变 ---
+    # 它们调用 _save_all()，所以会自动适配新逻辑
 
     def get_all_prompts(self):
         """获取所有提示词，按名称排序"""
@@ -261,8 +298,6 @@ class PromptData:
             name = self.data["prompts"].pop(p_id).get("name", "N/A")
             self._save_all(f"Delete prompt: {name}")
             st.success(f"提示词 '{name}' 已删除。")
-        else:
-            st.error("提示词 ID 不存在。")
 
 
 # ---------------------------------------------------------------------
