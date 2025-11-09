@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "1688类目采集助手 (供Streamlit使用)",
+  "version": "1.0",
+  "description": "自动翻页并复制1688类目页的商品HTML，以便在Streamlit中解析。",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "action": {
+    "default_icon": "icon48.png",
+    "default_popup": "popup.html",
+    "default_title": "1688类目采集"
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "clipboardWrite",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://*.1688.com/*"
+  ]
+}
