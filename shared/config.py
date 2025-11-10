@@ -2,37 +2,29 @@
 import streamlit as st
 from datetime import timezone, timedelta
 
-# <<< 运行模式检测函数 >>>
-def get_run_mode():
-    """
-    直接从 secrets 读取运行环境配置。
-    默认为 'cloud'，以保证部署到云端时的安全性（不会尝试写本地文件）。
-    """
-    return st.secrets.get("RUN_ENVIRONMENT", "cloud")
-
 
 class GlobalConfig:
     """存储所有页面共享的全局配置，例如密钥、API等。"""
 
     def __init__(self):
         # --- 运行模式 ---
-        self.RUN_MODE = get_run_mode()  # "local" or "cloud"
+        self.RUN_MODE = st.secrets.get("RUN_ENVIRONMENT", "cloud")  # "local" or "cloud"
         # 云端模式下用于验证身份的密码
         self.APP_PASSWORD = st.secrets.get("app_password")
 
-        self.IMAGE_PATH_IN_REPO = st.secrets.get("IMAGE_PATH_IN_REPO", "images")
+        self.GITHUB_TOKEN = st.secrets.get("github_data_token")  # github token
+        self.GITHUB_PRIVATE_REPO = st.secrets.get("github_data_repo")  # 私人数据库路径
+        self.GITHUB_PUBLIC_REPO = st.secrets.get("github_data_public_repo")  # 公共数据库路径
 
+        self.USAGE_DATA_FILE = "script_usage_data.json"  # 用户使用次数统计，存放在私人数据库（已决定废弃）
+        self.IMAGE_PATH_IN_REPO = st.secrets.get("IMAGE_PATH_IN_REPO", "images")  # 公共图床服务专用
 
+        # Turso数据库配置(用于存放绝大部分streamlit的数据)
+        self.STREAMLIT_TURSO_DB = st.secrets.get("streamlit_turso_db")
+        self.STREAMLIT_TURSO_TOKEN = st.secrets.get("streamlit_turso_token")
 
-        # 从 Streamlit secrets 加载密钥
-        self.GITHUB_TOKEN = st.secrets.get("github_data_token")
-        self.GITHUB_PRIVATE_REPO = st.secrets.get("github_data_repo")  # 私人数据库
-        self.GITHUB_PUBLIC_REPO = st.secrets.get("github_data_public_repo")  # 私人数据库
-        # 添加数据文件路径
-        self.USAGE_DATA_FILE = "script_usage_data.json"  # 用户使用次数统计，存放在私人数据库
-
+        # AI秘钥
         self.GEMINI_API_KEY = "gemini_api_key"
-
         # 可用的AI模型
         self.GEMINI_MODEL_OPTIONS = [
             "gemini-2.5-flash-lite",  # 默认模型，可用，2.15秒
@@ -46,5 +38,11 @@ class GlobalConfig:
             # "gemini-2.5-flash-image"
         ]
 
-        # 定义时区
-        self.APP_TIMEZONE = timezone(timedelta(hours=8))  # 北京时间 (UTC+8)
+        # 定义时区 北京时间 (UTC+8)
+        self.APP_TIMEZONE = timezone(timedelta(hours=8))
+
+# 创建全局配置实例
+@st.cache_resource
+def get_global_config():
+    """获取全局配置的缓存实例"""
+    return GlobalConfig()
