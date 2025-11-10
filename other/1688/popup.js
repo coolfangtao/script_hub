@@ -1,4 +1,4 @@
-// --- 1. 核心配置 ---
+// --- 1. 核心配置---
 const SELECTORS = {
     category: {
         container: ".space-common-offerlist",
@@ -8,18 +8,25 @@ const SELECTORS = {
     },
     ranking: {
         container: "#pc-home2024-recommend-part",
-        captchaModal: "#nc_1_wrapper" // 假设验证码选择器相同
+        captchaModal: "#nc_1_wrapper"
+    },
+    miaoshou: {
+        // 关键数据行容器 (此选择器代表一行数据)
+        dataRow: ".vue-recycle-scroller__item-wrapper > div",
+
+        // 链接的选择器（相对于 dataRow）
+        linkSelector: 'div:nth-child(4) div:nth-child(2) a',
+        // 跳过原因的选择器（相对于 dataRow）
+        reasonCellSelector: 'div:nth-child(7)',
+
+        // 精确的下一页按钮选择器
+        nextButton: "#appScrollContainer > div.pro-virtual-table > div.pro-pagination button.btn-next",
+        // 禁用按钮的类名 (用于判断是否到最后一页)
+        disabledClass: "is-disabled"
     }
 };
 
-// --- 2. 可注入函数 (在1688页面环境中执行) ---
-
-/**
- * [模式1: 类目] 采集当前页并点击“下一页”。
- * (已更新: 使用 MutationObserver 确保所有懒加载完成)
- * @param {object} selectors - 'category' 模式的选择器
- * @returns {Promise<object>}
- */
+// --- 2. 可注入函数 ---
 async function scrapeCategoryPageAndAdvance(selectors) {
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
     let html = "";
@@ -27,77 +34,56 @@ async function scrapeCategoryPageAndAdvance(selectors) {
     let hasNext = false;
 
     try {
-        // 1. 检查验证码
         const captcha = document.querySelector(selectors.captchaModal);
         if (captcha && window.getComputedStyle(captcha).display !== 'none') {
             stopReason = "captcha";
             return { html, hasNext, stopReason, error: null };
         }
 
-        // 2. 找到关键容器
         const container = document.querySelector(selectors.container);
         if (!container) {
             throw new Error("找不到商品容器。选择器可能已失效。");
         }
 
-        // --- 3. (全新) 终极懒加载处理：MutationObserver ---
-
-        // (此Promise将在内容稳定后被 resolve)
         const stablePromise = new Promise((resolve, reject) => {
-            let stableTimer = null; // 稳定计时器
-            const STABLE_WAIT_TIME = 3500; // (关键) 3.5秒内没动静=稳定
+            let stableTimer = null;
+            const STABLE_WAIT_TIME = 3500;
 
             const observer = new MutationObserver(() => {
-                // 只要检测到DOM变化（即有新商品加载）：
-                // 就重置“稳定”计时器
                 clearTimeout(stableTimer);
                 stableTimer = setTimeout(() => {
-                    // 如果 3.5 秒后此计时器仍然运行，说明DOM已稳定
-                    observer.disconnect(); // 停止监视
-                    resolve(); // 宣布“已稳定”
+                    observer.disconnect();
+                    resolve();
                 }, STABLE_WAIT_TIME);
             });
 
-            // 开始监视：监视容器的“子列表”和“子树”
             observer.observe(container, {
-                childList: true, // 监视子节点的添加/删除
-                subtree: true    // 监视所有后代节点
+                childList: true,
+                subtree: true
             });
 
-            // --- 触发懒加载 ---
-            // A. 积极地滚动几次，确保触发所有加载
             window.scrollTo(0, document.body.scrollHeight);
             sleep(500).then(() => window.scrollBy(0, -300));
             sleep(1000).then(() => window.scrollTo(0, document.body.scrollHeight));
 
-            // B. (关键) 启动第一个“稳定”计时器
-            // 这用于处理两种情况：
-            // 1. 页面根本没有懒加载（所有60个已显示），此时不会有mutation。
-            // 2. 懒加载已触发，我们在等待 3.5 秒的“静默期”。
             stableTimer = setTimeout(() => {
                 observer.disconnect();
                 resolve();
             }, STABLE_WAIT_TIME);
         });
 
-        // (设置一个20秒的“兜底”超时，防止页面bug导致无限等待)
         await Promise.race([
-            stablePromise,         // 等待“稳定”信号
-            sleep(20000)           // 或最多等待20秒
+            stablePromise,
+            sleep(20000)
         ]);
 
-        // --- 稳定逻辑结束 ---
-
-
-        // 4. 采集HTML (此时100%是完整的)
         html = container.innerHTML;
 
-        // 5. 查找“下一页”按钮
         const nextButton = document.querySelector(selectors.nextButton);
         if (nextButton && !nextButton.classList.contains(selectors.disabledClass)) {
             hasNext = true;
             stopReason = "progress";
-            nextButton.click(); // 为下一次循环点击“下一页”
+            nextButton.click();
         } else {
             hasNext = false;
             stopReason = "endOfPages";
@@ -109,10 +95,7 @@ async function scrapeCategoryPageAndAdvance(selectors) {
     }
 }
 
-/**
- * [模式2: 榜单] 滚动到底部以加载所有商品，然后采集。
- * (此函数无变动)
- */
+
 async function scrapeRankingPageByScrolling(selectors) {
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
     let lastHeight = -1;
@@ -150,8 +133,62 @@ async function scrapeRankingPageByScrolling(selectors) {
 }
 
 
-// --- 3. Popup 助手函数 (无变动) ---
+/**
+ * [模式3: 妙手] 采集当前页并点击“下一页”。
+ * @param {object} selectors - 'miaoshou' 模式的选择器
+ * @returns {Promise<object>}
+ */
+async function scrapeMiaoshouPageAndAdvance(selectors) {
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const results = [];
+    let hasNext = false;
+    let stopReason = "progress";
 
+    try {
+        // 1. 确保虚拟列表内容已加载完毕
+        // 即使是分页模式，妙手页面当前页的 20 个项目也可能需要短暂时间加载
+        await sleep(1500 + Math.random() * 500);
+
+        const rows = document.querySelectorAll(selectors.dataRow);
+
+        rows.forEach(row => {
+            const linkElement = row.querySelector(selectors.linkSelector);
+            const reasonCell = row.querySelector(selectors.reasonCellSelector);
+
+            if (linkElement && reasonCell) {
+                const link = linkElement.href || '';
+                const rawReasonText = reasonCell.textContent;
+
+                // 过滤无效链接
+                if (link.startsWith('http') && link.includes('1688.com')) {
+                    const reason = rawReasonText.replace(/\s+/g, ' ').trim();
+
+                    if (reason) {
+                        results.push({ link, reason });
+                    }
+                }
+            }
+        });
+
+        // 2. 查找并点击“下一页”按钮
+        const nextButton = document.querySelector(selectors.nextButton);
+        if (nextButton && !nextButton.classList.contains(selectors.disabledClass)) {
+            hasNext = true;
+            nextButton.click();
+        } else {
+            hasNext = false;
+            stopReason = "endOfPages";
+        }
+
+        return { data: results, hasNext, stopReason, error: null };
+
+    } catch (e) {
+        return { data: [], hasNext: false, stopReason: "error", error: e.message };
+    }
+}
+
+
+// --- 3. Popup 助手函数 ---
 function setStatus(message, type = 'info') {
     const statusEl = document.getElementById('status');
     statusEl.textContent = message;
@@ -184,8 +221,29 @@ function downloadHtml(html, mode, pageCount) {
     });
 }
 
+function downloadCsv(data) {
+    const headers = ["链接", "跳过原因"];
+    const csvContent = data.map(row =>
+        `"${row.link.replace(/"/g, '""')}",` +
+        `"${row.reason.replace(/"/g, '""')}"`
+    ).join('\n');
 
-// --- 4. 主采集处理器 (无变动) ---
+    const finalCsv = headers.join(',') + '\n' + csvContent;
+
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), finalCsv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date();
+    const f_date = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+    const filename = `miaoshou-skipped-links-${f_date}.csv`;
+
+    chrome.downloads.download({
+        url: url,
+        filename: filename
+    });
+}
+
+
+// --- 4. 主采集处理器 ---
 
 async function runCategoryScrape(tab, maxPages) {
     let allHtml = "";
@@ -199,7 +257,7 @@ async function runCategoryScrape(tab, maxPages) {
 
         const results = await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: scrapeCategoryPageAndAdvance, // (现在调用的是更新后的函数)
+            func: scrapeCategoryPageAndAdvance,
             args: [SELECTORS.category]
         });
 
@@ -211,7 +269,7 @@ async function runCategoryScrape(tab, maxPages) {
         stopReason = reason;
 
         if (stopReason === 'captcha') {
-            pageCount--; //
+            pageCount--;
             break;
         }
         if (stopReason === 'endOfPages') {
@@ -244,8 +302,57 @@ async function runRankingScrape(tab) {
     return { allHtml: html, pageCount: 1, stopReason };
 }
 
+/**
+ * [模式3] 执行妙手链接分页采集
+ * @param {chrome.tabs.Tab} tab - 当前Tab
+ * @param {number} maxPages - 用户设定的最大采集页数
+ */
+async function runMiaoshouScrape(tab, maxPages) {
+    let allData = [];
+    let pageCount = 0;
+    let hasNextPage = true;
+    let stopReason = "unknown";
 
-// --- 5. DOM 监听器 (无变动) ---
+    while (hasNextPage && pageCount < maxPages) {
+        pageCount++;
+        setStatus(`妙手采集中... 第 ${pageCount} / ${maxPages === 999 ? '?' : maxPages} 页...`, 'info');
+
+        // 关键点：等待页面渲染完毕 (妙手页面翻页后有明显的加载时间)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+
+        const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: scrapeMiaoshouPageAndAdvance,
+            args: [SELECTORS.miaoshou]
+        });
+
+        const { data, hasNext, stopReason: reason, error } = results[0].result;
+        if (error) throw new Error(error);
+
+        allData = allData.concat(data);
+        hasNextPage = hasNext;
+        stopReason = reason;
+
+        if (stopReason === 'endOfPages') {
+            break;
+        }
+
+        // 翻页后的稳定等待时间
+        if (hasNextPage) {
+            await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 1500));
+        }
+    }
+
+    if (stopReason !== 'endOfPages' && pageCount === maxPages) {
+        stopReason = "maxPages";
+    }
+
+    return { data: allData, count: allData.length, pageCount, stopReason };
+}
+
+
+// --- 5. DOM 监听器 ---
 
 document.addEventListener('DOMContentLoaded', () => {
     const scrapeButton = document.getElementById('scrapeButton');
@@ -253,9 +360,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const categoryOptions = document.getElementById('categoryOptions');
     const modeCategory = document.getElementById('modeCategory');
     const modeRanking = document.getElementById('modeRanking');
+    const modeMiaoshou = document.getElementById('modeMiaoshou');
 
     function updateModeUI() {
-        if (modeCategory.checked) {
+        // 只有 1688 类目采集 (category) 和 妙手采集 (miaoshou) 需要页数限制
+        if (modeCategory.checked || modeMiaoshou.checked) {
             categoryOptions.style.display = 'block';
         } else {
             categoryOptions.style.display = 'none';
@@ -263,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     modeCategory.addEventListener('change', updateModeUI);
     modeRanking.addEventListener('change', updateModeUI);
+    modeMiaoshou.addEventListener('change', updateModeUI);
     updateModeUI();
 
     scrapeButton.addEventListener('click', async () => {
@@ -270,45 +380,51 @@ document.addEventListener('DOMContentLoaded', () => {
         setStatus("准备中...", 'info');
 
         try {
-            const [tab] = await chrome.tabs.query({
-                active: true,
-                currentWindow: true,
-                url: "https://*.1688.com/*"
-            });
+            const selectedMode = document.querySelector('input[name="scrapeMode"]:checked').value;
+            let tabsQuery;
 
-            if (!tab) {
-                throw new Error("请先打开一个1688的页面。");
+            if (selectedMode === 'miaoshou') {
+                tabsQuery = {
+                    active: true,
+                    currentWindow: true,
+                    url: "https://erp.91miaoshou.com/*"
+                };
+            } else {
+                tabsQuery = {
+                    active: true,
+                    currentWindow: true,
+                    url: "https://*.1688.com/*"
+                };
             }
 
-            const selectedMode = document.querySelector('input[name="scrapeMode"]:checked').value;
-            let result;
+            const [tab] = await chrome.tabs.query(tabsQuery);
 
+            if (!tab) {
+                const requiredSite = selectedMode === 'miaoshou' ? "妙手的跳过链接页面" : "一个1688的页面";
+                throw new Error(`请先打开${requiredSite}。`);
+            }
+
+            // --- 核心采集逻辑分支 ---
             if (selectedMode === 'category') {
                 let maxPages = parseInt(pageLimitInput.value, 10);
                 if (isNaN(maxPages) || maxPages < 1) {
                     maxPages = 999;
                 }
-                result = await runCategoryScrape(tab, maxPages);
+                const result = await runCategoryScrape(tab, maxPages);
+                const { allHtml, pageCount, stopReason } = result;
 
-            } else if (selectedMode === 'ranking') {
-                result = await runRankingScrape(tab);
-            }
-
-            const { allHtml, pageCount, stopReason } = result;
-
-            if (!allHtml || allHtml.trim() === "") {
-                if (stopReason === 'captcha' && pageCount > 0) {
-                   // ...
-                } else if(stopReason === 'captcha' && pageCount === 0) {
-                    throw new Error("在第1页(或滚动开始时)就遇到了验证码。");
-                } else {
-                    throw new Error("采集到了0个商品，请检查选择器。");
+                if (!allHtml || allHtml.trim() === "") {
+                    if (stopReason === 'captcha' && pageCount > 0) {
+                        // ...
+                    } else if(stopReason === 'captcha' && pageCount === 0) {
+                        throw new Error("在第1页(或滚动开始时)就遇到了验证码。");
+                    } else {
+                        throw new Error("采集到了0个商品，请检查选择器。");
+                    }
                 }
-            }
 
-            downloadHtml(allHtml, selectedMode, pageCount);
+                downloadHtml(allHtml, selectedMode, pageCount);
 
-            if (selectedMode === 'category') {
                 if (stopReason === 'captcha') {
                     setStatus(`采集 ${pageCount} 页后遇验证码停止。已下载。`, 'warning');
                 } else if (stopReason === 'maxPages') {
@@ -316,13 +432,47 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     setStatus(`已采集 ${pageCount} 页！已下载。`, 'success');
                 }
+
             } else if (selectedMode === 'ranking') {
+                const result = await runRankingScrape(tab);
+                const { allHtml, stopReason } = result;
+
+                if (!allHtml || allHtml.trim() === "") {
+                    throw new Error("采集到了0个商品，请检查选择器。");
+                }
+
+                downloadHtml(allHtml, selectedMode, 1);
+
                 if (stopReason === 'captcha') {
                     setStatus(`滚动中遇验证码停止。已下载(可能不全)。`, 'warning');
                 } else {
                     setStatus(`榜单采集完毕！已下载。`, 'success');
                 }
+            } else if (selectedMode === 'miaoshou') {
+                // *** 妙手采集 (分页模式) ***
+                let maxPages = parseInt(pageLimitInput.value, 10);
+                if (isNaN(maxPages) || maxPages < 1) {
+                    maxPages = 999;
+                }
+
+                const result = await runMiaoshouScrape(tab, maxPages);
+                const { data, count, pageCount, stopReason } = result;
+
+                if (count === 0) {
+                    throw new Error("妙手采集到0条数据，请检查选择器或页面是否正确。");
+                }
+
+                downloadCsv(data);
+
+                if (stopReason === 'maxPages') {
+                    setStatus(`妙手采集完毕！已达 ${pageCount} 页上限，共收集 ${count} 条数据，已下载 CSV 文件。`, 'success');
+                } else if (stopReason === 'endOfPages') {
+                    setStatus(`妙手采集完毕！已到达末页 (${pageCount} 页)，共收集 ${count} 条数据，已下载 CSV 文件。`, 'success');
+                } else {
+                    setStatus(`妙手采集完成。共收集 ${count} 条数据，已下载 CSV 文件。`, 'success');
+                }
             }
+
 
         } catch (e) {
             console.error(e);

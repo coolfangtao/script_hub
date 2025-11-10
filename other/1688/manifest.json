@@ -20,6 +20,7 @@
     "downloads"
   ],
   "host_permissions": [
-    "https://*.1688.com/*"
+    "https://*.1688.com/*",
+    "https://erp.91miaoshou.com/*"
   ]
 }
