@@ -247,18 +247,29 @@ class UI:
         self.calculator = calculator
 
     def run(self):
-        st.title("亚马逊卖家成本利润计算器")
-        tab1, tab2, tab3 = st.tabs(["配置界面", "公式页面", "统计页面"])
+        st.set_page_config(layout="wide", page_title="亚马逊成本利润计算器", page_icon="📊")
+        st.title("📊 亚马逊卖家成本利润计算器")
+
+        # 运行计算
+        self.calculator.run_all_calculations()
+
+        # --- 新增：在顶部显示核心结果 ---
+        st.subheader("📈 核心数据一览")
+        r = self.calculator.results
+        res_col1, res_col2, res_col3, res_col4 = st.columns(4)
+        res_col1.metric("💰 总利润 (¥)", f"{r.get('profit_rmb', 0):,.2f}", f"{r.get('profit_margin', 0):.2f}% 利润率")
+        res_col2.metric("💵 净收入 (¥)", f"{r.get('net_revenue_rmb', 0):,.2f}",
+                        f"总销售额 ${r.get('total_revenue_usd', 0):,.2f}")
+        res_col3.metric("🧾 总成本 (¥)", f"{r.get('total_cost_rmb', 0):,.2f}")
+        res_col4.metric("📈 投资回报率 (ROI)", f"{r.get('profit_rmb', 0) / r.get('total_cost_rmb', 1):.2%}")
+        st.divider()
+
+        tab1, tab2, tab3 = st.tabs(["⚙️ 参数配置", "🧮 计算过程", "📊 统计图表"])
 
         with tab1:
             self._display_config_tab()
-
-        # 运行计算必须在渲染完所有输入框之后
-        self.calculator.run_all_calculations()
-
         with tab2:
             self._display_formulas_tab()
-
         with tab3:
             self._display_stats_tab()
 
@@ -276,9 +287,11 @@ class UI:
 
     def _display_procurement_config(self):
         with st.container(border=True):
-            st.subheader("1. 采购成本")
+            st.subheader("🛒 1. 采购成本")
             for name, details in list(st.session_state.skus.items()):
-                with st.expander(f"SKU: {name}", expanded=True):
+                # --- 美化：使用颜色高亮SKU名称 ---
+                st.markdown(f"##### SKU: <font color='green'>**{name}**</font>", unsafe_allow_html=True)
+                with st.container(border=True):
                     p_col1, p_col2, p_col3 = st.columns(3)
                     details['purchase_price'] = p_col1.number_input("采购单价(元)", key=f"price_{name}",
                                                                     value=details['purchase_price'], step=0.1,
@@ -289,13 +302,14 @@ class UI:
                                                             step=0.01, format="%.3f")
 
                     b_col1, b_col2 = st.columns(2)
-                    if b_col1.button(f"删除 {name}", key=f"del_sku_{name}", use_container_width=True):
+                    # --- 美化：为按钮添加图标 ---
+                    if b_col1.button(f"🗑️ 删除 {name}", key=f"del_sku_{name}", use_container_width=True):
                         del st.session_state.skus[name]
                         if name in self.config.platform['skus_platform_fees']:
                             del self.config.platform['skus_platform_fees'][name]
                         st.rerun()
 
-                    if b_col2.button(f"复制 {name}", key=f"copy_sku_{name}", use_container_width=True):
+                    if b_col2.button(f"📋 复制 {name}", key=f"copy_sku_{name}", use_container_width=True):
                         new_name = f"款式{chr(ord('A') + len(st.session_state.skus))}"
                         st.session_state.skus[new_name] = copy.deepcopy(details)
                         platform_fees = self.config.platform['skus_platform_fees'].get(name, {'sell_price': 0.0,
@@ -303,12 +317,13 @@ class UI:
                         self.config.platform['skus_platform_fees'][new_name] = copy.deepcopy(platform_fees)
                         st.rerun()
 
-            if st.button("新增SKU", use_container_width=True):
+            # --- 美化：使用 type="primary" 突出新增按钮 ---
+            if st.button("➕ 新增SKU", use_container_width=True, type="primary"):
                 new_name = f"款式{chr(ord('A') + len(st.session_state.skus))}"
                 st.session_state.skus[new_name] = {'purchase_price': 0.0, 'quantity': 0, 'weight': 0.0}
                 st.rerun()
 
-            st.markdown("---")
+            st.divider()
             self.config.procurement['discount_rate'] = st.number_input("折扣率 (%)",
                                                                        value=self.config.procurement['discount_rate'],
                                                                        step=1.0, format="%.2f")
@@ -319,9 +334,10 @@ class UI:
 
     def _display_packaging_config(self):
         with st.container(border=True):
-            st.subheader("2. 打包与装箱")
+            st.subheader("📦 2. 打包与装箱")
             for name, details in list(st.session_state.boxes.items()):
-                with st.expander(f"箱子: {name}", expanded=True):
+                st.markdown(f"##### 箱子: <font color='orange'>**{name}**</font>", unsafe_allow_html=True)
+                with st.container(border=True):
                     box_col1, box_col2 = st.columns(2)
                     details['quantity'] = box_col1.number_input("纸箱数量(个)", key=f"box_qty_{name}",
                                                                 value=details['quantity'], step=1)
@@ -344,15 +360,15 @@ class UI:
                                                              value=details['other_costs'], format="%.2f")
 
                     b_col1, b_col2 = st.columns(2)
-                    if b_col1.button(f"删除 {name}", key=f"del_box_{name}", use_container_width=True):
+                    if b_col1.button(f"🗑️ 删除 {name}", key=f"del_box_{name}", use_container_width=True):
                         del st.session_state.boxes[name]
                         st.rerun()
-                    if b_col2.button(f"复制 {name}", key=f"copy_box_{name}", use_container_width=True):
+                    if b_col2.button(f"📋 复制 {name}", key=f"copy_box_{name}", use_container_width=True):
                         new_name = f"箱子{len(st.session_state.boxes) + 1}"
                         st.session_state.boxes[new_name] = copy.deepcopy(details)
                         st.rerun()
 
-            if st.button("新增箱子", use_container_width=True):
+            if st.button("➕ 新增箱子", use_container_width=True, type="primary"):
                 new_name = f"箱子{len(st.session_state.boxes) + 1}"
                 st.session_state.boxes[new_name] = {'quantity': 1, 'items': {}, 'unit_price': 5.0, 'weight': 0.5,
                                                     'length': 50.0, 'width': 40.0, 'height': 40.0, 'other_costs': 0.0,
@@ -361,16 +377,15 @@ class UI:
 
     def _display_shipping_config(self):
         with st.container(border=True):
-            st.subheader("3. 国际货运成本")
+            st.subheader("🚚 3. 国际货运成本")
             ship_col1, ship_col2 = st.columns(2)
-            # --- 优化：更新标签以匹配逻辑 ---
             self.config.shipping['min_chargeable_weight'] = ship_col1.number_input("每箱最低计费重量(KG)",
                                                                                    value=self.config.shipping[
                                                                                        'min_chargeable_weight'])
             self.config.shipping['volume_ratio'] = ship_col2.number_input("体积比",
                                                                           value=self.config.shipping['volume_ratio'])
 
-            st.markdown("---")
+            st.divider()
             st.markdown("**各箱运费设置**")
             for name, details in list(self.config.packaging['boxes'].items()):
                 with st.container(border=True):
@@ -382,18 +397,18 @@ class UI:
                     details['destination_code'] = s_col2.text_input("目的仓库代码", key=f"dest_code_{name}",
                                                                     value=details.get('destination_code', 'ONT8'))
 
-            st.markdown("---")
+            st.divider()
             self.config.shipping['other_costs'] = st.number_input("货运其他费用(元)",
                                                                   value=self.config.shipping['other_costs'],
                                                                   format="%.2f")
 
     def _display_platform_config(self):
         with st.container(border=True):
-            st.subheader("4. 平台费用")
+            st.subheader("🌐 4. 平台费用")
             fees_cfg = self.config.platform['skus_platform_fees']
             for sku_name in self.config.procurement['skus'].keys():
                 if sku_name not in fees_cfg: fees_cfg[sku_name] = {'sell_price': 0.0, 'platform_fee': 0.0}
-                with st.expander(f"款式: {sku_name}", expanded=True):
+                with st.expander(f"SKU 平台费: {sku_name}", expanded=True):
                     plat_col1, plat_col2 = st.columns(2)
                     fees_cfg[sku_name]['sell_price'] = plat_col1.number_input("销售价格($)", key=f"sell_price_{sku_name}",
                                                                               value=fees_cfg[sku_name]['sell_price'],
@@ -401,7 +416,7 @@ class UI:
                     fees_cfg[sku_name]['platform_fee'] = plat_col2.number_input("每件平台费($)", key=f"plat_fee_{sku_name}",
                                                                                 value=fees_cfg[sku_name][
                                                                                     'platform_fee'], format="%.2f")
-            st.markdown("---")
+            st.divider()
             self.config.platform['fulfillment_fee'] = st.number_input("入库配置费($)",
                                                                       value=self.config.platform['fulfillment_fee'],
                                                                       format="%.2f")
@@ -414,117 +429,110 @@ class UI:
 
     def _display_advertising_config(self):
         with st.container(border=True):
-            st.subheader("5. 广告费用")
+            st.subheader("📢 5. 广告费用")
             cfg = self.config.advertising
             cfg['daily_spend'] = st.number_input("日均广告花费($)", value=cfg['daily_spend'], format="%.2f")
             cfg['duration_days'] = st.number_input("广告持续天数(天)", value=cfg['duration_days'], step=1)
 
     def _display_finance_config(self):
         with st.container(border=True):
-            st.subheader("6. 汇率和手续费")
+            st.subheader("🏦 6. 汇率和手续费")
             cfg = self.config.finance
             cfg['exchange_rate'] = st.number_input("汇率(美元兑人民币)", value=cfg['exchange_rate'], format="%.2f")
             cfg['withdrawal_fee_rate'] = st.number_input("提款手续费(%)", value=cfg['withdrawal_fee_rate'], format="%.2f")
 
     def _display_formulas_tab(self):
-        st.header("计算过程详情")
+        st.header("🧮 计算过程详情")
         r = self.calculator.results
 
-        # 1. 货物成本
-        with st.expander("1. 货物成本 (¥)", expanded=True):
-            st.markdown("`总货物成本 = (Σ(各SKU采购单价 * 数量) * 折扣率) + 采购运费 + 其他费用`")
+        with st.expander("🛒 **货物成本 (¥)**", expanded=True):
+            st.info("总货物成本 = (Σ(各SKU采购单价 * 数量) * 折扣率) + 采购运费 + 其他费用")
             proc_details = r.get('procurement_details', {})
-
             if proc_details.get("各SKU成本"):
                 st.markdown("**各SKU成本明细:**")
-                sku_cost_df = pd.DataFrame.from_dict(proc_details["各SKU成本"], orient='index', columns=['成本(元)'])
-                st.table(sku_cost_df)
+                st.table(pd.DataFrame.from_dict(proc_details["各SKU成本"], orient='index', columns=['成本(元)']))
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("折扣后商品成本", f"¥ {proc_details.get('折扣后商品成本', 0):.2f}", f"折扣前 ¥ {proc_details.get('商品总成本', 0):.2f}")
+            c2.metric("采购运费", f"¥ {proc_details.get('采购运费', 0):.2f}")
+            c3.metric("采购其他费用", f"¥ {proc_details.get('采购其他费用', 0):.2f}")
+            c4.success(f"货物总成本: ¥ {r.get('procurement_cost', 0):.2f}")
 
-            st.metric("折扣后商品成本", f"¥ {proc_details.get('折扣后商品成本', 0):.2f}", f"折扣前 ¥ {proc_details.get('商品总成本', 0):.2f}")
-            st.metric("采购运费", f"¥ {proc_details.get('采购运费', 0):.2f}")
-            st.metric("采购其他费用", f"¥ {proc_details.get('采购其他费用', 0):.2f}")
-            st.metric("货物总成本", f"¥ {r.get('procurement_cost', 0):.2f}")
-
-        # 2. 基础计费重量 (用于运费计算前)
-        with st.expander("2. 基础计费重量 (KG)", expanded=True):
-            st.markdown("`单箱实际重量 = (箱内所有商品总重) + 空箱重量`")
-            st.markdown("`单箱体积重 = (长 * 宽 * 高) / 体积比`")
-            st.markdown("`基础计费重量 = MAX(实际重量, 体积重)`")
+        with st.expander("⚖️ **基础计费重量 (KG)**", expanded=True):
+            st.info("单箱基础计费重量 = MAX((箱内商品总重 + 空箱重), (长*宽*高 / 体积比))")
             df_weights = pd.DataFrame(r.get('chargeable_weights', {})).T.rename(
                 columns={'actual_weight': '总实际重量', 'volume_weight': '总体积重', 'chargeable_weight': '总基础计费重量'}
             )
-            st.table(df_weights)
+            st.table(df_weights.style.format("{:.2f}"))
 
-        # 3. 国际运费
-        with st.expander("3. 国际运费 (¥)", expanded=True):
-            st.markdown("`单箱最终计费重量 = MAX(单箱基础计费重量, 每箱最低计费重量)`")
-            st.markdown("`总国际运费 = Σ(单箱最终计费重量 * 箱子数量 * 运费单价) + 货运其他费用`")
-
+        with st.expander("🚚 **国际运费 (¥)**", expanded=True):
+            st.info("总国际运费 = Σ(MAX(单箱基础计费重, 每箱最低计费重) * 箱数 * 单价) + 其他费用")
             shipping_details = r.get('shipping_details', {})
-
-            # --- 优化：显示更详细的每箱计费重量计算过程 ---
             if shipping_details.get("各箱最终计费重量详情"):
                 st.markdown("**各箱计费重量明细:**")
-                df_data = []
-                for box_name, data in shipping_details["各箱最终计费重量详情"].items():
-                    df_data.append({
-                        "箱子名称": box_name,
-                        "基础计费重量/个 (KG)": data['base_chargeable_weight_per_box'],
-                        "最终计费重量/个 (KG)": data['final_chargeable_weight_per_box'],
-                        "总最终计费重量 (KG)": data['total_final_chargeable_weight']
-                    })
-                df_shipping_weights = pd.DataFrame(df_data).set_index("箱子名称")
-                st.table(df_shipping_weights.style.format("{:.2f}"))
+                df_data = [{
+                    "箱子名称": box_name,
+                    "基础计费重量/个": data['base_chargeable_weight_per_box'],
+                    "最终计费重量/个": data['final_chargeable_weight_per_box'],
+                    "总最终计费重量": data['total_final_chargeable_weight']
+                } for box_name, data in shipping_details["各箱最终计费重量详情"].items()]
+                st.table(pd.DataFrame(df_data).set_index("箱子名称").style.format("{:.2f}"))
 
+            c1, c2, c3 = st.columns(3)
             if shipping_details.get("各箱运费"):
-                st.markdown("**各箱运费明细:**")
-                box_cost_df = pd.DataFrame.from_dict(shipping_details["各箱运费"], orient='index', columns=['运费(元)'])
-                st.table(box_cost_df)
+                with c1:
+                    st.markdown("**各箱运费:**")
+                    st.table(pd.DataFrame.from_dict(shipping_details["各箱运费"], orient='index', columns=['运费(元)']))
+            c2.metric("货运其他费用", f"¥ {shipping_details.get('货运其他费用', 0):.2f}")
+            c3.success(f"总国际运费: ¥ {r.get('shipping_cost', 0):.2f}")
 
-            st.metric("货运其他费用", f"¥ {shipping_details.get('货运其他费用', 0):.2f}")
-            st.metric("总国际运费", f"¥ {r.get('shipping_cost', 0):.2f}")
-
-        # 4. 打包成本
-        with st.expander("4. 打包成本 (¥)", expanded=True):
-            st.markdown("`总打包成本 = Σ(纸箱单价 * 纸箱数量 + 单箱其他费用)`")
+        with st.expander("📦 **打包成本 (¥)**", expanded=True):
+            st.info("总打包成本 = Σ(纸箱单价 * 纸箱数量 + 单箱其他费用)")
             packaging_per_box = r.get('packaging_per_box', {})
-            if packaging_per_box:
-                st.markdown("**各箱打包成本明细:**")
-                pack_cost_df = pd.DataFrame.from_dict(packaging_per_box, orient='index', columns=['打包成本(元)'])
-                st.table(pack_cost_df)
-            st.metric("总打包成本", f"¥ {r.get('packaging_cost', 0):.2f}")
+            c1, c2 = st.columns(2)
+            with c1:
+                if packaging_per_box:
+                    st.markdown("**各箱打包成本明细:**")
+                    st.table(pd.DataFrame.from_dict(packaging_per_box, orient='index', columns=['打包成本(元)']))
+            c2.success(f"总打包成本: ¥ {r.get('packaging_cost', 0):.2f}")
 
-        # 5. 平台费用
-        with st.expander("5. 平台费用 (¥)", expanded=True):
-            st.markdown("`平台费用(¥) = (Σ(每件平台费 * SKU数量) + 入库配置费 + 月租 + 其他费用) * 汇率`")
-            st.metric("平台费用", f"¥ {r.get('platform_fee_rmb', 0):.2f}", f"等同 ${r.get('platform_fee_usd', 0):.2f}")
-
-        # 6. 广告费用
-        with st.expander("6. 广告费用 (¥)", expanded=True):
-            st.markdown("`广告费用(¥) = (日均广告花费 * 广告持续天数) * 汇率`")
-            st.metric("广告费用", f"¥ {r.get('advertising_cost_rmb', 0):.2f}",
-                      f"等同 ${r.get('advertising_cost_usd', 0):.2f}")
+        col_p, col_a = st.columns(2)
+        with col_p:
+            with st.expander("🌐 **平台费用 (¥)**", expanded=True):
+                st.info("平台费用(¥) = (Σ(每件平台费*数量) + 其他费用) * 汇率")
+                st.metric("平台费用", f"¥ {r.get('platform_fee_rmb', 0):.2f}", f"等同 ${r.get('platform_fee_usd', 0):.2f}")
+        with col_a:
+            with st.expander("📢 **广告费用 (¥)**", expanded=True):
+                st.info("广告费用(¥) = (日均花费 * 天数) * 汇率")
+                st.metric("广告费用", f"¥ {r.get('advertising_cost_rmb', 0):.2f}",
+                          f"等同 ${r.get('advertising_cost_usd', 0):.2f}")
 
     def _display_stats_tab(self):
-        st.header("总体统计信息")
+        st.header("📊 成本构成分析")
         r = self.calculator.results
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("总利润 (¥)", f"{r.get('profit_rmb', 0):,.2f}", f"{r.get('profit_margin', 0):.2f}% 利润率")
-        col2.metric("净收入 (¥)", f"{r.get('net_revenue_rmb', 0):,.2f}")
-        col3.metric("总成本 (¥)", f"{r.get('total_cost_rmb', 0):,.2f}")
-        col4.metric("总销售额 ($)", f"${r.get('total_revenue_usd', 0):,.2f}")
-        st.markdown("---")
-        st.subheader("成本构成占比")
 
         cost_breakdown = r.get('cost_breakdown', {})
         filtered_costs = {k: v for k, v in cost_breakdown.items() if v > 0}
+
         if not filtered_costs:
             st.warning("所有成本项均为0，无法生成图表。")
         else:
             df = pd.DataFrame(list(filtered_costs.items()), columns=['成本项', '金额(¥)'])
-            fig = px.pie(df, values='金额(¥)', names='成本项', hole=0.3)
-            fig.update_traces(textposition='inside', textinfo='percent+label')
-            st.plotly_chart(fig, use_container_width=True)
+            df = df.sort_values(by='金额(¥)', ascending=False)
+
+            chart_col1, chart_col2 = st.columns(2)
+            with chart_col1:
+                st.subheader("成本构成占比 (饼图)")
+                fig_pie = px.pie(df, values='金额(¥)', names='成本项', hole=0.3,
+                                 title="各项成本占总成本的百分比")
+                fig_pie.update_traces(textposition='inside', textinfo='percent+label', pull=[0.05] * len(df))
+                st.plotly_chart(fig_pie, use_container_width=True)
+
+            with chart_col2:
+                st.subheader("成本构成金额 (条形图)")
+                fig_bar = px.bar(df, x='成本项', y='金额(¥)', text_auto='.2s',
+                                 title="各项成本的绝对金额对比")
+                fig_bar.update_traces(texttemplate='%{value:,.2f} 元', textposition='outside')
+                st.plotly_chart(fig_bar, use_container_width=True)
 
 
 # ===================================================================
