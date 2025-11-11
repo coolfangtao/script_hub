@@ -18,7 +18,6 @@ class Config:
     """
 
     def __init__(self):
-        # 仅在 session_state 中首次初始化整个参数结构
         if 'params' not in st.session_state:
             st.session_state.params = {
                 'procurement': {
@@ -68,9 +67,6 @@ class Config:
                 }
             }
 
-        # 为了兼容 UI 和 Calculator 类中对 self.procurement 等属性的调用，
-        # 我们将 session_state 中的字典直接赋值给实例属性。
-        # 关键在于：这些属性现在只是对 session_state 中字典的引用，而不是独立的副本。
         self.procurement = st.session_state.params['procurement']
         self.packaging = st.session_state.params['packaging']
         self.shipping = st.session_state.params['shipping']
@@ -78,13 +74,11 @@ class Config:
         self.advertising = st.session_state.params['advertising']
         self.finance = st.session_state.params['finance']
 
-        # 同样，为了让 UI 中的动态增删正常工作，直接引用 session_state 中的具体对象
         st.session_state.skus = self.procurement['skus']
         st.session_state.boxes = self.packaging['boxes']
 
     def get_all_params(self):
         """将所有配置数据打包成一个字典用于导出。"""
-        # 直接从 session_state 返回深拷贝，确保导出的是一份独立的数据
         return copy.deepcopy(st.session_state.params)
 
     def load_all_params(self, params: dict):
@@ -93,11 +87,8 @@ class Config:
         if not all(key in params for key in required_keys):
             raise ValueError("导入的JSON文件格式不正确或缺少必要的配置项。")
 
-        # 核心修改：直接用导入的数据覆盖 session_state 中的 params
         st.session_state.params = params
 
-        # 在UI代码中，动态增删SKU和箱子依赖于顶层的 st.session_state.skus 和 st.session_state.boxes
-        # 因此在加载后，需要重新建立这两个引用，以确保兼容性。
         st.session_state.skus = st.session_state.params['procurement']['skus']
         st.session_state.boxes = st.session_state.params['packaging']['boxes']
 
@@ -345,7 +336,6 @@ class UI:
     def __init__(self, config: Config, calculator: Calculator):
         self.config = config
         self.calculator = calculator
-        # 为 file_uploader 分配一个固定的 key
         self.uploader_key = "params_uploader"
 
 
@@ -356,7 +346,6 @@ class UI:
         """
         uploaded_file = st.session_state.get(self.uploader_key)
         if uploaded_file is None:
-            # 如果文件被清空，则不执行任何操作
             return
 
         try:
@@ -364,8 +353,6 @@ class UI:
             params = json.load(uploaded_file)
             self.config.load_all_params(params)
             st.success("参数已成功导入！页面将自动刷新以应用更改。")
-            # 注意：这里不再需要 time.sleep() 和 st.rerun()
-            # Streamlit 在回调结束后会自动重新运行脚本
         except Exception as e:
             st.error(f"导入失败，文件格式可能不正确: {e}")
 
@@ -421,7 +408,6 @@ class UI:
             except Exception as e:
                 st.error(f"导出参数时出错: {e}")
 
-            # 2. Import Section (核心修改处)
             st.file_uploader(
                 "📤 从本地文件导入参数",
                 type="json",
@@ -430,8 +416,6 @@ class UI:
             )
             st.warning("**注意**: 导入将覆盖当前所有配置，建议先导出备份。", icon="⚠️")
 
-            # 3. Import Logic (已移至 _handle_file_upload 回调函数中)
-            # 原本在这里的 'if uploaded_file is not None:' 逻辑块已被移除。
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -444,8 +428,7 @@ class UI:
             self._display_advertising_config()
             self._display_finance_config()
 
-    # 其他 _display_* 方法 (如 _display_procurement_config, _display_formulas_tab 等) 保持不变...
-    # ... (此处省略其他未改动的方法，请保留你原来的代码)
+
     def _display_procurement_config(self):
         with st.container(border=True):
             st.subheader("🛒 1. 采购成本", divider="rainbow")
@@ -674,11 +657,11 @@ class UI:
                           f"等同 ${r.get('advertising_cost_usd', 0):.2f}")
 
     def _display_stats_tab(self):
-        """【已重构】渲染“统计图表”选项卡，增加SKU维度的分析"""
+        """渲染“统计图表”选项卡，增加SKU维度的分析"""
         st.header("📊 数据分析中心")
         r = self.calculator.results
 
-        # --- 1. 总体成本构成分析 (保留原有功能) ---
+        # --- 1. 总体成本构成分析---
         st.subheader("总成本构成", divider="rainbow")
         cost_breakdown = r.get('cost_breakdown', {})
         filtered_costs = {k: v for k, v in cost_breakdown.items() if v > 0}
@@ -702,7 +685,7 @@ class UI:
                 fig_bar.update_traces(texttemplate='%{value:,.2f} 元', textposition='outside')
                 st.plotly_chart(fig_bar, use_container_width=True)
 
-        # --- 2. SKU 表现分析 (新增功能) ---
+        # --- 2. SKU 表现分析 ---
         st.subheader("SKU表现分析", divider="rainbow")
         sku_analysis_data = r.get('per_sku_analysis', {})
 
@@ -730,7 +713,7 @@ class UI:
                 fig_sku_profit.update_traces(texttemplate='%{value:,.2f} 元', textposition='outside')
                 st.plotly_chart(fig_sku_profit, use_container_width=True)
 
-            # --- 3. 各SKU详细数据表 (新增功能) ---
+            # --- 3. 各SKU详细数据表 ---
             st.subheader("📝 各SKU详细数据")
             st.info("点击列标题可以对表格进行排序，方便您发现表现最优和最差的SKU。")
 
@@ -738,7 +721,7 @@ class UI:
             display_df = df_sku[[
                 'Quantity', 'Net Revenue (¥)', 'Total Cost (¥)', 'Profit (¥)',
                 'Profit Margin (%)', 'ROI (%)', 'Unit Revenue (¥)', 'Unit Cost (¥)', 'Unit Profit (¥)'
-            ]].copy() # 使用.copy()避免SettingWithCopyWarning
+            ]].copy()
 
             st.dataframe(display_df.style.format({
                 'Net Revenue (¥)': "¥{:,.2f}",
