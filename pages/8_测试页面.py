@@ -305,47 +305,53 @@ class UI:
             self._display_stats_tab()
 
     def _display_config_tab(self):
-        # --- Import/Export Functionality ---
+        # =======================
+        #   UI OPTIMIZATION START
+        # =======================
         st.subheader("参数导入/导出", anchor=False)
         with st.container(border=True):
-            export_col, import_col = st.columns(2)
-            with export_col:
-                try:
-                    json_data = json.dumps(
-                        self.config.get_all_params(),
-                        indent=4,
-                        ensure_ascii=False
-                    )
-                    st.download_button(
-                        label="📥 导出当前参数为 JSON",
-                        data=json_data,
-                        file_name="amazon_calculator_params.json",
-                        mime="application/json",
-                        use_container_width=True,
-                    )
-                except Exception as e:
-                    st.error(f"导出参数时出错: {e}")
-
-            with import_col:
-                # =======================
-                #   FIX: REMOVED use_container_width
-                # =======================
-                uploaded_file = st.file_uploader(
-                    "📤 从 JSON 文件导入参数",
-                    type="json",
-                    accept_multiple_files=False,
+            # 1. Export Section
+            try:
+                json_data = json.dumps(
+                    self.config.get_all_params(),
+                    indent=4,
+                    ensure_ascii=False
                 )
-                if uploaded_file is not None:
-                    try:
-                        params = json.load(uploaded_file)
-                        self.config.load_all_params(params)
-                        st.success("参数已成功导入！页面将自动刷新。")
-                        time.sleep(1)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"导入失败: {e}")
+                st.download_button(
+                    label="📥 导出当前参数为 JSON",
+                    data=json_data,
+                    file_name="amazon_calculator_params.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
+            except Exception as e:
+                st.error(f"导出参数时出错: {e}")
+
+            st.divider()
+
+            # 2. Import Section
+            uploaded_file = st.file_uploader(
+                "📤 从 JSON 文件导入参数",
+                type="json",
+                accept_multiple_files=False,
+            )
             st.warning("**注意**: 导入将覆盖当前所有配置，建议先导出备份。", icon="⚠️")
+
+            # 3. Import Logic (runs when a file is uploaded)
+            if uploaded_file is not None:
+                try:
+                    params = json.load(uploaded_file)
+                    self.config.load_all_params(params)
+                    st.success("参数已成功导入！页面将自动刷新。")
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"导入失败: {e}")
+
         st.divider()
+        # =======================
+        #   UI OPTIMIZATION END
+        # =======================
 
         col1, col2, col3 = st.columns(3)
         with col1:
