@@ -7,12 +7,10 @@ import copy
 
 # ===================================================================
 # CLASS 1: Config - 数据配置中心
-# 负责存储和管理所有的配置信息。
 # ===================================================================
 class Config:
     """
     用于存储所有配置信息的数据类。
-    通过st.session_state管理动态添加的SKU和箱子。
     """
 
     def __init__(self):
@@ -31,29 +29,29 @@ class Config:
                     'length': 50.0,
                     'width': 40.0,
                     'height': 40.0,
-                    'other_costs': 0.0
+                    'other_costs': 0.0,
+                    # --- 新增：将运费信息直接绑定到箱子上 ---
+                    'shipping_price': 10.0,
+                    'destination_code': 'ONT8'
                 }
             }
-        if 'destinations' not in st.session_state:
-            st.session_state.destinations = {
-                'ONT8': {'shipping_price': 10.0, 'assigned_boxes': ['箱子1']}
-            }
+        # --- 移除旧的目的地配置 ---
+        # if 'destinations' not in st.session_state: ...
 
         # 将所有配置项分组存放在字典中
         self.procurement = {
-            'skus': st.session_state.skus,  # 引用会话状态
+            'skus': st.session_state.skus,
             'discount_rate': 100.0,
             'shipping_fee': 0.0,
             'other_costs': 0.0,
         }
         self.packaging = {
-            'boxes': st.session_state.boxes  # 引用会话状态
+            'boxes': st.session_state.boxes
         }
         self.shipping = {
             'min_chargeable_weight': 20.0,
             'volume_ratio': 6000,
-            'destinations': st.session_state.destinations,  # 引用会话状态
-            'other_costs': 0.0,
+            'other_costs': 0.0,  # 其他费用保留，作为整票货的附加费
         }
         self.platform = {
             'skus_platform_fees': {
@@ -75,12 +73,10 @@ class Config:
 
 # ===================================================================
 # CLASS 2: Calculator - 业务逻辑计算器
-# 负责执行所有的计算任务。
 # ===================================================================
 class Calculator:
     """
     负责所有业务逻辑的计算。
-    接收一个Config对象，并根据其数据进行计算。
     """
 
     def __init__(self, config: Config):
@@ -90,6 +86,7 @@ class Calculator:
     def run_all_calculations(self):
         self.calc_procurement_cost()
         self.calc_packaging_cost()
+        # --- 运费计算逻辑需要更新 ---
         self.calc_shipping_cost()
         self.calc_platform_cost_rmb()
         self.calc_advertising_cost_rmb()
@@ -132,6 +129,7 @@ class Calculator:
         return details
 
     def calc_shipping_cost(self):
+        """ --- 重构后的国际运费计算逻辑 --- """
         weight_details = self._get_chargeable_weight_details()
         self.results['chargeable_weights'] = weight_details
         total_shipping_cost = 0
@@ -140,16 +138,20 @@ class Calculator:
         min_weight = self.config.shipping['min_chargeable_weight']
 
         if total_chargeable_weight > 0 and total_chargeable_weight < min_weight:
-            first_dest_price = next(iter(self.config.shipping['destinations'].values()), {'shipping_price': 0})[
+            # 如果总重小于最低计费，按最低计费*单价。
+            # 真实业务复杂，这里简化为：使用第一个箱子的单价作为代表进行计算。
+            first_box_price = next(iter(self.config.packaging['boxes'].values()), {'shipping_price': 0})[
                 'shipping_price']
-            total_shipping_cost = min_weight * first_dest_price
+            total_shipping_cost = min_weight * first_box_price
         else:
-            for dest, dest_details in self.config.shipping['destinations'].items():
-                price_per_kg = dest_details['shipping_price']
-                for box_name in dest_details['assigned_boxes']:
-                    if box_name in weight_details:
-                        total_shipping_cost += weight_details[box_name]['chargeable_weight'] * price_per_kg
+            # 否则，按每个箱子自己的计费重量和单价计算
+            for box_name, details in self.config.packaging['boxes'].items():
+                if box_name in weight_details:
+                    chargeable_weight = weight_details[box_name]['chargeable_weight']
+                    price_per_kg = details['shipping_price']
+                    total_shipping_cost += chargeable_weight * price_per_kg
 
+        # 最后加上整票货的其它费用
         total_shipping_cost += self.config.shipping['other_costs']
         self.results['shipping_cost'] = total_shipping_cost
 
@@ -205,12 +207,10 @@ class Calculator:
 
 # ===================================================================
 # CLASS 3: UI - 用户界面渲染器
-# 负责构建Streamlit的所有前端组件。
 # ===================================================================
 class UI:
     """
     负责构建Streamlit用户界面。
-    接收Config和Calculator对象，用于数据绑定和结果展示。
     """
 
     def __init__(self, config: Config, calculator: Calculator):
@@ -224,6 +224,7 @@ class UI:
         with tab1:
             self._display_config_tab()
 
+        # 运行计算必须在渲染完所有输入框之后
         self.calculator.run_all_calculations()
 
         with tab2:
@@ -238,8 +239,9 @@ class UI:
             self._display_procurement_config()
         with col2:
             self._display_packaging_config()
-            self._display_shipping_config()
         with col3:
+            # 国际货运现在依赖于箱子，所以可以放在打包旁边或第三栏
+            self._display_shipping_config()
             self._display_platform_config()
             self._display_advertising_config()
             self._display_finance_config()
@@ -249,27 +251,26 @@ class UI:
             st.subheader("1. 采购成本")
             for name, details in list(st.session_state.skus.items()):
                 with st.expander(f"SKU: {name}", expanded=True):
-                    details['purchase_price'] = st.number_input(f"采购单价 (元)##{name}", value=details['purchase_price'],
-                                                                step=0.1, format="%.2f")
-                    details['quantity'] = st.number_input(f"采购数量 (件)##{name}", value=details['quantity'], step=1,
-                                                          min_value=0)
-                    details['weight'] = st.number_input(f"单件重量 (KG)##{name}", value=details['weight'], step=0.01,
-                                                        format="%.3f")
+                    # --- 优化1：三个输入框放在一行，并简化标签 ---
+                    p_col1, p_col2, p_col3 = st.columns(3)
+                    details['purchase_price'] = p_col1.number_input("采购单价(元)", key=f"price_{name}",
+                                                                    value=details['purchase_price'], step=0.1,
+                                                                    format="%.2f")
+                    details['quantity'] = p_col2.number_input("采购数量(件)", key=f"qty_{name}", value=details['quantity'],
+                                                              step=1, min_value=0)
+                    details['weight'] = p_col3.number_input("单件重量(KG)", key=f"weight_{name}", value=details['weight'],
+                                                            step=0.01, format="%.3f")
 
-                    # --- 新增：并排的删除和复制按钮 ---
                     b_col1, b_col2 = st.columns(2)
                     if b_col1.button(f"删除 {name}", key=f"del_sku_{name}", use_container_width=True):
                         del st.session_state.skus[name]
-                        # 安全地删除关联的平台费用
                         if name in self.config.platform['skus_platform_fees']:
                             del self.config.platform['skus_platform_fees'][name]
                         st.rerun()
 
                     if b_col2.button(f"复制 {name}", key=f"copy_sku_{name}", use_container_width=True):
                         new_name = f"款式{chr(ord('A') + len(st.session_state.skus))}"
-                        # 复制采购信息
                         st.session_state.skus[new_name] = copy.deepcopy(details)
-                        # 复制平台费用信息
                         platform_fees = self.config.platform['skus_platform_fees'].get(name, {'sell_price': 0.0,
                                                                                               'platform_fee': 0.0})
                         self.config.platform['skus_platform_fees'][new_name] = copy.deepcopy(platform_fees)
@@ -281,18 +282,12 @@ class UI:
                 st.rerun()
 
             st.markdown("---")
-            # --- 修改：折扣率从滑动条改为数字输入框 ---
-            self.config.procurement['discount_rate'] = st.number_input(
-                "折扣率 (%)",
-                min_value=0.0,
-                max_value=1000.0,  # 允许超过100以便处理特殊情况
-                value=self.config.procurement['discount_rate'],
-                step=1.0,
-                format="%.2f"
-            )
-            self.config.procurement['shipping_fee'] = st.number_input("运费 (元)",
+            self.config.procurement['discount_rate'] = st.number_input("折扣率 (%)",
+                                                                       value=self.config.procurement['discount_rate'],
+                                                                       step=1.0, format="%.2f")
+            self.config.procurement['shipping_fee'] = st.number_input("采购运费 (元)",
                                                                       value=self.config.procurement['shipping_fee'])
-            self.config.procurement['other_costs'] = st.number_input("其他费用 (元)",
+            self.config.procurement['other_costs'] = st.number_input("采购其他费用 (元)",
                                                                      value=self.config.procurement['other_costs'])
 
     def _display_packaging_config(self):
@@ -300,22 +295,30 @@ class UI:
             st.subheader("2. 打包与装箱")
             for name, details in list(st.session_state.boxes.items()):
                 with st.expander(f"箱子: {name}", expanded=True):
-                    details['quantity'] = st.number_input(f"纸箱数量 (个)##{name}", value=details['quantity'], step=1)
-                    details['unit_price'] = st.number_input(f"纸箱单价 (元)##{name}", value=details['unit_price'],
-                                                            format="%.2f")
+                    # --- 优化2：数量和单价放一行，简化标签 ---
+                    box_col1, box_col2 = st.columns(2)
+                    details['quantity'] = box_col1.number_input("纸箱数量(个)", key=f"box_qty_{name}",
+                                                                value=details['quantity'], step=1)
+                    details['unit_price'] = box_col2.number_input("纸箱单价(元)", key=f"box_price_{name}",
+                                                                  value=details['unit_price'], format="%.2f")
+
                     st.markdown("**箱内物品**")
                     for sku in self.config.procurement['skus'].keys():
-                        details['items'][sku] = st.number_input(f"{sku} 数量##{name}_{sku}",
+                        # --- 优化2：简化标签 ---
+                        details['items'][sku] = st.number_input(f"{sku} 数量", key=f"item_qty_{name}_{sku}",
                                                                 value=details['items'].get(sku, 0), step=1)
-                    details['weight'] = st.number_input(f"空箱重量 (KG)##{name}", value=details['weight'], format="%.2f")
-                    c1, c2, c3 = st.columns(3)
-                    details['length'] = c1.number_input(f"长(cm)##{name}", value=details['length'])
-                    details['width'] = c2.number_input(f"宽(cm)##{name}", value=details['width'])
-                    details['height'] = c3.number_input(f"高(cm)##{name}", value=details['height'])
-                    details['other_costs'] = st.number_input(f"其他费用(元)##{name}", value=details['other_costs'],
-                                                             format="%.2f")
 
-                    # --- 新增：并排的删除和复制按钮 ---
+                    # --- 优化2：尺寸放一行，重量放下面，简化标签 ---
+                    dim_col1, dim_col2, dim_col3 = st.columns(3)
+                    details['length'] = dim_col1.number_input("长(cm)", key=f"len_{name}", value=details['length'])
+                    details['width'] = dim_col2.number_input("宽(cm)", key=f"wid_{name}", value=details['width'])
+                    details['height'] = dim_col3.number_input("高(cm)", key=f"hei_{name}", value=details['height'])
+                    details['weight'] = st.number_input("空箱重量(KG)", key=f"box_weight_{name}", value=details['weight'],
+                                                        format="%.2f")
+
+                    details['other_costs'] = st.number_input(f"打包其他费用(元)", key=f"pack_other_{name}",
+                                                             value=details['other_costs'], format="%.2f")
+
                     b_col1, b_col2 = st.columns(2)
                     if b_col1.button(f"删除 {name}", key=f"del_box_{name}", use_container_width=True):
                         del st.session_state.boxes[name]
@@ -328,23 +331,36 @@ class UI:
             if st.button("新增箱子", use_container_width=True):
                 new_name = f"箱子{len(st.session_state.boxes) + 1}"
                 st.session_state.boxes[new_name] = {'quantity': 1, 'items': {}, 'unit_price': 5.0, 'weight': 0.5,
-                                                    'length': 50.0, 'width': 40.0, 'height': 40.0, 'other_costs': 0.0}
+                                                    'length': 50.0, 'width': 40.0, 'height': 40.0, 'other_costs': 0.0,
+                                                    'shipping_price': 10.0, 'destination_code': 'ONT8'}
                 st.rerun()
 
     def _display_shipping_config(self):
         with st.container(border=True):
             st.subheader("3. 国际货运成本")
-            self.config.shipping['min_chargeable_weight'] = st.number_input("每票最低计费重量 (KG)", value=self.config.shipping[
-                'min_chargeable_weight'])
-            self.config.shipping['volume_ratio'] = st.number_input("体积比", value=self.config.shipping['volume_ratio'])
-            for name, details in list(self.config.shipping['destinations'].items()):
-                with st.expander(f"目的地: {name}", expanded=True):
-                    details['shipping_price'] = st.number_input(f"运费单价(元/KG)##{name}", value=details['shipping_price'],
-                                                                format="%.2f")
-                    details['assigned_boxes'] = st.multiselect(f"发往此仓库的箱子##{name}",
-                                                               options=list(self.config.packaging['boxes'].keys()),
-                                                               default=details.get('assigned_boxes', []))
-            self.config.shipping['other_costs'] = st.number_input("其他费用(元)##shipping",
+            # --- 优化3：最低计费和体积比放一行 ---
+            ship_col1, ship_col2 = st.columns(2)
+            self.config.shipping['min_chargeable_weight'] = ship_col1.number_input("每票最低计费重量(KG)",
+                                                                                   value=self.config.shipping[
+                                                                                       'min_chargeable_weight'])
+            self.config.shipping['volume_ratio'] = ship_col2.number_input("体积比",
+                                                                          value=self.config.shipping['volume_ratio'])
+
+            st.markdown("---")
+            # --- 优化3：按箱子设置运费和目的地 ---
+            st.markdown("**各箱运费设置**")
+            for name, details in list(self.config.packaging['boxes'].items()):
+                with st.container(border=True):
+                    st.markdown(f"**{name}**")
+                    s_col1, s_col2 = st.columns(2)
+                    details['shipping_price'] = s_col1.number_input("运费单价(元/KG)", key=f"ship_price_{name}",
+                                                                    value=details.get('shipping_price', 10.0),
+                                                                    format="%.2f")
+                    details['destination_code'] = s_col2.text_input("目的仓库代码", key=f"dest_code_{name}",
+                                                                    value=details.get('destination_code', 'ONT8'))
+
+            st.markdown("---")
+            self.config.shipping['other_costs'] = st.number_input("货运其他费用(元)",
                                                                   value=self.config.shipping['other_costs'],
                                                                   format="%.2f")
 
@@ -355,12 +371,14 @@ class UI:
             for sku_name in self.config.procurement['skus'].keys():
                 if sku_name not in fees_cfg: fees_cfg[sku_name] = {'sell_price': 0.0, 'platform_fee': 0.0}
                 with st.expander(f"款式: {sku_name}", expanded=True):
-                    fees_cfg[sku_name]['sell_price'] = st.number_input(f"销售价格($)##{sku_name}",
-                                                                       value=fees_cfg[sku_name]['sell_price'],
-                                                                       format="%.2f")
-                    fees_cfg[sku_name]['platform_fee'] = st.number_input(f"每件平台费($)##{sku_name}",
-                                                                         value=fees_cfg[sku_name]['platform_fee'],
-                                                                         format="%.2f")
+                    # --- 优化4：售价和平台费放一行，简化标签 ---
+                    plat_col1, plat_col2 = st.columns(2)
+                    fees_cfg[sku_name]['sell_price'] = plat_col1.number_input("销售价格($)", key=f"sell_price_{sku_name}",
+                                                                              value=fees_cfg[sku_name]['sell_price'],
+                                                                              format="%.2f")
+                    fees_cfg[sku_name]['platform_fee'] = plat_col2.number_input("每件平台费($)", key=f"plat_fee_{sku_name}",
+                                                                                value=fees_cfg[sku_name][
+                                                                                    'platform_fee'], format="%.2f")
             st.markdown("---")
             self.config.platform['fulfillment_fee'] = st.number_input("入库配置费($)",
                                                                       value=self.config.platform['fulfillment_fee'],
@@ -368,7 +386,7 @@ class UI:
             self.config.platform['monthly_plan'] = st.number_input("专业计划月租($/月)",
                                                                    value=self.config.platform['monthly_plan'],
                                                                    format="%.2f")
-            self.config.platform['other_costs'] = st.number_input("其他费用($)##platform",
+            self.config.platform['other_costs'] = st.number_input("平台其他费用($)",
                                                                   value=self.config.platform['other_costs'],
                                                                   format="%.2f")
 
@@ -423,12 +441,8 @@ class UI:
 
 # ===================================================================
 # MAIN - 程序主入口
-# 负责实例化对象并运行应用。
 # ===================================================================
 def main():
-    """
-    应用程序主函数
-    """
     config = Config()
     calculator = Calculator(config)
     ui = UI(config, calculator)
