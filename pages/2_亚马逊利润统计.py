@@ -442,31 +442,43 @@ class UI:
             self._display_instructions_tab()
 
     def _display_data_source_selection(self):
-        """显示数据源选择界面"""
-        st.subheader("📋 选择数据源", anchor=False, divider="rainbow")
+        """简洁的数据源选择界面"""
+        st.subheader("选择数据源", divider="rainbow")
 
-        col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2, gap="large")
 
         with col1:
-            if st.button("📥 导入默认配置", use_container_width=True, type="primary"):
-                self.config.load_default_data()
-                st.rerun()
+            # 左侧：默认配置容器
+            with st.container(border=True, height=300):
+                st.markdown("### ⚡ 快速开始")
+                st.markdown("使用预设的默认配置快速体验系统功能")
+                st.divider()
+
+                if st.button("📥 导入默认配置", use_container_width=True, type="primary"):
+                    self.config.load_default_data()
+                    st.rerun()
 
         with col2:
-            # 根据是否已选择数据源来禁用文件上传
-            disabled = st.session_state.data_source is not None
-            uploaded_file = st.file_uploader(
-                "📤 从JSON文件导入",
-                type="json",
-                key=self.uploader_key,
-                disabled=disabled,
-                help="选择此选项将禁用默认配置导入" if not disabled else "已选择数据源，如需更改请刷新页面"
-            )
+            # 右侧：文件导入容器
+            with st.container(border=True, height=300):
+                st.markdown("### 📁 导入配置文件")
+                st.markdown("从已有的JSON配置文件导入您的设置")
+                st.divider()
 
-            if uploaded_file is not None and not disabled:
-                file_content = uploaded_file.getvalue().decode('utf-8')
-                if self.config.load_from_file(file_content):
-                    st.rerun()
+                # 文件上传
+                disabled = st.session_state.data_source is not None
+                uploaded_file = st.file_uploader(
+                    "从JSON文件导入",
+                    type="json",
+                    key=self.uploader_key,
+                    disabled=disabled,
+                    help="支持之前导出的配置文件格式"
+                )
+
+                if uploaded_file is not None and not disabled:
+                    file_content = uploaded_file.getvalue().decode('utf-8')
+                    if self.config.load_from_file(file_content):
+                        st.rerun()
 
         # 显示当前数据源状态
         if st.session_state.data_source:
