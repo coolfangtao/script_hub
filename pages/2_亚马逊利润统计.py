@@ -449,7 +449,7 @@ class UI:
 
         with col1:
             # 左侧：默认配置容器
-            with st.container(border=True, height=200):
+            with st.container(border=True, height=300):
                 st.markdown("### ⚡ 快速开始")
                 st.markdown("使用预设的默认配置快速体验系统功能")
                 st.divider()
@@ -460,7 +460,7 @@ class UI:
 
         with col2:
             # 右侧：文件导入容器
-            with st.container(border=True, height=200):
+            with st.container(border=True, height=300):
                 st.markdown("### 📁 导入配置文件")
                 st.markdown("从已有的JSON配置文件导入您的设置")
                 st.divider()
