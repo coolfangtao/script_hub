@@ -305,7 +305,7 @@ class UI:
             self._display_stats_tab()
 
     def _display_config_tab(self):
-        # --- NEW: Import/Export Functionality ---
+        # --- Import/Export Functionality ---
         st.subheader("参数导入/导出", anchor=False)
         with st.container(border=True):
             export_col, import_col = st.columns(2)
@@ -327,11 +327,13 @@ class UI:
                     st.error(f"导出参数时出错: {e}")
 
             with import_col:
+                # =======================
+                #   FIX: REMOVED use_container_width
+                # =======================
                 uploaded_file = st.file_uploader(
                     "📤 从 JSON 文件导入参数",
                     type="json",
                     accept_multiple_files=False,
-                    use_container_width=True
                 )
                 if uploaded_file is not None:
                     try:
