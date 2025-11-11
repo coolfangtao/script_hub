@@ -525,10 +525,10 @@ class UI:
         r = self.calculator.results
 
         with st.expander("💰 **总收入、成本与利润**", expanded=True):
-            st.info("净收入(¥) = (Σ(SKU销售价格 * 数量) * (1 - 提款手续费率)) * 汇率")
+            st.info("净收入(¥) = (Σ(SKU销售价格 × 数量) * (1 - 提款手续费率)) × 汇率")
             st.warning("总成本(¥) = 货物成本 + 打包成本 + 国际运费 + 平台费用 + 广告费用")
             st.success("总利润(¥) = 净收入(¥) - 总成本(¥)")
-            st.info("利润率(%) = (总利润(¥) / 净收入(¥)) * 100")
+            st.info("利润率(%) = (总利润(¥) / 净收入(¥)) × 100")
 
             f_col1, f_col2, f_col3 = st.columns(3)
             f_col1.metric("💵 净收入 (¥)", f"{r.get('net_revenue_rmb', 0):,.2f}")
@@ -536,7 +536,7 @@ class UI:
             f_col3.metric("💰 总利润 (¥)", f"{r.get('profit_rmb', 0):,.2f}", f"{r.get('profit_margin', 0):.2f}% 利润率")
 
         with st.expander("🛒 **货物成本 (¥)**", expanded=True):
-            st.info("总货物成本 = (Σ(各SKU采购单价 * 数量) * 折扣率) + 采购运费 + 其他费用")
+            st.info("总货物成本 = (Σ(各SKU采购单价 × 数量) × 折扣率) + 采购运费 + 其他费用")
             proc_details = r.get('procurement_details', {})
             if proc_details.get("各SKU成本"):
                 st.markdown("**各SKU成本明细:**")
@@ -548,14 +548,14 @@ class UI:
             c4.success(f"货物总成本: ¥ {r.get('procurement_cost', 0):.2f}")
 
         with st.expander("⚖️ **基础计费重量 (KG)**", expanded=True):
-            st.info("单箱基础计费重量 = MAX((箱内商品总重 + 空箱重), (长*宽*高 / 体积比))")
+            st.info("单箱基础计费重量 = MAX((箱内商品总重 + 空箱重), (长×宽×高 / 体积比))")
             df_weights = pd.DataFrame(r.get('chargeable_weights', {})).T.rename(
                 columns={'actual_weight': '总实际重量', 'volume_weight': '总体积重', 'chargeable_weight': '总基础计费重量'}
             )
             st.table(df_weights.style.format("{:.2f}"))
 
         with st.expander("🚢 **国际运费 (¥)**", expanded=True):
-            st.info("总国际运费 = Σ(MAX(单箱基础计费重, 每箱最低计费重) * 箱数 * 单价) + 其他费用")
+            st.info("总国际运费 = Σ(MAX(单箱基础计费重, 每箱最低计费重) × 箱数 × 单价) + 其他费用")
             shipping_details = r.get('shipping_details', {})
             if shipping_details.get("各箱最终计费重量详情"):
                 st.markdown("**各箱计费重量明细:**")
@@ -576,7 +576,7 @@ class UI:
             c3.success(f"总国际运费: ¥ {r.get('shipping_cost', 0):.2f}")
 
         with st.expander("📦 **打包成本 (¥)**", expanded=True):
-            st.info("总打包成本 = Σ(纸箱单价 * 纸箱数量 + 单箱其他费用)")
+            st.info("总打包成本 = Σ(纸箱单价 × 纸箱数量 + 单箱其他费用)")
             packaging_per_box = r.get('packaging_per_box', {})
             c1, c2 = st.columns(2)
             with c1:
@@ -588,11 +588,11 @@ class UI:
         col_p, col_a = st.columns(2)
         with col_p:
             with st.expander("🌐 **平台费用 (¥)**", expanded=True):
-                st.info("平台费用(¥) = (Σ(每件平台费*数量) + 其他费用) * 汇率")
+                st.info("平台费用(¥) = (Σ(每件平台费×数量) + 其他费用) × 汇率")
                 st.metric("平台费用", f"¥ {r.get('platform_fee_rmb', 0):.2f}", f"等同 ${r.get('platform_fee_usd', 0):.2f}")
         with col_a:
             with st.expander("📢 **广告费用 (¥)**", expanded=True):
-                st.info("广告费用(¥) = (日均花费 * 天数) * 汇率")
+                st.info("广告费用(¥) = (日均花费 × 天数) × 汇率")
                 st.metric("广告费用", f"¥ {r.get('advertising_cost_rmb', 0):.2f}",
                           f"等同 ${r.get('advertising_cost_usd', 0):.2f}")
 
