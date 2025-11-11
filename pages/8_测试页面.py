@@ -337,7 +337,7 @@ class UI:
             st.subheader("📦 2. 打包与装箱")
             for name, details in list(st.session_state.boxes.items()):
                 st.markdown(f"##### 箱子: <font color='orange'>**{name}**</font>", unsafe_allow_html=True)
-                with st.expander(expanded=True):
+                with st.container(border=True):
                     box_col1, box_col2 = st.columns(2)
                     details['quantity'] = box_col1.number_input("纸箱数量(个)", key=f"box_qty_{name}",
                                                                 value=details['quantity'], step=1)
