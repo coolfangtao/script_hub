@@ -24,7 +24,7 @@ SCRIPTS_BY_GROUP = {
     ],
     "📊 运营工具": [
         {
-            "label": "📊 亚马逊利润统计",
+            "label": "📈 亚马逊利润统计",
             "path": r"pages/2_亚马逊利润统计.py",
             "description": None
         },

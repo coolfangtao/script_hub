@@ -117,13 +117,14 @@ class Calculator:
     def run_all_calculations(self):
         self.calc_procurement_cost()
         self.calc_packaging_cost()
-        self.calc_shipping_cost()  # --- 运费计算逻辑已更新 ---
+        self.calc_shipping_cost()
         self.calc_platform_cost_rmb()
         self.calc_advertising_cost_rmb()
         self.calc_total_cost()
         self.calc_total_revenue_rmb()
         self.calc_profit()
         self.calc_cost_breakdown()
+        self.calc_per_sku_analysis()
 
     def calc_procurement_cost(self):
         cfg = self.config.procurement
@@ -266,6 +267,71 @@ class Calculator:
             '平台费用': self.results.get('platform_fee_rmb', 0),
             '广告费用': self.results.get('advertising_cost_rmb', 0),
         }
+
+    def calc_per_sku_analysis(self):
+        """新增：计算每个SKU的详细成本、收入和利润。"""
+        # 1. 汇总所有非直接与SKU挂钩的“间接成本”
+        total_overhead_costs = (
+                self.results['procurement_details'].get('采购运费', 0) +
+                self.results['procurement_details'].get('采购其他费用', 0) +
+                self.results.get('packaging_cost', 0) +
+                self.results.get('shipping_cost', 0) +
+                (
+                        self.config.platform.get('fulfillment_fee', 0) +
+                        self.config.platform.get('monthly_plan', 0) +
+                        self.config.platform.get('other_costs', 0)
+                ) * self.config.finance['exchange_rate'] +
+                self.results.get('advertising_cost_rmb', 0)
+        )
+
+        # 2. 计算总商品数量，用于分摊间接成本
+        all_skus = self.config.procurement['skus']
+        total_items = sum(sku['quantity'] for sku in all_skus.values())
+
+        # 3. 计算每件商品需要分摊的间接成本
+        overhead_cost_per_item = total_overhead_costs / total_items if total_items > 0 else 0
+
+        # 4. 遍历每个SKU，计算其详细指标
+        analysis_results = {}
+        for sku_name, sku_details in all_skus.items():
+            quantity = sku_details.get('quantity', 0)
+            if quantity == 0:
+                continue  # 跳过数量为0的SKU
+
+            # 计算收入
+            sell_price_usd = self.config.platform['skus_platform_fees'].get(sku_name, {}).get('sell_price', 0)
+            total_revenue_usd = sell_price_usd * quantity
+            net_revenue_rmb = total_revenue_usd * (1 - self.config.finance['withdrawal_fee_rate'] / 100.0) * \
+                              self.config.finance['exchange_rate']
+
+            # 计算成本
+            direct_procurement_cost = sku_details['purchase_price'] * quantity * (
+                    self.config.procurement['discount_rate'] / 100.0)
+            platform_fee_usd = self.config.platform['skus_platform_fees'].get(sku_name, {}).get('platform_fee', 0)
+            direct_platform_fee_rmb = platform_fee_usd * quantity * self.config.finance['exchange_rate']
+            allocated_overhead_rmb = overhead_cost_per_item * quantity
+            total_cost_rmb = direct_procurement_cost + direct_platform_fee_rmb + allocated_overhead_rmb
+
+            # 计算利润与回报
+            profit_rmb = net_revenue_rmb - total_cost_rmb
+            margin = (profit_rmb / net_revenue_rmb * 100) if net_revenue_rmb != 0 else 0
+            roi = (profit_rmb / total_cost_rmb * 100) if total_cost_rmb != 0 else 0
+
+            # 存储该SKU的所有分析结果
+            analysis_results[sku_name] = {
+                'SKU': sku_name,
+                'Quantity': quantity,
+                'Net Revenue (¥)': net_revenue_rmb,
+                'Total Cost (¥)': total_cost_rmb,
+                'Profit (¥)': profit_rmb,
+                'Profit Margin (%)': margin,
+                'ROI (%)': roi,
+                'Unit Revenue (¥)': net_revenue_rmb / quantity,
+                'Unit Cost (¥)': total_cost_rmb / quantity,
+                'Unit Profit (¥)': profit_rmb / quantity
+            }
+
+        self.results['per_sku_analysis'] = analysis_results
 
 
 # ===================================================================
@@ -608,32 +674,84 @@ class UI:
                           f"等同 ${r.get('advertising_cost_usd', 0):.2f}")
 
     def _display_stats_tab(self):
-        st.header("📊 成本构成分析")
+        """【已重构】渲染“统计图表”选项卡，增加SKU维度的分析"""
+        st.header("📊 数据分析中心")
         r = self.calculator.results
 
+        # --- 1. 总体成本构成分析 (保留原有功能) ---
+        st.subheader("总成本构成", divider="rainbow")
         cost_breakdown = r.get('cost_breakdown', {})
         filtered_costs = {k: v for k, v in cost_breakdown.items() if v > 0}
 
         if not filtered_costs:
-            st.warning("所有成本项均为0，无法生成图表。")
+            st.warning("所有成本项均为0，无法生成成本构成图表。")
         else:
-            df = pd.DataFrame(list(filtered_costs.items()), columns=['成本项', '金额(¥)'])
-            df = df.sort_values(by='金额(¥)', ascending=False)
+            df_cost = pd.DataFrame(list(filtered_costs.items()), columns=['成本项', '金额(¥)'])
+            df_cost = df_cost.sort_values(by='金额(¥)', ascending=False)
 
             chart_col1, chart_col2 = st.columns(2)
             with chart_col1:
-                st.subheader("成本构成占比 (饼图)")
-                fig_pie = px.pie(df, values='金额(¥)', names='成本项', hole=0.3,
+                fig_pie = px.pie(df_cost, values='金额(¥)', names='成本项', hole=0.3,
                                  title="各项成本占总成本的百分比")
-                fig_pie.update_traces(textposition='inside', textinfo='percent+label', pull=[0.05] * len(df))
+                fig_pie.update_traces(textposition='inside', textinfo='percent+label', pull=[0.05] * len(df_cost))
                 st.plotly_chart(fig_pie, use_container_width=True)
 
             with chart_col2:
-                st.subheader("成本构成金额 (条形图)")
-                fig_bar = px.bar(df, x='成本项', y='金额(¥)', text_auto='.2s',
+                fig_bar = px.bar(df_cost, x='成本项', y='金额(¥)', text_auto='.2s',
                                  title="各项成本的绝对金额对比")
                 fig_bar.update_traces(texttemplate='%{value:,.2f} 元', textposition='outside')
                 st.plotly_chart(fig_bar, use_container_width=True)
+
+        # --- 2. SKU 表现分析 (新增功能) ---
+        st.subheader("SKU表现分析", divider="rainbow")
+        sku_analysis_data = r.get('per_sku_analysis', {})
+
+        if not sku_analysis_data:
+            st.warning("没有可供分析的SKU数据。请在'费用配置'中添加SKU并设置其数量和价格。")
+        else:
+            df_sku = pd.DataFrame.from_dict(sku_analysis_data, orient='index')
+            df_sku_profit = df_sku[df_sku['Profit (¥)'] != 0] # 过滤掉利润为0的，避免图表干扰
+
+            sku_chart_col1, sku_chart_col2 = st.columns(2)
+            with sku_chart_col1:
+                df_revenue_positive = df_sku[df_sku['Net Revenue (¥)'] > 0]
+                fig_sku_revenue = px.pie(df_revenue_positive, values='Net Revenue (¥)', names='SKU', hole=0.3,
+                                         title="各SKU净收入贡献占比")
+                fig_sku_revenue.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig_sku_revenue, use_container_width=True)
+
+            with sku_chart_col2:
+                # 为利润条形图添加颜色区分
+                df_sku_profit['利润状态'] = df_sku_profit['Profit (¥)'].apply(lambda x: '盈利' if x > 0 else '亏损')
+                fig_sku_profit = px.bar(df_sku_profit.sort_values(by='Profit (¥)', ascending=False),
+                                        x='SKU', y='Profit (¥)', text_auto='.2s',
+                                        title="各SKU利润对比", color='利润状态',
+                                        color_discrete_map={'盈利': 'green', '亏损': 'red'})
+                fig_sku_profit.update_traces(texttemplate='%{value:,.2f} 元', textposition='outside')
+                st.plotly_chart(fig_sku_profit, use_container_width=True)
+
+            # --- 3. 各SKU详细数据表 (新增功能) ---
+            st.subheader("📝 各SKU详细数据")
+            st.info("点击列标题可以对表格进行排序，方便您发现表现最优和最差的SKU。")
+
+            # 格式化显示DataFrame
+            display_df = df_sku[[
+                'Quantity', 'Net Revenue (¥)', 'Total Cost (¥)', 'Profit (¥)',
+                'Profit Margin (%)', 'ROI (%)', 'Unit Revenue (¥)', 'Unit Cost (¥)', 'Unit Profit (¥)'
+            ]].copy() # 使用.copy()避免SettingWithCopyWarning
+
+            st.dataframe(display_df.style.format({
+                'Net Revenue (¥)': "¥{:,.2f}",
+                'Total Cost (¥)': "¥{:,.2f}",
+                'Profit (¥)': "¥{:,.2f}",
+                'Profit Margin (%)': "{:,.2f}%",
+                'ROI (%)': "{:,.2f}%",
+                'Unit Revenue (¥)': "¥{:,.2f}",
+                'Unit Cost (¥)': "¥{:,.2f}",
+                'Unit Profit (¥)': "¥{:,.2f}",
+            }).background_gradient(
+                cmap='RdYlGn', subset=['Profit (¥)', 'Profit Margin (%)', 'ROI (%)', 'Unit Profit (¥)']
+            ), use_container_width=True)
 
 
     def _display_instructions_tab(self):
