@@ -308,7 +308,7 @@ class UI:
         # =======================
         #   UI OPTIMIZATION START
         # =======================
-        st.subheader("参数导入/导出", anchor=False)
+        st.subheader("参数导入/导出", anchor=False, divider="rainbow")
         with st.container(border=True):
             # 1. Export Section
             try:
@@ -318,7 +318,7 @@ class UI:
                     ensure_ascii=False
                 )
                 st.download_button(
-                    label="📥 导出当前参数为 JSON",
+                    label="📥 导出当前参数到本地",
                     data=json_data,
                     file_name="amazon_calculator_params.json",
                     mime="application/json",
@@ -331,7 +331,7 @@ class UI:
 
             # 2. Import Section
             uploaded_file = st.file_uploader(
-                "📤 从 JSON 文件导入参数",
+                "📤 从本地文件导入参数",
                 type="json",
                 accept_multiple_files=False,
             )
