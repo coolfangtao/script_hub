@@ -82,13 +82,62 @@ class Config:
         return copy.deepcopy(st.session_state.params)
 
     def load_all_params(self, params: dict):
-        """从字典加载配置数据，并直接更新整个 session_state。"""
+        """
+        从字典加载配置数据，并直接更新整个 session_state。
+        这包括核心数据源 (st.session_state.params) 和所有与UI小部件绑定的独立状态键。
+        """
         required_keys = ['procurement', 'packaging', 'shipping', 'platform', 'advertising', 'finance']
         if not all(key in params for key in required_keys):
             raise ValueError("导入的JSON文件格式不正确或缺少必要的配置项。")
 
-        # 只更新核心数据源。__init__将在下一次rerun时负责同步快捷方式。
+        # 1. 更新核心数据源
         st.session_state.params = params
+
+        # ===================================================================
+        # START OF FIX: Manually synchronize all widget states from the new data source
+        # ===================================================================
+
+        # 2. 手动更新所有与UI小部件关联的 session_state 键
+        # 这是至关重要的一步，可以防止UI显示旧的缓存值。
+
+        # 更新 SKU 相关的组件值
+        if 'procurement' in params and 'skus' in params['procurement']:
+            for name, details in params['procurement']['skus'].items():
+                st.session_state[f"price_{name}"] = details.get('purchase_price', 0.0)
+                st.session_state[f"qty_{name}"] = details.get('quantity', 0)
+                st.session_state[f"weight_{name}"] = details.get('weight', 0.0)
+
+        # 更新箱子相关的组件值
+        if 'packaging' in params and 'boxes' in params['packaging']:
+            all_sku_keys = params.get('procurement', {}).get('skus', {}).keys()
+            for name, details in params['packaging']['boxes'].items():
+                st.session_state[f"box_qty_{name}"] = details.get('quantity', 0)
+                st.session_state[f"box_price_{name}"] = details.get('unit_price', 0.0)
+                st.session_state[f"len_{name}"] = details.get('length', 0.0)
+                st.session_state[f"wid_{name}"] = details.get('width', 0.0)
+                st.session_state[f"hei_{name}"] = details.get('height', 0.0)
+                st.session_state[f"box_weight_{name}"] = details.get('weight', 0.0)
+                st.session_state[f"pack_other_{name}"] = details.get('other_costs', 0.0)
+                st.session_state[f"ship_price_{name}"] = details.get('shipping_price', 10.0)
+                st.session_state[f"dest_code_{name}"] = details.get('destination_code', 'ONT8')
+
+                # 更新箱内每个SKU数量的组件值
+                for sku_key in all_sku_keys:
+                    item_qty = details.get('items', {}).get(sku_key, 0)
+                    st.session_state[f"item_qty_{name}_{sku_key}"] = item_qty
+
+        # 更新平台费用相关的组件值
+        if 'platform' in params and 'skus_platform_fees' in params['platform']:
+            for sku_name, details in params['platform']['skus_platform_fees'].items():
+                st.session_state[f"sell_price_{sku_name}"] = details.get('sell_price', 0.0)
+                st.session_state[f"plat_fee_{sku_name}"] = details.get('platform_fee', 0.0)
+
+        # 继承旧的快捷方式更新逻辑，确保在rerun之前它们是同步的
+        st.session_state.skus = st.session_state.params['procurement']['skus']
+        st.session_state.boxes = st.session_state.params['packaging']['boxes']
+        # ===================================================================
+        # END OF FIX
+        # ===================================================================
 
 
 # ===================================================================
