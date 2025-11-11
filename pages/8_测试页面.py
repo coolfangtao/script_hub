@@ -262,7 +262,6 @@ class UI:
                         f"总销售额 ${r.get('total_revenue_usd', 0):,.2f}")
         res_col3.metric("🧾 总成本 (¥)", f"{r.get('total_cost_rmb', 0):,.2f}")
         res_col4.metric("📈 投资回报率 (ROI)", f"{r.get('profit_rmb', 0) / r.get('total_cost_rmb', 1):.2%}")
-        st.divider()
 
         tab1, tab2, tab3 = st.tabs(["⚙️ 参数配置", "🧮 计算过程", "📊 统计图表"])
 
@@ -287,7 +286,7 @@ class UI:
 
     def _display_procurement_config(self):
         with st.container(border=True):
-            st.subheader("🛒 1. 采购成本")
+            st.subheader("🛒 1. 采购成本", divider="rainbow")
             for name, details in list(st.session_state.skus.items()):
                 # --- 美化：使用颜色高亮SKU名称 ---
                 st.markdown(f"##### SKU: <font color='green'>**{name}**</font>", unsafe_allow_html=True)
@@ -334,7 +333,7 @@ class UI:
 
     def _display_packaging_config(self):
         with st.container(border=True):
-            st.subheader("📦 2. 打包与装箱")
+            st.subheader("📦 2. 打包与装箱", divider="rainbow")
             for name, details in list(st.session_state.boxes.items()):
                 st.markdown(f"##### 箱子: <font color='orange'>**{name}**</font>", unsafe_allow_html=True)
                 with st.container(border=True):
@@ -377,7 +376,7 @@ class UI:
 
     def _display_shipping_config(self):
         with st.container(border=True):
-            st.subheader("🚢 3. 国际货运成本")
+            st.subheader("🚢 3. 国际货运成本", divider="rainbow")
             ship_col1, ship_col2 = st.columns(2)
             self.config.shipping['min_chargeable_weight'] = ship_col1.number_input("每箱最低计费重量(KG)",
                                                                                    value=self.config.shipping[
@@ -404,7 +403,7 @@ class UI:
 
     def _display_platform_config(self):
         with st.container(border=True):
-            st.subheader("🌐 4. 平台费用")
+            st.subheader("🌐 4. 平台费用", divider="rainbow")
             fees_cfg = self.config.platform['skus_platform_fees']
             for sku_name in self.config.procurement['skus'].keys():
                 if sku_name not in fees_cfg: fees_cfg[sku_name] = {'sell_price': 0.0, 'platform_fee': 0.0}
@@ -429,14 +428,14 @@ class UI:
 
     def _display_advertising_config(self):
         with st.container(border=True):
-            st.subheader("📢 5. 广告费用")
+            st.subheader("📢 5. 广告费用", divider="rainbow")
             cfg = self.config.advertising
             cfg['daily_spend'] = st.number_input("日均广告花费($)", value=cfg['daily_spend'], format="%.2f")
             cfg['duration_days'] = st.number_input("广告持续天数(天)", value=cfg['duration_days'], step=1)
 
     def _display_finance_config(self):
         with st.container(border=True):
-            st.subheader("🏦 6. 汇率和手续费")
+            st.subheader("🏦 6. 汇率和手续费", divider="rainbow")
             cfg = self.config.finance
             cfg['exchange_rate'] = st.number_input("汇率(美元兑人民币)", value=cfg['exchange_rate'], format="%.2f")
             cfg['withdrawal_fee_rate'] = st.number_input("提款手续费(%)", value=cfg['withdrawal_fee_rate'], format="%.2f")
