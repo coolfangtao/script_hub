@@ -305,9 +305,7 @@ class UI:
             self._display_stats_tab()
 
     def _display_config_tab(self):
-        # =======================
-        #   UI OPTIMIZATION START
-        # =======================
+
         st.subheader("参数导入/导出", anchor=False, divider="rainbow")
         with st.container(border=True):
             # 1. Export Section
@@ -326,8 +324,6 @@ class UI:
                 )
             except Exception as e:
                 st.error(f"导出参数时出错: {e}")
-
-            st.divider()
 
             # 2. Import Section
             uploaded_file = st.file_uploader(
@@ -348,10 +344,6 @@ class UI:
                 except Exception as e:
                     st.error(f"导入失败: {e}")
 
-        st.divider()
-        # =======================
-        #   UI OPTIMIZATION END
-        # =======================
 
         col1, col2, col3 = st.columns(3)
         with col1:
