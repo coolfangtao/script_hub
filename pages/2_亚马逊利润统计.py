@@ -411,7 +411,7 @@ class UI:
     def run(self):
         create_common_sidebar(current_label="📈 亚马逊利润统计")
         st.set_page_config(layout="wide", page_title="亚马逊成本利润计算器", page_icon="📊")
-        st.title("📊 亚马逊卖家成本利润计算器")
+        st.title("📈 亚马逊卖家成本利润计算器")
 
         # 如果没有数据，只显示数据源选择
         if not self.config.has_data():
@@ -421,7 +421,7 @@ class UI:
         # 有数据时正常显示计算界面
         self.calculator.run_all_calculations()
 
-        st.subheader("📈 核心数据一览")
+        st.subheader("📈 核心数据一览", divider="rainbow")
         r = self.calculator.results
         res_col1, res_col2, res_col3, res_col4 = st.columns(4)
         res_col1.metric("💰 总利润 (¥)", f"{r.get('profit_rmb', 0):,.2f}", f"{r.get('profit_margin', 0):.2f}% 利润率")
