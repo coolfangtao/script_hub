@@ -249,11 +249,11 @@ class UI:
             st.subheader("1. 采购成本")
             for name, details in list(st.session_state.skus.items()):
                 with st.expander(f"SKU: {name}", expanded=True):
-                    details['purchase_price'] = st.number_input(f"采购单价 (元)##{name}", value=details['purchase_price'],
+                    details['purchase_price'] = st.number_input(f"采购单价 (元)", value=details['purchase_price'],
                                                                 step=0.1, format="%.2f")
-                    details['quantity'] = st.number_input(f"采购数量 (件)##{name}", value=details['quantity'], step=1,
+                    details['quantity'] = st.number_input(f"采购数量 (件)", value=details['quantity'], step=1,
                                                           min_value=0)
-                    details['weight'] = st.number_input(f"单件重量 (KG)##{name}", value=details['weight'], step=0.01,
+                    details['weight'] = st.number_input(f"单件重量 (KG)", value=details['weight'], step=0.01,
                                                         format="%.3f")
 
                     # --- 新增：并排的删除和复制按钮 ---
