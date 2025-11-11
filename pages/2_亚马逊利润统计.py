@@ -87,10 +87,8 @@ class Config:
         if not all(key in params for key in required_keys):
             raise ValueError("导入的JSON文件格式不正确或缺少必要的配置项。")
 
+        # 只更新核心数据源。__init__将在下一次rerun时负责同步快捷方式。
         st.session_state.params = params
-
-        st.session_state.skus = st.session_state.params['procurement']['skus']
-        st.session_state.boxes = st.session_state.params['packaging']['boxes']
 
 
 # ===================================================================
