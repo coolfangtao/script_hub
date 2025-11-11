@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import copy
 
 
 # ===================================================================
@@ -118,7 +119,8 @@ class Calculator:
         details = {}
         for name, box in self.config.packaging['boxes'].items():
             product_weight = sum(
-                self.config.procurement['skus'][sku]['weight'] * qty for sku, qty in box['items'].items()
+                self.config.procurement['skus'][sku]['weight'] * qty for sku, qty in box['items'].items() if
+                sku in self.config.procurement['skus']
             )
             actual_weight = product_weight + box['weight'] * box['quantity']
             volume_weight = (box['length'] * box['width'] * box['height']) / self.config.shipping['volume_ratio'] * box[
@@ -134,13 +136,12 @@ class Calculator:
         self.results['chargeable_weights'] = weight_details
         total_shipping_cost = 0
 
-        # 实际业务中，最低计费重量是按“票”算的，这里简化处理
         total_chargeable_weight = sum(d['chargeable_weight'] for d in weight_details.values())
         min_weight = self.config.shipping['min_chargeable_weight']
 
-        if total_chargeable_weight < min_weight:
-            # 如果总重小于最低计费，按最低计费*单价（这里用第一个目的地的单价作为示例）
-            first_dest_price = next(iter(self.config.shipping['destinations'].values()))['shipping_price']
+        if total_chargeable_weight > 0 and total_chargeable_weight < min_weight:
+            first_dest_price = next(iter(self.config.shipping['destinations'].values()), {'shipping_price': 0})[
+                'shipping_price']
             total_shipping_cost = min_weight * first_dest_price
         else:
             for dest, dest_details in self.config.shipping['destinations'].items():
@@ -154,10 +155,12 @@ class Calculator:
 
     def calc_platform_cost_rmb(self):
         cfg_p = self.config.platform
-        total_usd = sum(
-            details['platform_fee'] * self.config.procurement['skus'][sku]['quantity']
-            for sku, details in cfg_p['skus_platform_fees'].items()
-        ) + cfg_p['fulfillment_fee'] + cfg_p['monthly_plan'] + cfg_p['other_costs']
+        total_usd = 0
+        for sku, details in cfg_p['skus_platform_fees'].items():
+            if sku in self.config.procurement['skus']:
+                total_usd += details['platform_fee'] * self.config.procurement['skus'][sku]['quantity']
+
+        total_usd += cfg_p['fulfillment_fee'] + cfg_p['monthly_plan'] + cfg_p['other_costs']
         self.results['platform_fee_usd'] = total_usd
         self.results['platform_fee_rmb'] = total_usd * self.config.finance['exchange_rate']
 
@@ -168,10 +171,11 @@ class Calculator:
         self.results['advertising_cost_rmb'] = total_usd * self.config.finance['exchange_rate']
 
     def calc_total_revenue_rmb(self):
-        total_revenue_usd = sum(
-            d['sell_price'] * self.config.procurement['skus'][sku]['quantity']
-            for sku, d in self.config.platform['skus_platform_fees'].items()
-        )
+        total_revenue_usd = 0
+        for sku, d in self.config.platform['skus_platform_fees'].items():
+            if sku in self.config.procurement['skus']:
+                total_revenue_usd += d['sell_price'] * self.config.procurement['skus'][sku]['quantity']
+
         net_revenue_usd = total_revenue_usd * (1 - self.config.finance['withdrawal_fee_rate'] / 100.0)
         self.results['total_revenue_usd'] = total_revenue_usd
         self.results['net_revenue_rmb'] = net_revenue_usd * self.config.finance['exchange_rate']
@@ -243,7 +247,6 @@ class UI:
     def _display_procurement_config(self):
         with st.container(border=True):
             st.subheader("1. 采购成本")
-            # 动态增删SKU
             for name, details in list(st.session_state.skus.items()):
                 with st.expander(f"SKU: {name}", expanded=True):
                     details['purchase_price'] = st.number_input(f"采购单价 (元)##{name}", value=details['purchase_price'],
@@ -252,16 +255,41 @@ class UI:
                                                           min_value=0)
                     details['weight'] = st.number_input(f"单件重量 (KG)##{name}", value=details['weight'], step=0.01,
                                                         format="%.3f")
-                    if st.button(f"删除 {name}", key=f"del_sku_{name}"):
+
+                    # --- 新增：并排的删除和复制按钮 ---
+                    b_col1, b_col2 = st.columns(2)
+                    if b_col1.button(f"删除 {name}", key=f"del_sku_{name}", use_container_width=True):
                         del st.session_state.skus[name]
+                        # 安全地删除关联的平台费用
+                        if name in self.config.platform['skus_platform_fees']:
+                            del self.config.platform['skus_platform_fees'][name]
                         st.rerun()
-            if st.button("新增SKU"):
+
+                    if b_col2.button(f"复制 {name}", key=f"copy_sku_{name}", use_container_width=True):
+                        new_name = f"款式{chr(ord('A') + len(st.session_state.skus))}"
+                        # 复制采购信息
+                        st.session_state.skus[new_name] = copy.deepcopy(details)
+                        # 复制平台费用信息
+                        platform_fees = self.config.platform['skus_platform_fees'].get(name, {'sell_price': 0.0,
+                                                                                              'platform_fee': 0.0})
+                        self.config.platform['skus_platform_fees'][new_name] = copy.deepcopy(platform_fees)
+                        st.rerun()
+
+            if st.button("新增SKU", use_container_width=True):
                 new_name = f"款式{chr(ord('A') + len(st.session_state.skus))}"
                 st.session_state.skus[new_name] = {'purchase_price': 0.0, 'quantity': 0, 'weight': 0.0}
                 st.rerun()
+
             st.markdown("---")
-            self.config.procurement['discount_rate'] = st.slider("折扣率 (%)", 0.0, 100.0,
-                                                                 self.config.procurement['discount_rate'], 0.5)
+            # --- 修改：折扣率从滑动条改为数字输入框 ---
+            self.config.procurement['discount_rate'] = st.number_input(
+                "折扣率 (%)",
+                min_value=0.0,
+                max_value=1000.0,  # 允许超过100以便处理特殊情况
+                value=self.config.procurement['discount_rate'],
+                step=1.0,
+                format="%.2f"
+            )
             self.config.procurement['shipping_fee'] = st.number_input("运费 (元)",
                                                                       value=self.config.procurement['shipping_fee'])
             self.config.procurement['other_costs'] = st.number_input("其他费用 (元)",
@@ -286,10 +314,18 @@ class UI:
                     details['height'] = c3.number_input(f"高(cm)##{name}", value=details['height'])
                     details['other_costs'] = st.number_input(f"其他费用(元)##{name}", value=details['other_costs'],
                                                              format="%.2f")
-                    if st.button(f"删除 {name}", key=f"del_box_{name}"):
+
+                    # --- 新增：并排的删除和复制按钮 ---
+                    b_col1, b_col2 = st.columns(2)
+                    if b_col1.button(f"删除 {name}", key=f"del_box_{name}", use_container_width=True):
                         del st.session_state.boxes[name]
                         st.rerun()
-            if st.button("新增箱子"):
+                    if b_col2.button(f"复制 {name}", key=f"copy_box_{name}", use_container_width=True):
+                        new_name = f"箱子{len(st.session_state.boxes) + 1}"
+                        st.session_state.boxes[new_name] = copy.deepcopy(details)
+                        st.rerun()
+
+            if st.button("新增箱子", use_container_width=True):
                 new_name = f"箱子{len(st.session_state.boxes) + 1}"
                 st.session_state.boxes[new_name] = {'quantity': 1, 'items': {}, 'unit_price': 5.0, 'weight': 0.5,
                                                     'length': 50.0, 'width': 40.0, 'height': 40.0, 'other_costs': 0.0}
@@ -353,27 +389,29 @@ class UI:
     def _display_formulas_tab(self):
         st.header("计算过程详情")
         r = self.calculator.results
-        st.expander("1. 货物成本 (¥)", expanded=True).write(r['procurement_details'])
-        st.expander("2. 计费重量 (KG)", expanded=True).table(pd.DataFrame(r['chargeable_weights']).T)
-        st.expander("3. 国际运费 (¥)", expanded=True).metric("总国际运费", f"¥ {r['shipping_cost']:.2f}")
-        st.expander("4. 平台费用 (¥)", expanded=True).metric("平台费用", f"¥ {r['platform_fee_rmb']:.2f}",
-                                                         f"${r['platform_fee_usd']:.2f}")
-        st.expander("5. 广告费用 (¥)", expanded=True).metric("广告费用", f"¥ {r['advertising_cost_rmb']:.2f}",
-                                                         f"${r['advertising_cost_usd']:.2f}")
-        st.expander("6. 其他费用 (¥)", expanded=True).metric("打包过程费用", f"¥ {r['packaging_cost']:.2f}")
+        st.expander("1. 货物成本 (¥)", expanded=True).write(r.get('procurement_details', {}))
+        st.expander("2. 计费重量 (KG)", expanded=True).table(pd.DataFrame(r.get('chargeable_weights', {})).T.rename(
+            columns={'actual_weight': '实际重量', 'volume_weight': '体积重', 'chargeable_weight': '计费重量'}))
+        st.expander("3. 国际运费 (¥)", expanded=True).metric("总国际运费", f"¥ {r.get('shipping_cost', 0):.2f}")
+        st.expander("4. 平台费用 (¥)", expanded=True).metric("平台费用", f"¥ {r.get('platform_fee_rmb', 0):.2f}",
+                                                         f"${r.get('platform_fee_usd', 0):.2f}")
+        st.expander("5. 广告费用 (¥)", expanded=True).metric("广告费用", f"¥ {r.get('advertising_cost_rmb', 0):.2f}",
+                                                         f"${r.get('advertising_cost_usd', 0):.2f}")
+        st.expander("6. 其他费用 (¥)", expanded=True).metric("打包过程费用", f"¥ {r.get('packaging_cost', 0):.2f}")
 
     def _display_stats_tab(self):
         st.header("总体统计信息")
         r = self.calculator.results
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("总利润 (¥)", f"{r['profit_rmb']:,.2f}", f"{r['profit_margin']:.2f}% 利润率")
-        col2.metric("净收入 (¥)", f"{r['net_revenue_rmb']:,.2f}")
-        col3.metric("总成本 (¥)", f"{r['total_cost_rmb']:,.2f}")
-        col4.metric("总销售额 ($)", f"${r['total_revenue_usd']:,.2f}")
+        col1.metric("总利润 (¥)", f"{r.get('profit_rmb', 0):,.2f}", f"{r.get('profit_margin', 0):.2f}% 利润率")
+        col2.metric("净收入 (¥)", f"{r.get('net_revenue_rmb', 0):,.2f}")
+        col3.metric("总成本 (¥)", f"{r.get('total_cost_rmb', 0):,.2f}")
+        col4.metric("总销售额 ($)", f"${r.get('total_revenue_usd', 0):,.2f}")
         st.markdown("---")
         st.subheader("成本构成占比")
 
-        filtered_costs = {k: v for k, v in r['cost_breakdown'].items() if v > 0}
+        cost_breakdown = r.get('cost_breakdown', {})
+        filtered_costs = {k: v for k, v in cost_breakdown.items() if v > 0}
         if not filtered_costs:
             st.warning("所有成本项均为0，无法生成图表。")
         else:
@@ -389,11 +427,7 @@ class UI:
 # ===================================================================
 def main():
     """
-    应用程序主函数：
-    1. 初始化配置对象。
-    2. 初始化计算器对象，并传入配置。
-    3. 初始化UI对象，并传入配置和计算器。
-    4. 运行UI。
+    应用程序主函数
     """
     config = Config()
     calculator = Calculator(config)
