@@ -30,13 +30,10 @@ class Config:
                     'width': 40.0,
                     'height': 40.0,
                     'other_costs': 0.0,
-                    # --- 新增：将运费信息直接绑定到箱子上 ---
                     'shipping_price': 10.0,
                     'destination_code': 'ONT8'
                 }
             }
-        # --- 移除旧的目的地配置 ---
-        # if 'destinations' not in st.session_state: ...
 
         # 将所有配置项分组存放在字典中
         self.procurement = {
@@ -51,7 +48,7 @@ class Config:
         self.shipping = {
             'min_chargeable_weight': 20.0,
             'volume_ratio': 6000,
-            'other_costs': 0.0,  # 其他费用保留，作为整票货的附加费
+            'other_costs': 0.0,
         }
         self.platform = {
             'skus_platform_fees': {
@@ -98,7 +95,6 @@ class Calculator:
         cfg = self.config.procurement
         discount = cfg['discount_rate'] / 100.0
 
-        # --- 新增：计算每个SKU的成本 ---
         per_sku_costs = {
             name: sku['purchase_price'] * sku['quantity']
             for name, sku in cfg['skus'].items()
@@ -117,7 +113,6 @@ class Calculator:
         }
 
     def calc_packaging_cost(self):
-        # --- 新增：计算每个箱子的打包成本 ---
         per_box_costs = {
             name: box['unit_price'] * box['quantity'] + box['other_costs']
             for name, box in self.config.packaging['boxes'].items()
@@ -126,70 +121,66 @@ class Calculator:
         self.results['packaging_cost'] = sum(per_box_costs.values())
 
     def _get_chargeable_weight_details(self):
+        """计算每个箱子类型的总实际重和总体积重（未考虑最低计费）"""
         details = {}
         for name, box in self.config.packaging['boxes'].items():
-            product_weight = sum(
+            # 计算箱内所有商品的总重量
+            product_weight_total = sum(
                 self.config.procurement['skus'][sku]['weight'] * qty for sku, qty in box['items'].items() if
                 sku in self.config.procurement['skus']
             )
-            # 注意: 这里的 actual_weight 应该乘以箱子数量
-            actual_weight = (product_weight + box['weight']) * box['quantity']
-            volume_weight = (box['length'] * box['width'] * box['height']) / self.config.shipping['volume_ratio'] * box[
-                'quantity']
+            # 计算此类型所有箱子的总实际重量
+            actual_weight_total = (product_weight_total + box['weight'] * box['quantity'])
+
+            # 计算此类型所有箱子的总体积重量
+            volume_weight_total = (box['length'] * box['width'] * box['height']) / self.config.shipping[
+                'volume_ratio'] * box['quantity']
+
             details[name] = {
-                'actual_weight': actual_weight,
-                'volume_weight': volume_weight,
-                'chargeable_weight': max(actual_weight, volume_weight)
+                'actual_weight': actual_weight_total,
+                'volume_weight': volume_weight_total,
+                'chargeable_weight': max(actual_weight_total, volume_weight_total)
             }
         return details
 
     def calc_shipping_cost(self):
-        """ --- 优化后的国际运费计算逻辑 --- """
+        """ --- 优化后的国际运费计算逻辑 (按箱应用最低计费) --- """
         weight_details = self._get_chargeable_weight_details()
-        self.results['chargeable_weights'] = weight_details
+        self.results['chargeable_weights'] = weight_details  # 存储基础计费重，用于UI展示
 
-        # 1. 计算整票货物的总真实重量、总体积重
-        total_actual_weight = sum(d['actual_weight'] for d in weight_details.values())
-        total_volume_weight = sum(d['volume_weight'] for d in weight_details.values())
-        min_chargeable_weight = self.config.shipping['min_chargeable_weight']
-
-        # 2. 最终计费重量 = MAX(总真实重, 总体积重, 最低计费重)
-        final_billable_weight = max(total_actual_weight, total_volume_weight, min_chargeable_weight)
-
-        # 3. 计算各个箱子按自身单价计算的理论运费
-        per_box_shipping_cost_before_min = {}
-        for box_name, details in self.config.packaging['boxes'].items():
-            if box_name in weight_details:
-                # 每个箱子的计费重 = max(真实重, 体积重)
-                chargeable_weight_per_box = weight_details[box_name]['chargeable_weight']
-                price_per_kg = details['shipping_price']
-                per_box_shipping_cost_before_min[box_name] = chargeable_weight_per_box * price_per_kg
-
-        # 4. 按比例分摊总运费
-        total_cost_before_min = sum(per_box_shipping_cost_before_min.values())
-        total_chargeable_weight_before_min = sum(d['chargeable_weight'] for d in weight_details.values())
-
-        final_per_box_cost = {}
+        min_weight_per_box = self.config.shipping['min_chargeable_weight']
         total_shipping_cost = 0
+        per_box_final_costs = {}
+        per_box_final_weights_details = {}
 
-        if total_chargeable_weight_before_min > 0:
-            # 计算总运费，如果总重小于最低计费，则通过比例放大总费用
-            total_shipping_cost = (final_billable_weight / total_chargeable_weight_before_min) * total_cost_before_min
-            # 将放大/缩小后的总费用，按原费用比例分摊回每个箱子
-            for box_name, cost in per_box_shipping_cost_before_min.items():
-                final_per_box_cost[box_name] = (
-                                                           cost / total_cost_before_min) * total_shipping_cost if total_cost_before_min > 0 else 0
+        for box_name, box_config in self.config.packaging['boxes'].items():
+            if box_name in weight_details and box_config['quantity'] > 0:
+                # 1. 计算单个箱子的基础计费重量 = MAX(单箱实际重, 单箱体积重)
+                base_chargeable_weight_per_box = weight_details[box_name]['chargeable_weight'] / box_config['quantity']
 
-        # 5. 加上整票货的其它费用
+                # 2. 确定单个箱子的最终计费重量 = MAX(基础计费重, 每箱最低计费重)
+                final_chargeable_weight_per_box = max(base_chargeable_weight_per_box, min_weight_per_box)
+
+                # 3. 计算此类型所有箱子的总运费
+                price_per_kg = box_config['shipping_price']
+                cost_for_this_box_type = final_chargeable_weight_per_box * box_config['quantity'] * price_per_kg
+
+                # 4. 累加总费用并存储明细
+                total_shipping_cost += cost_for_this_box_type
+                per_box_final_costs[box_name] = cost_for_this_box_type
+                per_box_final_weights_details[box_name] = {
+                    'base_chargeable_weight_per_box': base_chargeable_weight_per_box,
+                    'final_chargeable_weight_per_box': final_chargeable_weight_per_box,
+                    'total_final_chargeable_weight': final_chargeable_weight_per_box * box_config['quantity']
+                }
+
+        # 5. 最后加上整票货的其它费用
         total_shipping_cost += self.config.shipping['other_costs']
 
         self.results['shipping_cost'] = total_shipping_cost
         self.results['shipping_details'] = {
-            '总实际重量': total_actual_weight,
-            '总体积重量': total_volume_weight,
-            '最低计费重量': min_chargeable_weight,
-            '最终计费重量': final_billable_weight,
-            '各箱运费': final_per_box_cost,
+            '各箱最终计费重量详情': per_box_final_weights_details,
+            '各箱运费': per_box_final_costs,
             '货运其他费用': self.config.shipping['other_costs']
         }
 
@@ -278,7 +269,6 @@ class UI:
         with col2:
             self._display_packaging_config()
         with col3:
-            # 国际货运现在依赖于箱子，所以可以放在打包旁边或第三栏
             self._display_shipping_config()
             self._display_platform_config()
             self._display_advertising_config()
@@ -289,7 +279,6 @@ class UI:
             st.subheader("1. 采购成本")
             for name, details in list(st.session_state.skus.items()):
                 with st.expander(f"SKU: {name}", expanded=True):
-                    # --- 优化1：三个输入框放在一行，并简化标签 ---
                     p_col1, p_col2, p_col3 = st.columns(3)
                     details['purchase_price'] = p_col1.number_input("采购单价(元)", key=f"price_{name}",
                                                                     value=details['purchase_price'], step=0.1,
@@ -333,7 +322,6 @@ class UI:
             st.subheader("2. 打包与装箱")
             for name, details in list(st.session_state.boxes.items()):
                 with st.expander(f"箱子: {name}", expanded=True):
-                    # --- 优化2：数量和单价放一行，简化标签 ---
                     box_col1, box_col2 = st.columns(2)
                     details['quantity'] = box_col1.number_input("纸箱数量(个)", key=f"box_qty_{name}",
                                                                 value=details['quantity'], step=1)
@@ -342,11 +330,9 @@ class UI:
 
                     st.markdown("**箱内物品**")
                     for sku in self.config.procurement['skus'].keys():
-                        # --- 优化2：简化标签 ---
                         details['items'][sku] = st.number_input(f"{sku} 数量", key=f"item_qty_{name}_{sku}",
                                                                 value=details['items'].get(sku, 0), step=1)
 
-                    # --- 优化2：尺寸放一行，重量放下面，简化标签 ---
                     dim_col1, dim_col2, dim_col3 = st.columns(3)
                     details['length'] = dim_col1.number_input("长(cm)", key=f"len_{name}", value=details['length'])
                     details['width'] = dim_col2.number_input("宽(cm)", key=f"wid_{name}", value=details['width'])
@@ -376,16 +362,15 @@ class UI:
     def _display_shipping_config(self):
         with st.container(border=True):
             st.subheader("3. 国际货运成本")
-            # --- 优化3：最低计费和体积比放一行 ---
             ship_col1, ship_col2 = st.columns(2)
-            self.config.shipping['min_chargeable_weight'] = ship_col1.number_input("每票最低计费重量(KG)",
+            # --- 优化：更新标签以匹配逻辑 ---
+            self.config.shipping['min_chargeable_weight'] = ship_col1.number_input("每箱最低计费重量(KG)",
                                                                                    value=self.config.shipping[
                                                                                        'min_chargeable_weight'])
             self.config.shipping['volume_ratio'] = ship_col2.number_input("体积比",
                                                                           value=self.config.shipping['volume_ratio'])
 
             st.markdown("---")
-            # --- 优化3：按箱子设置运费和目的地 ---
             st.markdown("**各箱运费设置**")
             for name, details in list(self.config.packaging['boxes'].items()):
                 with st.container(border=True):
@@ -409,7 +394,6 @@ class UI:
             for sku_name in self.config.procurement['skus'].keys():
                 if sku_name not in fees_cfg: fees_cfg[sku_name] = {'sell_price': 0.0, 'platform_fee': 0.0}
                 with st.expander(f"款式: {sku_name}", expanded=True):
-                    # --- 优化4：售价和平台费放一行，简化标签 ---
                     plat_col1, plat_col2 = st.columns(2)
                     fees_cfg[sku_name]['sell_price'] = plat_col1.number_input("销售价格($)", key=f"sell_price_{sku_name}",
                                                                               value=fees_cfg[sku_name]['sell_price'],
@@ -451,44 +435,52 @@ class UI:
             st.markdown("`总货物成本 = (Σ(各SKU采购单价 * 数量) * 折扣率) + 采购运费 + 其他费用`")
             proc_details = r.get('procurement_details', {})
 
-            # 显示各SKU成本
             if proc_details.get("各SKU成本"):
                 st.markdown("**各SKU成本明细:**")
                 sku_cost_df = pd.DataFrame.from_dict(proc_details["各SKU成本"], orient='index', columns=['成本(元)'])
                 st.table(sku_cost_df)
 
-            # 显示其他成本项
             st.metric("折扣后商品成本", f"¥ {proc_details.get('折扣后商品成本', 0):.2f}", f"折扣前 ¥ {proc_details.get('商品总成本', 0):.2f}")
             st.metric("采购运费", f"¥ {proc_details.get('采购运费', 0):.2f}")
             st.metric("采购其他费用", f"¥ {proc_details.get('采购其他费用', 0):.2f}")
             st.metric("货物总成本", f"¥ {r.get('procurement_cost', 0):.2f}")
 
-        # 2. 计费重量
-        with st.expander("2. 计费重量 (KG)", expanded=True):
+        # 2. 基础计费重量 (用于运费计算前)
+        with st.expander("2. 基础计费重量 (KG)", expanded=True):
             st.markdown("`单箱实际重量 = (箱内所有商品总重) + 空箱重量`")
             st.markdown("`单箱体积重 = (长 * 宽 * 高) / 体积比`")
-            st.markdown("`单箱计费重量 = MAX(单箱实际重量, 单箱体积重)`")
+            st.markdown("`基础计费重量 = MAX(实际重量, 体积重)`")
             df_weights = pd.DataFrame(r.get('chargeable_weights', {})).T.rename(
-                columns={'actual_weight': '实际重量', 'volume_weight': '体积重', 'chargeable_weight': '计费重量'}
+                columns={'actual_weight': '总实际重量', 'volume_weight': '总体积重', 'chargeable_weight': '总基础计费重量'}
             )
             st.table(df_weights)
 
         # 3. 国际运费
         with st.expander("3. 国际运费 (¥)", expanded=True):
-            st.markdown("`最终计费重量 = MAX(总实际重量, 总体积重量, 每票最低计费重量)`")
-            st.markdown("`总国际运费 = (最终计费重量 / Σ(各箱计费重量)) * Σ(各箱计费重量 * 单价) + 其他费用`")
+            st.markdown("`单箱最终计费重量 = MAX(单箱基础计费重量, 每箱最低计费重量)`")
+            st.markdown("`总国际运费 = Σ(单箱最终计费重量 * 箱子数量 * 运费单价) + 货运其他费用`")
 
             shipping_details = r.get('shipping_details', {})
-            s_col1, s_col2, s_col3 = st.columns(3)
-            s_col1.metric("总实际重量", f"{shipping_details.get('总实际重量', 0):.2f} KG")
-            s_col2.metric("总体积重量", f"{shipping_details.get('总体积重量', 0):.2f} KG")
-            s_col3.metric("最低计费重量", f"{shipping_details.get('最低计费重量', 0):.2f} KG")
-            st.metric("最终计费重量", f"{shipping_details.get('最终计费重量', 0):.2f} KG")
+
+            # --- 优化：显示更详细的每箱计费重量计算过程 ---
+            if shipping_details.get("各箱最终计费重量详情"):
+                st.markdown("**各箱计费重量明细:**")
+                df_data = []
+                for box_name, data in shipping_details["各箱最终计费重量详情"].items():
+                    df_data.append({
+                        "箱子名称": box_name,
+                        "基础计费重量/个 (KG)": data['base_chargeable_weight_per_box'],
+                        "最终计费重量/个 (KG)": data['final_chargeable_weight_per_box'],
+                        "总最终计费重量 (KG)": data['total_final_chargeable_weight']
+                    })
+                df_shipping_weights = pd.DataFrame(df_data).set_index("箱子名称")
+                st.table(df_shipping_weights.style.format("{:.2f}"))
 
             if shipping_details.get("各箱运费"):
                 st.markdown("**各箱运费明细:**")
                 box_cost_df = pd.DataFrame.from_dict(shipping_details["各箱运费"], orient='index', columns=['运费(元)'])
                 st.table(box_cost_df)
+
             st.metric("货运其他费用", f"¥ {shipping_details.get('货运其他费用', 0):.2f}")
             st.metric("总国际运费", f"¥ {r.get('shipping_cost', 0):.2f}")
 
