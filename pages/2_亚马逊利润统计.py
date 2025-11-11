@@ -83,8 +83,7 @@ class Config:
 
     def load_all_params(self, params: dict):
         """
-        从字典加载配置数据，并直接更新整个 session_state。
-        这包括核心数据源 (st.session_state.params) 和所有与UI小部件绑定的独立状态键。
+        从字典加载配置数据，更新核心数据源，并设置一个标志位通知UI进行同步。
         """
         required_keys = ['procurement', 'packaging', 'shipping', 'platform', 'advertising', 'finance']
         if not all(key in params for key in required_keys):
@@ -93,51 +92,12 @@ class Config:
         # 1. 更新核心数据源
         st.session_state.params = params
 
-        # ===================================================================
-        # START OF FIX: Manually synchronize all widget states from the new data source
-        # ===================================================================
-
-        # 2. 手动更新所有与UI小部件关联的 session_state 键
-        # 这是至关重要的一步，可以防止UI显示旧的缓存值。
-
-        # 更新 SKU 相关的组件值
-        if 'procurement' in params and 'skus' in params['procurement']:
-            for name, details in params['procurement']['skus'].items():
-                st.session_state[f"price_{name}"] = details.get('purchase_price', 0.0)
-                st.session_state[f"qty_{name}"] = details.get('quantity', 0)
-                st.session_state[f"weight_{name}"] = details.get('weight', 0.0)
-
-        # 更新箱子相关的组件值
-        if 'packaging' in params and 'boxes' in params['packaging']:
-            all_sku_keys = params.get('procurement', {}).get('skus', {}).keys()
-            for name, details in params['packaging']['boxes'].items():
-                st.session_state[f"box_qty_{name}"] = details.get('quantity', 0)
-                st.session_state[f"box_price_{name}"] = details.get('unit_price', 0.0)
-                st.session_state[f"len_{name}"] = details.get('length', 0.0)
-                st.session_state[f"wid_{name}"] = details.get('width', 0.0)
-                st.session_state[f"hei_{name}"] = details.get('height', 0.0)
-                st.session_state[f"box_weight_{name}"] = details.get('weight', 0.0)
-                st.session_state[f"pack_other_{name}"] = details.get('other_costs', 0.0)
-                st.session_state[f"ship_price_{name}"] = details.get('shipping_price', 10.0)
-                st.session_state[f"dest_code_{name}"] = details.get('destination_code', 'ONT8')
-
-                # 更新箱内每个SKU数量的组件值
-                for sku_key in all_sku_keys:
-                    item_qty = details.get('items', {}).get(sku_key, 0)
-                    st.session_state[f"item_qty_{name}_{sku_key}"] = item_qty
-
-        # 更新平台费用相关的组件值
-        if 'platform' in params and 'skus_platform_fees' in params['platform']:
-            for sku_name, details in params['platform']['skus_platform_fees'].items():
-                st.session_state[f"sell_price_{sku_name}"] = details.get('sell_price', 0.0)
-                st.session_state[f"plat_fee_{sku_name}"] = details.get('platform_fee', 0.0)
-
-        # 继承旧的快捷方式更新逻辑，确保在rerun之前它们是同步的
+        # 2. 更新快捷方式，确保后续UI渲染逻辑能访问到最新结构
         st.session_state.skus = st.session_state.params['procurement']['skus']
         st.session_state.boxes = st.session_state.params['packaging']['boxes']
-        # ===================================================================
-        # END OF FIX
-        # ===================================================================
+
+        # 3. 设置UI同步标志位
+        st.session_state['_ui_needs_sync'] = True
 
 
 # ===================================================================
@@ -373,18 +333,18 @@ class Calculator:
 
 
 # ===================================================================
-# CLASS 3: UI - 用户界面渲染器
+# CLASS 3: UI - 用户界面渲染器 (Corrected and Robust Version)
 # ===================================================================
 class UI:
     """
     负责构建Streamlit用户界面。
+    该版本采用UI自同步模式，健壮且易于维护。
     """
 
     def __init__(self, config: Config, calculator: Calculator):
         self.config = config
         self.calculator = calculator
         self.uploader_key = "params_uploader"
-
 
     def _handle_file_upload(self):
         """
@@ -402,7 +362,6 @@ class UI:
             st.success("参数已成功导入！页面将自动刷新以应用更改。")
         except Exception as e:
             st.error(f"导入失败，文件格式可能不正确: {e}")
-
 
     def run(self):
         create_common_sidebar(current_label="📈 亚马逊利润统计")
@@ -430,15 +389,19 @@ class UI:
             self._display_formulas_tab()
         with tab3:
             self._display_stats_tab()
-        # 为新的Tab添加内容渲染
         with tab4:
             self._display_instructions_tab()
 
+        # ===================================================================
+        # ROBUST FIX: 在渲染周期的末尾重置同步标志位
+        # 这确保了同步逻辑只在导入后的第一次rerun中执行一次。
+        # ===================================================================
+        if st.session_state.get('_ui_needs_sync', False):
+            st.session_state['_ui_needs_sync'] = False
 
     def _display_config_tab(self):
         st.subheader("参数导入/导出", anchor=False, divider="rainbow")
         with st.container(border=True):
-            # 1. Export Section
             try:
                 json_data = json.dumps(
                     self.config.get_all_params(),
@@ -458,11 +421,10 @@ class UI:
             st.file_uploader(
                 "📤 从本地文件导入参数",
                 type="json",
-                key=self.uploader_key,        # 分配一个固定的 key
-                on_change=self._handle_file_upload  # 设置 on_change 回调
+                key=self.uploader_key,
+                on_change=self._handle_file_upload
             )
             st.warning("**注意**: 导入将覆盖当前所有配置，建议先导出备份。", icon="⚠️")
-
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -475,19 +437,35 @@ class UI:
             self._display_advertising_config()
             self._display_finance_config()
 
-
     def _display_procurement_config(self):
         with st.container(border=True):
             st.subheader("🛒 1. 采购成本", divider="rainbow")
+
+            # 获取UI同步标志位
+            sync_ui = st.session_state.get('_ui_needs_sync', False)
+
             for name, details in list(st.session_state.skus.items()):
                 with st.expander(f"SKU: {name}", expanded=True):
                     p_col1, p_col2, p_col3 = st.columns(3)
-                    details['purchase_price'] = p_col1.number_input("采购单价(元)", key=f"price_{name}",
+
+                    # --- 为每个带key的组件添加同步逻辑 ---
+                    price_key = f"price_{name}"
+                    if sync_ui:
+                        st.session_state[price_key] = details['purchase_price']
+                    details['purchase_price'] = p_col1.number_input("采购单价(元)", key=price_key,
                                                                     value=details['purchase_price'], step=0.1,
                                                                     format="%.2f")
-                    details['quantity'] = p_col2.number_input("采购数量(件)", key=f"qty_{name}", value=details['quantity'],
+
+                    qty_key = f"qty_{name}"
+                    if sync_ui:
+                        st.session_state[qty_key] = details['quantity']
+                    details['quantity'] = p_col2.number_input("采购数量(件)", key=qty_key, value=details['quantity'],
                                                               step=1, min_value=0)
-                    details['weight'] = p_col3.number_input("单件重量(KG)", key=f"weight_{name}", value=details['weight'],
+
+                    weight_key = f"weight_{name}"
+                    if sync_ui:
+                        st.session_state[weight_key] = details['weight']
+                    details['weight'] = p_col3.number_input("单件重量(KG)", key=weight_key, value=details['weight'],
                                                             step=0.01, format="%.3f")
 
                     b_col1, b_col2 = st.columns(2)
@@ -511,6 +489,7 @@ class UI:
                 st.rerun()
 
             st.divider()
+            # 注意：没有key的组件不需要同步逻辑，它们会直接从value参数获取值
             self.config.procurement['discount_rate'] = st.number_input("折扣率 (%)",
                                                                        value=self.config.procurement['discount_rate'],
                                                                        step=1.0, format="%.2f")
@@ -522,27 +501,59 @@ class UI:
     def _display_packaging_config(self):
         with st.container(border=True):
             st.subheader("📦 2. 打包与装箱", divider="rainbow")
+            sync_ui = st.session_state.get('_ui_needs_sync', False)
+
             for name, details in list(st.session_state.boxes.items()):
                 with st.expander(f"箱子: {name}", expanded=True):
                     box_col1, box_col2 = st.columns(2)
-                    details['quantity'] = box_col1.number_input("纸箱数量(个)", key=f"box_qty_{name}",
+
+                    box_qty_key = f"box_qty_{name}"
+                    if sync_ui:
+                        st.session_state[box_qty_key] = details['quantity']
+                    details['quantity'] = box_col1.number_input("纸箱数量(个)", key=box_qty_key,
                                                                 value=details['quantity'], step=1)
-                    details['unit_price'] = box_col2.number_input("纸箱单价(元)", key=f"box_price_{name}",
+
+                    box_price_key = f"box_price_{name}"
+                    if sync_ui:
+                        st.session_state[box_price_key] = details['unit_price']
+                    details['unit_price'] = box_col2.number_input("纸箱单价(元)", key=box_price_key,
                                                                   value=details['unit_price'], format="%.2f")
 
                     st.markdown("**箱内物品**")
                     for sku in self.config.procurement['skus'].keys():
-                        details['items'][sku] = st.number_input(f"{sku} 数量", key=f"item_qty_{name}_{sku}",
+                        item_qty_key = f"item_qty_{name}_{sku}"
+                        if sync_ui:
+                            st.session_state[item_qty_key] = details.get('items', {}).get(sku, 0)
+                        details['items'][sku] = st.number_input(f"{sku} 数量", key=item_qty_key,
                                                                 value=details['items'].get(sku, 0), step=1)
 
                     dim_col1, dim_col2, dim_col3 = st.columns(3)
-                    details['length'] = dim_col1.number_input("长(cm)", key=f"len_{name}", value=details['length'])
-                    details['width'] = dim_col2.number_input("宽(cm)", key=f"wid_{name}", value=details['width'])
-                    details['height'] = dim_col3.number_input("高(cm)", key=f"hei_{name}", value=details['height'])
-                    details['weight'] = st.number_input("空箱重量(KG)", key=f"box_weight_{name}", value=details['weight'],
+
+                    len_key = f"len_{name}"
+                    if sync_ui:
+                        st.session_state[len_key] = details['length']
+                    details['length'] = dim_col1.number_input("长(cm)", key=len_key, value=details['length'])
+
+                    wid_key = f"wid_{name}"
+                    if sync_ui:
+                        st.session_state[wid_key] = details['width']
+                    details['width'] = dim_col2.number_input("宽(cm)", key=wid_key, value=details['width'])
+
+                    hei_key = f"hei_{name}"
+                    if sync_ui:
+                        st.session_state[hei_key] = details['height']
+                    details['height'] = dim_col3.number_input("高(cm)", key=hei_key, value=details['height'])
+
+                    box_weight_key = f"box_weight_{name}"
+                    if sync_ui:
+                        st.session_state[box_weight_key] = details['weight']
+                    details['weight'] = st.number_input("空箱重量(KG)", key=box_weight_key, value=details['weight'],
                                                         format="%.2f")
 
-                    details['other_costs'] = st.number_input(f"打包其他费用(元)", key=f"pack_other_{name}",
+                    pack_other_key = f"pack_other_{name}"
+                    if sync_ui:
+                        st.session_state[pack_other_key] = details['other_costs']
+                    details['other_costs'] = st.number_input(f"打包其他费用(元)", key=pack_other_key,
                                                              value=details['other_costs'], format="%.2f")
 
                     b_col1, b_col2 = st.columns(2)
@@ -564,7 +575,10 @@ class UI:
     def _display_shipping_config(self):
         with st.container(border=True):
             st.subheader("🚢 3. 国际货运成本", divider="rainbow")
+            sync_ui = st.session_state.get('_ui_needs_sync', False)
+
             ship_col1, ship_col2 = st.columns(2)
+            # No keys, no sync logic needed
             self.config.shipping['min_chargeable_weight'] = ship_col1.number_input("每箱最低计费重量(KG)",
                                                                                    value=self.config.shipping[
                                                                                        'min_chargeable_weight'])
@@ -577,10 +591,18 @@ class UI:
                 with st.container(border=True):
                     st.markdown(f"**{name}**")
                     s_col1, s_col2 = st.columns(2)
-                    details['shipping_price'] = s_col1.number_input("运费单价(元/KG)", key=f"ship_price_{name}",
+
+                    ship_price_key = f"ship_price_{name}"
+                    if sync_ui:
+                        st.session_state[ship_price_key] = details.get('shipping_price', 10.0)
+                    details['shipping_price'] = s_col1.number_input("运费单价(元/KG)", key=ship_price_key,
                                                                     value=details.get('shipping_price', 10.0),
                                                                     format="%.2f")
-                    details['destination_code'] = s_col2.text_input("目的仓库代码", key=f"dest_code_{name}",
+
+                    dest_code_key = f"dest_code_{name}"
+                    if sync_ui:
+                        st.session_state[dest_code_key] = details.get('destination_code', 'ONT8')
+                    details['destination_code'] = s_col2.text_input("目的仓库代码", key=dest_code_key,
                                                                     value=details.get('destination_code', 'ONT8'))
 
             st.divider()
@@ -591,17 +613,28 @@ class UI:
     def _display_platform_config(self):
         with st.container(border=True):
             st.subheader("🌐 4. 平台费用", divider="rainbow")
+            sync_ui = st.session_state.get('_ui_needs_sync', False)
+
             fees_cfg = self.config.platform['skus_platform_fees']
             for sku_name in self.config.procurement['skus'].keys():
                 if sku_name not in fees_cfg: fees_cfg[sku_name] = {'sell_price': 0.0, 'platform_fee': 0.0}
                 with st.expander(f"SKU 平台费: {sku_name}", expanded=True):
                     plat_col1, plat_col2 = st.columns(2)
-                    fees_cfg[sku_name]['sell_price'] = plat_col1.number_input("销售价格($)", key=f"sell_price_{sku_name}",
+
+                    sell_price_key = f"sell_price_{sku_name}"
+                    if sync_ui:
+                        st.session_state[sell_price_key] = fees_cfg[sku_name]['sell_price']
+                    fees_cfg[sku_name]['sell_price'] = plat_col1.number_input("销售价格($)", key=sell_price_key,
                                                                               value=fees_cfg[sku_name]['sell_price'],
                                                                               format="%.2f")
-                    fees_cfg[sku_name]['platform_fee'] = plat_col2.number_input("每件平台费($)", key=f"plat_fee_{sku_name}",
+
+                    plat_fee_key = f"plat_fee_{sku_name}"
+                    if sync_ui:
+                        st.session_state[plat_fee_key] = fees_cfg[sku_name]['platform_fee']
+                    fees_cfg[sku_name]['platform_fee'] = plat_col2.number_input("每件平台费($)", key=plat_fee_key,
                                                                                 value=fees_cfg[sku_name][
-                                                                                    'platform_fee'], format="%.2f")
+                                                                                    'platform_fee'],
+                                                                                format="%.2f")
             st.divider()
             self.config.platform['fulfillment_fee'] = st.number_input("入库配置费($)",
                                                                       value=self.config.platform['fulfillment_fee'],
@@ -614,6 +647,7 @@ class UI:
                                                                   format="%.2f")
 
     def _display_advertising_config(self):
+        # No keyed widgets in this section, no changes needed.
         with st.container(border=True):
             st.subheader("📢 5. 广告费用", divider="rainbow")
             cfg = self.config.advertising
@@ -621,6 +655,7 @@ class UI:
             cfg['duration_days'] = st.number_input("广告持续天数(天)", value=cfg['duration_days'], step=1)
 
     def _display_finance_config(self):
+        # No keyed widgets in this section, no changes needed.
         with st.container(border=True):
             st.subheader("🏦 6. 汇率和手续费", divider="rainbow")
             cfg = self.config.finance
@@ -628,6 +663,7 @@ class UI:
             cfg['withdrawal_fee_rate'] = st.number_input("提款手续费(%)", value=cfg['withdrawal_fee_rate'], format="%.2f")
 
     def _display_formulas_tab(self):
+        # This is a display-only tab, no changes needed.
         st.header("🧮 计算过程详情")
         r = self.calculator.results
 
@@ -704,11 +740,10 @@ class UI:
                           f"等同 ${r.get('advertising_cost_usd', 0):.2f}")
 
     def _display_stats_tab(self):
-        """渲染“统计图表”选项卡，增加SKU维度的分析"""
+        # This is a display-only tab, no changes needed.
         st.header("📊 数据分析中心")
         r = self.calculator.results
 
-        # --- 1. 总体成本构成分析---
         st.subheader("总成本构成", divider="rainbow")
         cost_breakdown = r.get('cost_breakdown', {})
         filtered_costs = {k: v for k, v in cost_breakdown.items() if v > 0}
@@ -732,7 +767,6 @@ class UI:
                 fig_bar.update_traces(texttemplate='%{value:,.2f} 元', textposition='outside')
                 st.plotly_chart(fig_bar, use_container_width=True)
 
-        # --- 2. SKU 表现分析 ---
         st.subheader("SKU表现分析", divider="rainbow")
         sku_analysis_data = r.get('per_sku_analysis', {})
 
@@ -740,7 +774,7 @@ class UI:
             st.warning("没有可供分析的SKU数据。请在'费用配置'中添加SKU并设置其数量和价格。")
         else:
             df_sku = pd.DataFrame.from_dict(sku_analysis_data, orient='index')
-            df_sku_profit = df_sku[df_sku['Profit (¥)'] != 0] # 过滤掉利润为0的，避免图表干扰
+            df_sku_profit = df_sku[df_sku['Profit (¥)'] != 0]
 
             sku_chart_col1, sku_chart_col2 = st.columns(2)
             with sku_chart_col1:
@@ -751,7 +785,6 @@ class UI:
                 st.plotly_chart(fig_sku_revenue, use_container_width=True)
 
             with sku_chart_col2:
-                # 为利润条形图添加颜色区分
                 df_sku_profit['利润状态'] = df_sku_profit['Profit (¥)'].apply(lambda x: '盈利' if x > 0 else '亏损')
                 fig_sku_profit = px.bar(df_sku_profit.sort_values(by='Profit (¥)', ascending=False),
                                         x='SKU', y='Profit (¥)', text_auto='.2s',
@@ -760,11 +793,9 @@ class UI:
                 fig_sku_profit.update_traces(texttemplate='%{value:,.2f} 元', textposition='outside')
                 st.plotly_chart(fig_sku_profit, use_container_width=True)
 
-            # --- 3. 各SKU详细数据表 ---
             st.subheader("📝 各SKU详细数据")
             st.info("点击列标题可以对表格进行排序，方便您发现表现最优和最差的SKU。")
 
-            # 格式化显示DataFrame
             display_df = df_sku[[
                 'Quantity', 'Net Revenue (¥)', 'Total Cost (¥)', 'Profit (¥)',
                 'Profit Margin (%)', 'ROI (%)', 'Unit Revenue (¥)', 'Unit Cost (¥)', 'Unit Profit (¥)'
@@ -783,9 +814,8 @@ class UI:
                 cmap='RdYlGn', subset=['Profit (¥)', 'Profit Margin (%)', 'ROI (%)', 'Unit Profit (¥)']
             ), use_container_width=True)
 
-
     def _display_instructions_tab(self):
-        """渲染“使用说明”选项卡的内容。"""
+        # This is a display-only tab, no changes needed.
         st.header("💡 使用说明与注意事项")
         st.markdown("""
         欢迎使用亚马逊成本利润计算器！本工具旨在帮助亚马逊卖家精确估算一票货物的总成本、预期利润及各项费用明细。为了获得最准确的结果，请仔细阅读以下说明。
