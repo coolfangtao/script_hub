@@ -377,7 +377,7 @@ class UI:
 
     def _display_shipping_config(self):
         with st.container(border=True):
-            st.subheader("🚚 3. 国际货运成本")
+            st.subheader("🚢 3. 国际货运成本")
             ship_col1, ship_col2 = st.columns(2)
             self.config.shipping['min_chargeable_weight'] = ship_col1.number_input("每箱最低计费重量(KG)",
                                                                                    value=self.config.shipping[
@@ -464,7 +464,7 @@ class UI:
             )
             st.table(df_weights.style.format("{:.2f}"))
 
-        with st.expander("🚚 **国际运费 (¥)**", expanded=True):
+        with st.expander("🚢 **国际运费 (¥)**", expanded=True):
             st.info("总国际运费 = Σ(MAX(单箱基础计费重, 每箱最低计费重) * 箱数 * 单价) + 其他费用")
             shipping_details = r.get('shipping_details', {})
             if shipping_details.get("各箱最终计费重量详情"):
