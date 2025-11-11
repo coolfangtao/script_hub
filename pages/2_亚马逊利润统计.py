@@ -18,65 +18,85 @@ class Config:
     """
 
     def __init__(self):
+        # 只在完全空白的session中初始化默认值
         if 'params' not in st.session_state:
-            st.session_state.params = {
-                'procurement': {
-                    'skus': {
-                        '款式A': {'purchase_price': 10.0, 'quantity': 100, 'weight': 0.2}
-                    },
-                    'discount_rate': 100.0,
-                    'shipping_fee': 0.0,
-                    'other_costs': 0.0,
-                },
-                'packaging': {
-                    'boxes': {
-                        '箱子1': {
-                            'quantity': 1,
-                            'items': {'款式A': 100},
-                            'unit_price': 5.0,
-                            'weight': 0.5,
-                            'length': 50.0,
-                            'width': 40.0,
-                            'height': 40.0,
-                            'other_costs': 0.0,
-                            'shipping_price': 10.0,
-                            'destination_code': 'ONT8'
-                        }
-                    }
-                },
-                'shipping': {
-                    'min_chargeable_weight': 20.0,
-                    'volume_ratio': 6000,
-                    'other_costs': 0.0,
-                },
-                'platform': {
-                    'skus_platform_fees': {
-                        '款式A': {'sell_price': 29.9, 'platform_fee': 8.0}
-                    },
-                    'fulfillment_fee': 0.0,
-                    'monthly_plan': 39.9,
-                    'other_costs': 0.0,
-                },
-                'advertising': {
-                    'daily_spend': 12.0,
-                    'duration_days': 7,
-                },
-                'finance': {
-                    'exchange_rate': 7.12,
-                    'withdrawal_fee_rate': 0.3,
-                }
-            }
+            st.session_state.params = self._get_default_params()
 
-        self.procurement = st.session_state.params['procurement']
-        self.packaging = st.session_state.params['packaging']
-        self.shipping = st.session_state.params['shipping']
-        self.platform = st.session_state.params['platform']
-        self.advertising = st.session_state.params['advertising']
-        self.finance = st.session_state.params['finance']
+        # 动态属性，每次都从session_state读取最新值
+        self._update_from_session()
 
-        # 快捷方式，确保UI渲染逻辑能直接访问
+        # 确保快捷方式存在
+        if 'skus' not in st.session_state:
+            st.session_state.skus = self.procurement['skus']
+        if 'boxes' not in st.session_state:
+            st.session_state.boxes = self.packaging['boxes']
+
+    def _update_from_session(self):
+        """从session_state更新所有配置属性"""
+        params = st.session_state.params
+        self.procurement = params['procurement']
+        self.packaging = params['packaging']
+        self.shipping = params['shipping']
+        self.platform = params['platform']
+        self.advertising = params['advertising']
+        self.finance = params['finance']
+
+    def refresh(self):
+        """在导入数据后调用此方法刷新配置"""
+        self._update_from_session()
+        # 更新快捷方式引用
         st.session_state.skus = self.procurement['skus']
         st.session_state.boxes = self.packaging['boxes']
+
+    def _get_default_params(self):
+        """提取默认参数到单独的方法，避免代码重复"""
+        return {
+            'procurement': {
+                'skus': {
+                    '款式A': {'purchase_price': 10.0, 'quantity': 100, 'weight': 0.2}
+                },
+                'discount_rate': 100.0,
+                'shipping_fee': 0.0,
+                'other_costs': 0.0,
+            },
+            'packaging': {
+                'boxes': {
+                    '箱子1': {
+                        'quantity': 1,
+                        'items': {'款式A': 100},
+                        'unit_price': 5.0,
+                        'weight': 0.5,
+                        'length': 50.0,
+                        'width': 40.0,
+                        'height': 40.0,
+                        'other_costs': 0.0,
+                        'shipping_price': 10.0,
+                        'destination_code': 'ONT8'
+                    }
+                }
+            },
+            'shipping': {
+                'min_chargeable_weight': 20.0,
+                'volume_ratio': 6000,
+                'other_costs': 0.0,
+            },
+            'platform': {
+                'skus_platform_fees': {
+                    '款式A': {'sell_price': 29.9, 'platform_fee': 8.0}
+                },
+                'fulfillment_fee': 0.0,
+                'monthly_plan': 39.9,
+                'other_costs': 0.0,
+            },
+            'advertising': {
+                'daily_spend': 12.0,
+                'duration_days': 7,
+            },
+            'finance': {
+                'exchange_rate': 7.12,
+                'withdrawal_fee_rate': 0.3,
+            }
+        }
 
     def get_all_params(self):
         """将所有配置数据打包成一个字典用于导出。"""
@@ -313,6 +333,8 @@ class UI:
             # 4. 【关键步骤】将新的数据源作为唯一状态放回session_state
             st.session_state.params = new_params
             st.success("参数已成功导入！页面已使用新配置刷新。")
+
+            self.config.refresh()
 
         except Exception as e:
             st.error(f"导入失败，文件可能不是有效的JSON: {e}")
