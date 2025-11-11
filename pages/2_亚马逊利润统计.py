@@ -12,27 +12,26 @@ from shared.sidebar import create_common_sidebar
 # ===================================================================
 class Config:
     """
-    用于存储所有配置信息的数据类。
-    重构后，此类不再保存状态副本，而是直接作为 st.session_state 的接口，
-    确保数据源的唯一性。
+    修改后的Config类：不自动初始化默认数据
     """
 
     def __init__(self):
-        # 只在完全空白的session中初始化默认值
+        # 关键修改：不在构造函数中初始化默认数据
         if 'params' not in st.session_state:
-            st.session_state.params = self._get_default_params()
+            st.session_state.params = None  # 初始为None，表示未选择数据源
 
-        # 动态属性，每次都从session_state读取最新值
-        self._update_from_session()
+        if 'data_source' not in st.session_state:
+            st.session_state.data_source = None  # 记录数据来源：'file' 或 'default'
 
-        # 确保快捷方式存在
-        if 'skus' not in st.session_state:
-            st.session_state.skus = self.procurement['skus']
-        if 'boxes' not in st.session_state:
-            st.session_state.boxes = self.packaging['boxes']
+        # 只有在选择了数据源后才初始化属性
+        if st.session_state.params is not None:
+            self._init_properties()
+        else:
+            # 设置为空字典，避免后续访问出错
+            self.procurement = self.packaging = self.shipping = self.platform = self.advertising = self.finance = {}
 
-    def _update_from_session(self):
-        """从session_state更新所有配置属性"""
+    def _init_properties(self):
+        """根据session_state中的params初始化属性"""
         params = st.session_state.params
         self.procurement = params['procurement']
         self.packaging = params['packaging']
@@ -41,12 +40,33 @@ class Config:
         self.advertising = params['advertising']
         self.finance = params['finance']
 
-    def refresh(self):
-        """在导入数据后调用此方法刷新配置"""
-        self._update_from_session()
-        # 更新快捷方式引用
+        # 设置快捷方式
         st.session_state.skus = self.procurement['skus']
         st.session_state.boxes = self.packaging['boxes']
+
+    def load_default_data(self):
+        """加载默认数据"""
+        st.session_state.params = self._get_default_params()
+        st.session_state.data_source = 'default'
+        self._init_properties()
+        st.success("已加载默认配置数据！")
+
+    def load_from_file(self, file_content):
+        """从文件加载数据"""
+        try:
+            new_params = json.loads(file_content)
+            required_keys = ['procurement', 'packaging', 'shipping', 'platform', 'advertising', 'finance']
+            if not all(key in new_params for key in required_keys):
+                raise ValueError("JSON文件格式不正确")
+
+            st.session_state.params = new_params
+            st.session_state.data_source = 'file'
+            self._init_properties()
+            st.success("参数已成功导入！")
+            return True
+        except Exception as e:
+            st.error(f"导入失败：{e}")
+            return False
 
     def _get_default_params(self):
         """提取默认参数到单独的方法，避免代码重复"""
@@ -99,9 +119,14 @@ class Config:
         }
 
     def get_all_params(self):
-        """将所有配置数据打包成一个字典用于导出。"""
+        """获取所有参数（确保有数据时才调用）"""
+        if st.session_state.params is None:
+            return {}
         return copy.deepcopy(st.session_state.params)
 
+    def has_data(self):
+        """检查是否有有效数据"""
+        return st.session_state.params is not None
 
 # ===================================================================
 # CLASS 2: Calculator - 业务逻辑计算器
@@ -116,6 +141,48 @@ class Calculator:
         self.results = {}
 
     def run_all_calculations(self):
+        """运行所有计算，增加数据检查"""
+        if not self.config.has_data():
+            # 没有数据时设置空结果，避免后续计算出错
+            self.results = {
+                'profit_rmb': 0,
+                'profit_margin': 0,
+                'net_revenue_rmb': 0,
+                'total_revenue_usd': 0,
+                'total_cost_rmb': 0,
+                'procurement_cost': 0,
+                'packaging_cost': 0,
+                'shipping_cost': 0,
+                'platform_fee_rmb': 0,
+                'platform_fee_usd': 0,
+                'advertising_cost_rmb': 0,
+                'advertising_cost_usd': 0,
+                'procurement_details': {
+                    "各SKU成本": {},
+                    "商品总成本": 0,
+                    "折扣后商品成本": 0,
+                    "采购运费": 0,
+                    "采购其他费用": 0
+                },
+                'packaging_per_box': {},
+                'chargeable_weights': {},
+                'shipping_details': {
+                    '各箱最终计费重量详情': {},
+                    '各箱运费': {},
+                    '货运其他费用': 0
+                },
+                'cost_breakdown': {
+                    '货物成本': 0,
+                    '打包成本': 0,
+                    '国际运费': 0,
+                    '平台费用': 0,
+                    '广告费用': 0,
+                },
+                'per_sku_analysis': {}
+            }
+            return
+
+        # 有数据时正常执行所有计算
         self.calc_procurement_cost()
         self.calc_packaging_cost()
         self.calc_shipping_cost()
@@ -346,6 +413,12 @@ class UI:
         st.set_page_config(layout="wide", page_title="亚马逊成本利润计算器", page_icon="📊")
         st.title("📊 亚马逊卖家成本利润计算器")
 
+        # 如果没有数据，只显示数据源选择
+        if not self.config.has_data():
+            self._display_data_source_selection()
+            return
+
+        # 有数据时正常显示计算界面
         self.calculator.run_all_calculations()
 
         st.subheader("📈 核心数据一览")
@@ -368,9 +441,53 @@ class UI:
         with tab4:
             self._display_instructions_tab()
 
+    def _display_data_source_selection(self):
+        """显示数据源选择界面"""
+        st.subheader("📋 选择数据源", anchor=False, divider="rainbow")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("📥 导入默认配置", use_container_width=True, type="primary"):
+                self.config.load_default_data()
+                st.rerun()
+
+        with col2:
+            # 根据是否已选择数据源来禁用文件上传
+            disabled = st.session_state.data_source is not None
+            uploaded_file = st.file_uploader(
+                "📤 从JSON文件导入",
+                type="json",
+                key=self.uploader_key,
+                disabled=disabled,
+                help="选择此选项将禁用默认配置导入" if not disabled else "已选择数据源，如需更改请刷新页面"
+            )
+
+            if uploaded_file is not None and not disabled:
+                file_content = uploaded_file.getvalue().decode('utf-8')
+                if self.config.load_from_file(file_content):
+                    st.rerun()
+
+        # 显示当前数据源状态
+        if st.session_state.data_source:
+            st.info(f"✅ 当前数据源: {'默认配置' if st.session_state.data_source == 'default' else '文件导入'}")
+
+            if st.button("🔄 重新选择数据源", type="secondary"):
+                st.session_state.clear()
+                st.rerun()
+
     def _display_config_tab(self):
+        """修改配置选项卡"""
         st.subheader("参数导入/导出", anchor=False, divider="rainbow")
+
+        # 如果没有数据，显示数据源选择界面
+        if not self.config.has_data():
+            self._display_data_source_selection()
+            return
+
+        # 有数据时显示正常的配置界面
         with st.container(border=True):
+            # 导出功能
             try:
                 json_data = json.dumps(
                     self.config.get_all_params(), indent=4, ensure_ascii=False
@@ -385,13 +502,10 @@ class UI:
             except Exception as e:
                 st.error(f"导出参数时出错: {e}")
 
-            st.file_uploader(
-                "📤 从本地文件导入参数",
-                type="json",
-                key=self.uploader_key,
-                on_change=self._handle_file_upload_and_reset  # <-- 使用新的回调函数
-            )
-            st.warning("**注意**: 导入将覆盖当前所有配置，建议先导出备份。", icon="⚠️")
+            # 重新选择数据源的选项
+            if st.button("🔄 重新选择数据源", use_container_width=True):
+                st.session_state.clear()
+                st.rerun()
 
         col1, col2, col3 = st.columns(3)
         with col1:
