@@ -37,6 +37,18 @@ class Config:
                 }
             }
 
+        # ==================== 代码修改处 1/2 ====================
+        # 将平台费用的字典也存入 session_state，以实现数据持久化
+        if 'platform' not in st.session_state:
+            st.session_state.platform = {
+                'skus_platform_fees': {
+                    '款式A': {'sell_price': 29.9, 'platform_fee': 8.0}
+                },
+                'fulfillment_fee': 0.0,
+                'monthly_plan': 39.9,
+                'other_costs': 0.0,
+            }
+
         # 将所有配置项分组存放在字典中
         self.procurement = {
             'skus': st.session_state.skus,
@@ -52,14 +64,10 @@ class Config:
             'volume_ratio': 6000,
             'other_costs': 0.0,
         }
-        self.platform = {
-            'skus_platform_fees': {
-                '款式A': {'sell_price': 29.9, 'platform_fee': 8.0}
-            },
-            'fulfillment_fee': 0.0,
-            'monthly_plan': 39.9,
-            'other_costs': 0.0,
-        }
+
+        # 直接引用 session_state 中的 platform 对象
+        self.platform = st.session_state.platform
+
         self.advertising = {
             'daily_spend': 12.0,
             'duration_days': 7,
@@ -71,6 +79,7 @@ class Config:
 
     def get_all_params(self):
         """将所有配置数据打包成一个字典用于导出。"""
+        # 注意：这里的 self.platform 现在引用的是 session_state，所以会导出最新的数据
         params = {
             'procurement': copy.deepcopy(self.procurement),
             'packaging': copy.deepcopy(self.packaging),
@@ -90,6 +99,10 @@ class Config:
         # 优先更新session_state，因为config对象依赖于它
         st.session_state.skus = params['procurement']['skus']
         st.session_state.boxes = params['packaging']['boxes']
+
+        # ==================== 代码修改处 2/2 ====================
+        # 导入时，必须更新 session_state 中的 platform 数据
+        st.session_state.platform = params['platform']
 
         # 更新config对象
         self.procurement = params['procurement']
