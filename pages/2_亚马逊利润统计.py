@@ -449,7 +449,7 @@ class UI:
 
         with col1:
             # 左侧：默认配置容器
-            with st.container(border=True, height=300):
+            with st.container(border=True, height=200):
                 st.markdown("### ⚡ 快速开始")
                 st.markdown("使用预设的默认配置快速体验系统功能")
                 st.divider()
@@ -460,7 +460,7 @@ class UI:
 
         with col2:
             # 右侧：文件导入容器
-            with st.container(border=True, height=300):
+            with st.container(border=True, height=200):
                 st.markdown("### 📁 导入配置文件")
                 st.markdown("从已有的JSON配置文件导入您的设置")
                 st.divider()
@@ -480,13 +480,13 @@ class UI:
                     if self.config.load_from_file(file_content):
                         st.rerun()
 
-        # 显示当前数据源状态
-        if st.session_state.data_source:
-            st.info(f"✅ 当前数据源: {'默认配置' if st.session_state.data_source == 'default' else '文件导入'}")
-
-            if st.button("🔄 重新选择数据源", type="secondary"):
-                st.session_state.clear()
-                st.rerun()
+        # # 显示当前数据源状态
+        # if st.session_state.data_source:
+        #     st.info(f"✅ 当前数据源: {'默认配置' if st.session_state.data_source == 'default' else '文件导入'}")
+        #
+        #     if st.button("🔄 重新选择数据源", type="secondary"):
+        #         st.session_state.clear()
+        #         st.rerun()
 
     def _display_config_tab(self):
         """修改配置选项卡"""
