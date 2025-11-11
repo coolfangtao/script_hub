@@ -13,104 +13,93 @@ import time
 class Config:
     """
     用于存储所有配置信息的数据类。
+    重构后，此类不再保存状态副本，而是直接作为 st.session_state 的接口，
+    确保数据源的唯一性，从而解决导入状态后UI渲染失败的问题。
     """
 
     def __init__(self):
-        # 初始化会话状态，用于动态添加/删除SKU和箱子
-        if 'skus' not in st.session_state:
-            st.session_state.skus = {
-                '款式A': {'purchase_price': 10.0, 'quantity': 100, 'weight': 0.2}
-            }
-        if 'boxes' not in st.session_state:
-            st.session_state.boxes = {
-                '箱子1': {
-                    'quantity': 1,
-                    'items': {'款式A': 100},
-                    'unit_price': 5.0,
-                    'weight': 0.5,
-                    'length': 50.0,
-                    'width': 40.0,
-                    'height': 40.0,
+        # 仅在 session_state 中首次初始化整个参数结构
+        if 'params' not in st.session_state:
+            st.session_state.params = {
+                'procurement': {
+                    'skus': {
+                        '款式A': {'purchase_price': 10.0, 'quantity': 100, 'weight': 0.2}
+                    },
+                    'discount_rate': 100.0,
+                    'shipping_fee': 0.0,
                     'other_costs': 0.0,
-                    'shipping_price': 10.0,
-                    'destination_code': 'ONT8'
+                },
+                'packaging': {
+                    'boxes': {
+                        '箱子1': {
+                            'quantity': 1,
+                            'items': {'款式A': 100},
+                            'unit_price': 5.0,
+                            'weight': 0.5,
+                            'length': 50.0,
+                            'width': 40.0,
+                            'height': 40.0,
+                            'other_costs': 0.0,
+                            'shipping_price': 10.0,
+                            'destination_code': 'ONT8'
+                        }
+                    }
+                },
+                'shipping': {
+                    'min_chargeable_weight': 20.0,
+                    'volume_ratio': 6000,
+                    'other_costs': 0.0,
+                },
+                'platform': {
+                    'skus_platform_fees': {
+                        '款式A': {'sell_price': 29.9, 'platform_fee': 8.0}
+                    },
+                    'fulfillment_fee': 0.0,
+                    'monthly_plan': 39.9,
+                    'other_costs': 0.0,
+                },
+                'advertising': {
+                    'daily_spend': 12.0,
+                    'duration_days': 7,
+                },
+                'finance': {
+                    'exchange_rate': 7.12,
+                    'withdrawal_fee_rate': 0.3,
                 }
             }
 
-        # ==================== 代码修改处 1/2 ====================
-        # 将平台费用的字典也存入 session_state，以实现数据持久化
-        if 'platform' not in st.session_state:
-            st.session_state.platform = {
-                'skus_platform_fees': {
-                    '款式A': {'sell_price': 29.9, 'platform_fee': 8.0}
-                },
-                'fulfillment_fee': 0.0,
-                'monthly_plan': 39.9,
-                'other_costs': 0.0,
-            }
+        # 为了兼容 UI 和 Calculator 类中对 self.procurement 等属性的调用，
+        # 我们将 session_state 中的字典直接赋值给实例属性。
+        # 关键在于：这些属性现在只是对 session_state 中字典的引用，而不是独立的副本。
+        self.procurement = st.session_state.params['procurement']
+        self.packaging = st.session_state.params['packaging']
+        self.shipping = st.session_state.params['shipping']
+        self.platform = st.session_state.params['platform']
+        self.advertising = st.session_state.params['advertising']
+        self.finance = st.session_state.params['finance']
 
-        # 将所有配置项分组存放在字典中
-        self.procurement = {
-            'skus': st.session_state.skus,
-            'discount_rate': 100.0,
-            'shipping_fee': 0.0,
-            'other_costs': 0.0,
-        }
-        self.packaging = {
-            'boxes': st.session_state.boxes
-        }
-        self.shipping = {
-            'min_chargeable_weight': 20.0,
-            'volume_ratio': 6000,
-            'other_costs': 0.0,
-        }
-
-        # 直接引用 session_state 中的 platform 对象
-        self.platform = st.session_state.platform
-
-        self.advertising = {
-            'daily_spend': 12.0,
-            'duration_days': 7,
-        }
-        self.finance = {
-            'exchange_rate': 7.12,
-            'withdrawal_fee_rate': 0.3,
-        }
+        # 同样，为了让 UI 中的动态增删正常工作，直接引用 session_state 中的具体对象
+        st.session_state.skus = self.procurement['skus']
+        st.session_state.boxes = self.packaging['boxes']
 
     def get_all_params(self):
         """将所有配置数据打包成一个字典用于导出。"""
-        # 注意：这里的 self.platform 现在引用的是 session_state，所以会导出最新的数据
-        params = {
-            'procurement': copy.deepcopy(self.procurement),
-            'packaging': copy.deepcopy(self.packaging),
-            'shipping': copy.deepcopy(self.shipping),
-            'platform': copy.deepcopy(self.platform),
-            'advertising': copy.deepcopy(self.advertising),
-            'finance': copy.deepcopy(self.finance),
-        }
-        return params
+        # 直接从 session_state 返回深拷贝，确保导出的是一份独立的数据
+        return copy.deepcopy(st.session_state.params)
 
     def load_all_params(self, params: dict):
-        """从字典加载配置数据，并更新session_state和自身属性。"""
+        """从字典加载配置数据，并直接更新整个 session_state。"""
         required_keys = ['procurement', 'packaging', 'shipping', 'platform', 'advertising', 'finance']
         if not all(key in params for key in required_keys):
             raise ValueError("导入的JSON文件格式不正确或缺少必要的配置项。")
 
-        # 优先更新session_state，因为config对象依赖于它
-        st.session_state.skus = params['procurement']['skus']
-        st.session_state.boxes = params['packaging']['boxes']
+        # 核心修改：直接用导入的数据覆盖 session_state 中的 params
+        st.session_state.params = params
 
-        # ==================== 代码修改处 2/2 ====================
-        # 导入时，必须更新 session_state 中的 platform 数据
-        st.session_state.platform = params['platform']
-
-        # 更新config对象
-        self.procurement = params['procurement']
-        self.packaging = params['packaging']
-        self.shipping = params['shipping']
-        self.platform = params['platform']
-        self.advertising = params['advertising']
-        self.finance = params['finance']
+        # 在UI代码中，动态增删SKU和箱子依赖于顶层的 st.session_state.skus 和 st.session_state.boxes
+        # 因此在加载后，需要重新建立这两个引用，以确保兼容性。
+        st.session_state.skus = st.session_state.params['procurement']['skus']
+        st.session_state.boxes = st.session_state.params['packaging']['boxes']
 
 
 # ===================================================================
