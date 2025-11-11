@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import copy
+import json
+import time
 
 
 # ===================================================================
@@ -66,6 +68,36 @@ class Config:
             'exchange_rate': 7.12,
             'withdrawal_fee_rate': 0.3,
         }
+
+    def get_all_params(self):
+        """将所有配置数据打包成一个字典用于导出。"""
+        params = {
+            'procurement': copy.deepcopy(self.procurement),
+            'packaging': copy.deepcopy(self.packaging),
+            'shipping': copy.deepcopy(self.shipping),
+            'platform': copy.deepcopy(self.platform),
+            'advertising': copy.deepcopy(self.advertising),
+            'finance': copy.deepcopy(self.finance),
+        }
+        return params
+
+    def load_all_params(self, params: dict):
+        """从字典加载配置数据，并更新session_state和自身属性。"""
+        required_keys = ['procurement', 'packaging', 'shipping', 'platform', 'advertising', 'finance']
+        if not all(key in params for key in required_keys):
+            raise ValueError("导入的JSON文件格式不正确或缺少必要的配置项。")
+
+        # 优先更新session_state，因为config对象依赖于它
+        st.session_state.skus = params['procurement']['skus']
+        st.session_state.boxes = params['packaging']['boxes']
+
+        # 更新config对象
+        self.procurement = params['procurement']
+        self.packaging = params['packaging']
+        self.shipping = params['shipping']
+        self.platform = params['platform']
+        self.advertising = params['advertising']
+        self.finance = params['finance']
 
 
 # ===================================================================
@@ -253,7 +285,7 @@ class UI:
         # 运行计算
         self.calculator.run_all_calculations()
 
-        # --- 新增：在顶部显示核心结果 ---
+        # --- 在顶部显示核心结果 ---
         st.subheader("📈 核心数据一览")
         r = self.calculator.results
         res_col1, res_col2, res_col3, res_col4 = st.columns(4)
@@ -273,6 +305,46 @@ class UI:
             self._display_stats_tab()
 
     def _display_config_tab(self):
+        # --- NEW: Import/Export Functionality ---
+        st.subheader("参数导入/导出", anchor=False)
+        with st.container(border=True):
+            export_col, import_col = st.columns(2)
+            with export_col:
+                try:
+                    json_data = json.dumps(
+                        self.config.get_all_params(),
+                        indent=4,
+                        ensure_ascii=False
+                    )
+                    st.download_button(
+                        label="📥 导出当前参数为 JSON",
+                        data=json_data,
+                        file_name="amazon_calculator_params.json",
+                        mime="application/json",
+                        use_container_width=True,
+                    )
+                except Exception as e:
+                    st.error(f"导出参数时出错: {e}")
+
+            with import_col:
+                uploaded_file = st.file_uploader(
+                    "📤 从 JSON 文件导入参数",
+                    type="json",
+                    accept_multiple_files=False,
+                    use_container_width=True
+                )
+                if uploaded_file is not None:
+                    try:
+                        params = json.load(uploaded_file)
+                        self.config.load_all_params(params)
+                        st.success("参数已成功导入！页面将自动刷新。")
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"导入失败: {e}")
+            st.warning("**注意**: 导入将覆盖当前所有配置，建议先导出备份。", icon="⚠️")
+        st.divider()
+
         col1, col2, col3 = st.columns(3)
         with col1:
             self._display_procurement_config()
@@ -287,9 +359,6 @@ class UI:
     def _display_procurement_config(self):
         with st.container(border=True):
             st.subheader("🛒 1. 采购成本", divider="rainbow")
-            # =======================
-            #  OPTIMIZATION 1 START
-            # =======================
             for name, details in list(st.session_state.skus.items()):
                 with st.expander(f"SKU: {name}", expanded=True):
                     p_col1, p_col2, p_col3 = st.columns(3)
@@ -302,7 +371,6 @@ class UI:
                                                             step=0.01, format="%.3f")
 
                     b_col1, b_col2 = st.columns(2)
-                    # --- 美化：为按钮添加图标 ---
                     if b_col1.button(f"🗑️ 删除 {name}", key=f"del_sku_{name}", use_container_width=True):
                         del st.session_state.skus[name]
                         if name in self.config.platform['skus_platform_fees']:
@@ -316,11 +384,7 @@ class UI:
                                                                                               'platform_fee': 0.0})
                         self.config.platform['skus_platform_fees'][new_name] = copy.deepcopy(platform_fees)
                         st.rerun()
-            # =======================
-            #  OPTIMIZATION 1 END
-            # =======================
 
-            # --- 美化：使用 type="primary" 突出新增按钮 ---
             if st.button("➕ 新增SKU", use_container_width=True, type="primary"):
                 new_name = f"款式{chr(ord('A') + len(st.session_state.skus))}"
                 st.session_state.skus[new_name] = {'purchase_price': 0.0, 'quantity': 0, 'weight': 0.0}
@@ -338,9 +402,6 @@ class UI:
     def _display_packaging_config(self):
         with st.container(border=True):
             st.subheader("📦 2. 打包与装箱", divider="rainbow")
-            # =======================
-            #  OPTIMIZATION 2 START
-            # =======================
             for name, details in list(st.session_state.boxes.items()):
                 with st.expander(f"箱子: {name}", expanded=True):
                     box_col1, box_col2 = st.columns(2)
@@ -372,9 +433,6 @@ class UI:
                         new_name = f"箱子{len(st.session_state.boxes) + 1}"
                         st.session_state.boxes[new_name] = copy.deepcopy(details)
                         st.rerun()
-            # =======================
-            #  OPTIMIZATION 2 END
-            # =======================
 
             if st.button("➕ 新增箱子", use_container_width=True, type="primary"):
                 new_name = f"箱子{len(st.session_state.boxes) + 1}"
@@ -453,9 +511,6 @@ class UI:
         st.header("🧮 计算过程详情")
         r = self.calculator.results
 
-        # =======================
-        #  OPTIMIZATION 3 START
-        # =======================
         with st.expander("💰 **总收入、成本与利润**", expanded=True):
             st.info("净收入(¥) = (Σ(SKU销售价格 * 数量) * (1 - 提款手续费率)) * 汇率")
             st.warning("总成本(¥) = 货物成本 + 打包成本 + 国际运费 + 平台费用 + 广告费用")
@@ -466,9 +521,6 @@ class UI:
             f_col1.metric("💵 净收入 (¥)", f"{r.get('net_revenue_rmb', 0):,.2f}")
             f_col2.metric("🧾 总成本 (¥)", f"{r.get('total_cost_rmb', 0):,.2f}")
             f_col3.metric("💰 总利润 (¥)", f"{r.get('profit_rmb', 0):,.2f}", f"{r.get('profit_margin', 0):.2f}% 利润率")
-        # =======================
-        #  OPTIMIZATION 3 END
-        # =======================
 
         with st.expander("🛒 **货物成本 (¥)**", expanded=True):
             st.info("总货物成本 = (Σ(各SKU采购单价 * 数量) * 折扣率) + 采购运费 + 其他费用")
