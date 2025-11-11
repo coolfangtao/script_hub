@@ -287,10 +287,11 @@ class UI:
     def _display_procurement_config(self):
         with st.container(border=True):
             st.subheader("🛒 1. 采购成本", divider="rainbow")
+            # =======================
+            #  OPTIMIZATION 1 START
+            # =======================
             for name, details in list(st.session_state.skus.items()):
-                # --- 美化：使用颜色高亮SKU名称 ---
-                st.markdown(f"##### SKU: <font color='green'>**{name}**</font>", unsafe_allow_html=True)
-                with st.container(border=True):
+                with st.expander(f"SKU: {name}", expanded=True):
                     p_col1, p_col2, p_col3 = st.columns(3)
                     details['purchase_price'] = p_col1.number_input("采购单价(元)", key=f"price_{name}",
                                                                     value=details['purchase_price'], step=0.1,
@@ -315,6 +316,9 @@ class UI:
                                                                                               'platform_fee': 0.0})
                         self.config.platform['skus_platform_fees'][new_name] = copy.deepcopy(platform_fees)
                         st.rerun()
+            # =======================
+            #  OPTIMIZATION 1 END
+            # =======================
 
             # --- 美化：使用 type="primary" 突出新增按钮 ---
             if st.button("➕ 新增SKU", use_container_width=True, type="primary"):
@@ -334,9 +338,11 @@ class UI:
     def _display_packaging_config(self):
         with st.container(border=True):
             st.subheader("📦 2. 打包与装箱", divider="rainbow")
+            # =======================
+            #  OPTIMIZATION 2 START
+            # =======================
             for name, details in list(st.session_state.boxes.items()):
-                st.markdown(f"##### 箱子: <font color='orange'>**{name}**</font>", unsafe_allow_html=True)
-                with st.container(border=True):
+                with st.expander(f"箱子: {name}", expanded=True):
                     box_col1, box_col2 = st.columns(2)
                     details['quantity'] = box_col1.number_input("纸箱数量(个)", key=f"box_qty_{name}",
                                                                 value=details['quantity'], step=1)
@@ -366,6 +372,9 @@ class UI:
                         new_name = f"箱子{len(st.session_state.boxes) + 1}"
                         st.session_state.boxes[new_name] = copy.deepcopy(details)
                         st.rerun()
+            # =======================
+            #  OPTIMIZATION 2 END
+            # =======================
 
             if st.button("➕ 新增箱子", use_container_width=True, type="primary"):
                 new_name = f"箱子{len(st.session_state.boxes) + 1}"
@@ -443,6 +452,23 @@ class UI:
     def _display_formulas_tab(self):
         st.header("🧮 计算过程详情")
         r = self.calculator.results
+
+        # =======================
+        #  OPTIMIZATION 3 START
+        # =======================
+        with st.expander("💰 **总收入、成本与利润**", expanded=True):
+            st.info("净收入(¥) = (Σ(SKU销售价格 * 数量) * (1 - 提款手续费率)) * 汇率")
+            st.warning("总成本(¥) = 货物成本 + 打包成本 + 国际运费 + 平台费用 + 广告费用")
+            st.success("总利润(¥) = 净收入(¥) - 总成本(¥)")
+            st.info("利润率(%) = (总利润(¥) / 净收入(¥)) * 100")
+
+            f_col1, f_col2, f_col3 = st.columns(3)
+            f_col1.metric("💵 净收入 (¥)", f"{r.get('net_revenue_rmb', 0):,.2f}")
+            f_col2.metric("🧾 总成本 (¥)", f"{r.get('total_cost_rmb', 0):,.2f}")
+            f_col3.metric("💰 总利润 (¥)", f"{r.get('profit_rmb', 0):,.2f}", f"{r.get('profit_margin', 0):.2f}% 利润率")
+        # =======================
+        #  OPTIMIZATION 3 END
+        # =======================
 
         with st.expander("🛒 **货物成本 (¥)**", expanded=True):
             st.info("总货物成本 = (Σ(各SKU采购单价 * 数量) * 折扣率) + 采购运费 + 其他费用")
