@@ -371,7 +371,7 @@ class UI:
 
 
     def run(self):
-        create_common_sidebar(current_label="📊 亚马逊利润统计")
+        create_common_sidebar(current_label="📈 亚马逊利润统计")
         st.set_page_config(layout="wide", page_title="亚马逊成本利润计算器", page_icon="📊")
         st.title("📊 亚马逊卖家成本利润计算器")
 
