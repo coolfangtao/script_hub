@@ -1,387 +1,524 @@
 import streamlit as st
 import json
 import copy
-import pandas as pd  # 引入Pandas以修复表格编辑问题
-from typing import List, Dict, Any, Optional
-
-# 定义常量
-INPUT_FORMATS = ['text', 'image', 'file', 'audio', 'video']
-OUTPUT_FORMATS = ['text', 'image', 'file', 'audio', 'video']
-PRICING_METHODS = ['per_token', 'per_call']
-CURRENCIES = ['CNY', 'USD']
+import uuid
 
 
+# --- 配置类 ---
+class Config:
+    """存放应用的静态配置"""
+    INPUT_OUTPUT_TYPES = ["text", "image", "file", "audio", "video"]
+    PRICING_UNITS = {
+        "按Token (每百万)": "per_token_m",
+        "按Token (每一千)": "per_token_k",
+        "按次 (每一次)": "per_call_single",
+        "按次 (每一千次)": "per_call_k"
+    }
+    CURRENCIES = ["USD", "CNY"]
+    # 假设一个固定的汇率用于转换，实际应用中可以考虑API调用获取实时汇率
+    USD_TO_CNY_RATE = 7.2
+
+
+# --- 数据管理类 ---
 class DataManager:
-    def __init__(self, state):
-        self._state = state
-        if 'data' not in self._state:
-            self._state.data = self.get_default_data()
+    """处理所有数据的增删改查、导入导出"""
 
-    @staticmethod
-    def get_default_data() -> Dict[str, Any]:
-        return {
-            "tasks": [],
-            "platforms": [],
-            "settings": {"usd_to_cny_rate": 7.25}
-        }
+    def __init__(self):
+        if 'tasks' not in st.session_state:
+            st.session_state.tasks = []
+        if 'platforms' not in st.session_state:
+            st.session_state.platforms = []
 
-    @property
-    def data(self) -> Dict[str, Any]:
-        return self._state.data
+    def get_tasks(self):
+        return st.session_state.tasks
 
-    def load_data_from_json(self, uploaded_file) -> bool:
-        try:
-            new_data = json.load(uploaded_file)
-            if "tasks" in new_data and "platforms" in new_data:
-                self._state.data = new_data
-                if "settings" not in self._state.data:
-                    self._state.data["settings"] = self.get_default_data()["settings"]
-                return True
-            return False
-        except Exception as e:
-            st.error(f"JSON加载错误: {e}")
-            return False
+    def get_platforms(self):
+        return st.session_state.platforms
 
-    def export_data_to_json(self) -> str:
-        return json.dumps(self.data, indent=4, ensure_ascii=False)
+    def add_or_update_task(self, task_data, task_id=None):
+        if task_id:
+            for i, task in enumerate(st.session_state.tasks):
+                if task['id'] == task_id:
+                    st.session_state.tasks[i] = task_data
+                    return
+        else:
+            task_data['id'] = str(uuid.uuid4())
+            st.session_state.tasks.append(task_data)
 
-    def find_compatible_models(self, task: Dict[str, Any]) -> List[Dict[str, Any]]:
-        if not task: return []
-        compatible_models = []
-        task_in = {i['format'] for i in task.get('inputs', [])}
-        task_out = {i['format'] for i in task.get('outputs', [])}
+    def delete_task(self, task_id):
+        st.session_state.tasks = [t for t in st.session_state.tasks if t.get('id') != task_id]
 
-        for platform in self.data.get('platforms', []):
-            for model in platform.get('models', []):
-                # 确保数据结构存在
-                m_in = set(model.get('supported_inputs', []))
-                m_out = set(model.get('supported_outputs', []))
+    def add_or_update_platform(self, platform_data, platform_id=None):
+        if platform_id:
+            for i, p in enumerate(st.session_state.platforms):
+                if p['id'] == platform_id:
+                    st.session_state.platforms[i] = platform_data
+                    return
+        else:
+            platform_data['id'] = str(uuid.uuid4())
+            st.session_state.platforms.append(platform_data)
 
-                if m_in.issuperset(task_in) and m_out.issuperset(task_out):
-                    m_copy = copy.deepcopy(model)
-                    m_copy['platform_name'] = platform['name']
-                    compatible_models.append(m_copy)
-        return compatible_models
+    def delete_platform(self, platform_id):
+        st.session_state.platforms = [p for p in st.session_state.platforms if p.get('id') != platform_id]
 
-    def calculate_task_cost(self, task: Dict[str, Any], model: Dict[str, Any]) -> Optional[Dict[str, float]]:
-        if not task or not model: return None
-
-        # 免费模型处理
-        pricing = model.get('pricing', [])
-        if pricing == 'free' or (isinstance(pricing, list) and len(pricing) == 0 and model.get('is_free', False)):
-            return {'CNY': 0.0, 'USD': 0.0}
-
-        total_usd = 0.0
-        count = task.get('count', 1000)
-        rate = self.data['settings']['usd_to_cny_rate']
-
-        # 遍历任务的所有输入输出组件
-        for io_type in ['inputs', 'outputs']:
-            for item in task.get(io_type, []):
-                fmt = item['format']
-                tokens = item.get('tokens', 0)
-
-                # 查找匹配的定价规则
-                matched_rule = None
-                # model['pricing'] 应该是一个列表
-                if isinstance(pricing, list):
-                    for rule in pricing:
-                        # 匹配 IO类型 (input/output) 和 格式 (text/image...)
-                        # 注意：task里是 'inputs'/'outputs'，rule里是 'input'/'output'
-                        if rule.get('io_type') == io_type[:-1] and rule.get('format') == fmt:
-                            matched_rule = rule
-                            break
-
-                if not matched_rule:
-                    return None  # 缺少必要的定价规则，无法计算
-
-                price = matched_rule.get('price', 0)
-                unit = matched_rule.get('unit', 1)
-                method = matched_rule.get('method', 'per_token')
-                currency = matched_rule.get('currency', 'USD')
-
-                cost = 0
-                if method == 'per_token':
-                    cost = (tokens / unit) * price if unit > 0 else 0
-                elif method == 'per_call':
-                    cost = (1 / unit) * price if unit > 0 else 0
-
-                if currency == 'CNY':
-                    total_usd += cost / rate if rate > 0 else 0
+    def add_or_update_model(self, platform_id, model_data, model_id=None):
+        for p in st.session_state.platforms:
+            if p['id'] == platform_id:
+                if 'models' not in p:
+                    p['models'] = []
+                if model_id:
+                    for i, m in enumerate(p['models']):
+                        if m['id'] == model_id:
+                            p['models'][i] = model_data
+                            return
                 else:
-                    total_usd += cost
+                    model_data['id'] = str(uuid.uuid4())
+                    p['models'].append(model_data)
+                return
 
-        total_usd *= count
-        return {'CNY': total_usd * rate, 'USD': total_usd}
+    def delete_model(self, platform_id, model_id):
+        for p in st.session_state.platforms:
+            if p['id'] == platform_id:
+                p['models'] = [m for m in p['models'] if m.get('id') != model_id]
+                return
+
+    def export_data(self):
+        return json.dumps({
+            "tasks": st.session_state.tasks,
+            "platforms": st.session_state.platforms
+        }, indent=2)
+
+    def import_data(self, uploaded_file):
+        try:
+            data = json.load(uploaded_file)
+            st.session_state.tasks = data.get("tasks", [])
+            st.session_state.platforms = data.get("platforms", [])
+            # 确保导入的数据有ID
+            for task in st.session_state.tasks:
+                task.setdefault('id', str(uuid.uuid4()))
+            for platform in st.session_state.platforms:
+                platform.setdefault('id', str(uuid.uuid4()))
+                for model in platform.get('models', []):
+                    model.setdefault('id', str(uuid.uuid4()))
+            return True
+        except json.JSONDecodeError:
+            return False
 
 
-class UIManager:
-    def __init__(self, dm: DataManager):
-        self.dm = dm
-        if 'current_task_idx' not in st.session_state:
-            st.session_state.current_task_idx = None
+# --- UI界面类 ---
+class StreamlitApp:
+    """管理所有Streamlit界面组件和逻辑"""
 
-    def run(self):
-        st.set_page_config(layout="wide", page_title="AI成本计算器")
-        st.title("🤖 AI 模型成本可视化计算器")
+    def __init__(self, data_manager):
+        self.dm = data_manager
+        self.config = Config()
 
-        self.render_sidebar()
-        tab1, tab2 = st.tabs(["📊 任务与结果", "⚙️ 平台与模型配置"])
+    def render(self):
+        st.set_page_config(layout="wide", page_title="AI模型成本计算器")
+        st.title("AI模型成本计算与任务管理")
+        st.write("一个用于管理AI任务、模型价格并快速计算任务成本的工具。")
 
-        with tab1: self.render_task_tab()
-        with tab2: self.render_config_tab()
+        self.render_import_export()
 
-    def render_sidebar(self):
+        tab1, tab2 = st.tabs(["📊 任务与计费", "🛠️ 平台与模型配置"])
+
+        with tab1:
+            self.render_task_and_billing_tab()
+
+        with tab2:
+            self.render_platform_and_model_tab()
+
+    def render_import_export(self):
         with st.sidebar:
-            st.header("数据管理")
-            st.download_button("📥 导出配置", self.dm.export_data_to_json(), "config.json", "application/json")
-            f = st.file_uploader("📤 导入配置", type="json")
-            if f and self.dm.load_data_from_json(f):
-                st.success("导入成功")
-                st.rerun()
+            st.header("数据导入/导出")
 
-            st.divider()
-            st.header("汇率设置")
-            self.dm.data['settings']['usd_to_cny_rate'] = st.number_input(
-                "USD -> CNY", value=self.dm.data['settings']['usd_to_cny_rate'], step=0.01
+            # 导出
+            json_data = self.dm.export_data()
+            st.download_button(
+                label="📥 导出所有配置 (JSON)",
+                data=json_data,
+                file_name="ai_model_config.json",
+                mime="application/json"
             )
 
-    def render_task_tab(self):
-        tasks = self.dm.data['tasks']
+            # 导入
+            uploaded_file = st.file_uploader("📤 导入配置 (JSON)", type="json")
+            if uploaded_file is not None:
+                if self.dm.import_data(uploaded_file):
+                    st.success("配置已成功导入！")
+                    st.rerun()
+                else:
+                    st.error("导入失败，请检查文件格式是否正确。")
 
-        # --- 任务选择区域 ---
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            # 获取当前选项的索引，如果列表为空则处理
-            options = [t['name'] for t in tasks]
-            idx = st.session_state.current_task_idx
-            # 修正索引越界问题
-            if idx is not None and idx >= len(options):
-                idx = 0 if options else None
+    # --- 任务与计费标签页 ---
+    def render_task_and_billing_tab(self):
+        st.header("任务管理")
 
-            selected_name = st.selectbox(
-                "选择任务", options,
-                index=idx if (idx is not None and options) else 0,
-                key="task_select"
-            )
-            # 更新 session state
-            if selected_name:
-                st.session_state.current_task_idx = options.index(selected_name)
+        # 任务表单
+        with st.expander("➕ 新建/编辑任务", expanded=False):
+            self.render_task_form()
 
-        with c2:
-            if st.button("➕ 新建任务", use_container_width=True):
-                tasks.append({"name": f"任务-{len(tasks) + 1}", "count": 1000, "inputs": [], "outputs": []})
-                st.session_state.current_task_idx = len(tasks) - 1
-                st.rerun()
-
-        if not tasks or st.session_state.current_task_idx is None:
-            st.info("暂无任务，请先新建。")
+        # 任务列表
+        tasks = self.dm.get_tasks()
+        if not tasks:
+            st.info("尚未创建任何任务。请在上方表单中新建一个任务。")
             return
 
-        curr_task = tasks[st.session_state.current_task_idx]
+        task_options = {task['name']: task['id'] for task in tasks}
+        selected_task_name = st.selectbox("选择要分析的任务", options=task_options.keys())
 
-        # --- 任务编辑区域 ---
-        with st.expander("✏️ 编辑当前任务", expanded=True):
-            t_name = st.text_input("任务名称", curr_task['name'])
-            t_count = st.number_input("任务总数", 1, value=curr_task['count'])
+        if selected_task_name:
+            task_id = task_options[selected_task_name]
+            task = next((t for t in tasks if t['id'] == task_id), None)
 
-            c_in, c_out = st.columns(2)
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                st.subheader(f"任务详情: {task['name']}")
+                st.write(f"**任务总数**: {task['total_count']:,}")
+                st.write("**输入格式与Token消耗:**")
+                for item in task['inputs']:
+                    st.write(f"- {item['type'].capitalize()}: {item['tokens']:,} tokens")
+                st.write("**输出格式与Token消耗:**")
+                for item in task['outputs']:
+                    st.write(f"- {item['type'].capitalize()}: {item['tokens']:,} tokens")
 
-            # Helper: 使用 Pandas DataFrame 确保空表格也有表头
-            def get_editor_df(data_list):
-                if not data_list:
-                    return pd.DataFrame(columns=["format", "tokens"])
-                return pd.DataFrame(data_list)
+                edit_btn, delete_btn = st.columns(2)
+                if edit_btn.button("✏️ 编辑此任务"):
+                    st.session_state.editing_task_id = task_id
+                    st.rerun()  # Rerun to populate the form
+                if delete_btn.button("🗑️ 删除此任务", key=f"del_{task_id}"):
+                    self.dm.delete_task(task_id)
+                    st.success(f"任务 '{task['name']}' 已删除。")
+                    st.rerun()
 
-            with c_in:
-                st.markdown("##### 输入 (Inputs)")
-                df_in = get_editor_df(curr_task.get('inputs', []))
-                edited_in = st.data_editor(
-                    df_in, num_rows="dynamic", key="ed_in", use_container_width=True,
-                    column_config={
-                        "format": st.column_config.SelectboxColumn("格式", options=INPUT_FORMATS, required=True),
-                        "tokens": st.column_config.NumberColumn("Token消耗", min_value=0, required=True)
+            with col2:
+                st.subheader("可用模型与成本预估")
+                self.calculate_and_display_costs(task)
+
+    def render_task_form(self, task_id=None):
+        is_editing = 'editing_task_id' in st.session_state and st.session_state.editing_task_id is not None
+
+        task_to_edit = None
+        if is_editing:
+            task_id = st.session_state.editing_task_id
+            task_to_edit = next((t for t in self.dm.get_tasks() if t['id'] == task_id), None)
+
+        default_task = {
+            'name': '', 'total_count': 1000, 'inputs': [], 'outputs': []
+        }
+        task_data = task_to_edit or default_task
+
+        with st.form(key="task_form", clear_on_submit=not is_editing):
+            name = st.text_input("任务名称", value=task_data['name'])
+            total_count = st.number_input("任务总数", min_value=1, value=task_data['total_count'])
+
+            st.markdown("---")
+            st.markdown("**输入配置**")
+            # 使用 session_state 来动态管理输入/输出行
+            if 'task_form_inputs' not in st.session_state or not is_editing:
+                st.session_state.task_form_inputs = task_data.get('inputs', [{'type': 'text', 'tokens': 100}])
+
+            self._render_io_rows('inputs')
+
+            st.markdown("---")
+            st.markdown("**输出配置**")
+            if 'task_form_outputs' not in st.session_state or not is_editing:
+                st.session_state.task_form_outputs = task_data.get('outputs', [{'type': 'text', 'tokens': 100}])
+
+            self._render_io_rows('outputs')
+
+            submitted = st.form_submit_button("✅ 保存任务" if is_editing else "➕ 添加任务")
+            if submitted:
+                if not name:
+                    st.error("任务名称不能为空！")
+                else:
+                    final_task = {
+                        "id": task_id,
+                        "name": name,
+                        "total_count": total_count,
+                        "inputs": st.session_state.task_form_inputs,
+                        "outputs": st.session_state.task_form_outputs
                     }
-                )
-
-            with c_out:
-                st.markdown("##### 输出 (Outputs)")
-                df_out = get_editor_df(curr_task.get('outputs', []))
-                edited_out = st.data_editor(
-                    df_out, num_rows="dynamic", key="ed_out", use_container_width=True,
-                    column_config={
-                        "format": st.column_config.SelectboxColumn("格式", options=OUTPUT_FORMATS, required=True),
-                        "tokens": st.column_config.NumberColumn("Token消耗", min_value=0, required=True)
-                    }
-                )
-
-            # 保存与删除按钮
-            btn_col1, btn_col2 = st.columns([1, 5])
-            if btn_col1.button("💾 保存任务"):
-                curr_task['name'] = t_name
-                curr_task['count'] = t_count
-                # 将 DataFrame 转回 List[Dict]
-                curr_task['inputs'] = edited_in.to_dict('records')
-                curr_task['outputs'] = edited_out.to_dict('records')
-                st.success("已保存")
-                st.rerun()  # 刷新以更新下拉框名称
-
-            if btn_col2.button("🗑️ 删除任务", type="primary"):
-                tasks.pop(st.session_state.current_task_idx)
-                st.session_state.current_task_idx = None
+                    self.dm.add_or_update_task(final_task, task_id)
+                    st.success(f"任务 '{name}' 已成功保存！")
+                    # 清理状态
+                    del st.session_state.editing_task_id
+                    del st.session_state.task_form_inputs
+                    del st.session_state.task_form_outputs
+                    st.rerun()
+        if is_editing:
+            if st.button("❌ 取消编辑"):
+                del st.session_state.editing_task_id
+                del st.session_state.task_form_inputs
+                del st.session_state.task_form_outputs
                 st.rerun()
 
-        # --- 结果计算区域 ---
-        st.divider()
-        st.subheader("💰 成本计算结果")
+    def _render_io_rows(self, io_type):
+        """辅助函数，用于渲染输入或输出的动态行"""
+        state_key = f'task_form_{io_type}'
 
-        # 只有在已保存后（内存中有数据）才计算
-        valid_inputs = [i for i in curr_task.get('inputs', []) if i.get('format')]
-        valid_outputs = [i for i in curr_task.get('outputs', []) if i.get('format')]
+        for i in range(len(st.session_state[state_key])):
+            cols = st.columns([3, 3, 1])
+            with cols[0]:
+                st.session_state[state_key][i]['type'] = st.selectbox(
+                    f"格式", self.config.INPUT_OUTPUT_TYPES,
+                    index=self.config.INPUT_OUTPUT_TYPES.index(st.session_state[state_key][i]['type']),
+                    key=f"{io_type}_type_{i}"
+                )
+            with cols[1]:
+                st.session_state[state_key][i]['tokens'] = st.number_input(
+                    "Token数量", min_value=0,
+                    value=st.session_state[state_key][i]['tokens'],
+                    key=f"{io_type}_tokens_{i}"
+                )
+            with cols[2]:
+                if st.button("➖", key=f"{io_type}_del_{i}"):
+                    st.session_state[state_key].pop(i)
+                    st.rerun()
 
-        if not valid_inputs and not valid_outputs:
-            st.warning("请先配置任务的输入或输出格式并保存。")
-        else:
-            compat_models = self.dm.find_compatible_models(curr_task)
-            if not compat_models:
-                st.error("没有找到支持该输入/输出组合的模型。请在'平台配置'中添加对应的模型。")
-            else:
-                results = []
-                for m in compat_models:
-                    cost = self.dm.calculate_task_cost(curr_task, m)
-                    if cost:
-                        results.append({
-                            "model": m,
-                            "cost": cost
-                        })
-
-                # 按价格排序
-                results.sort(key=lambda x: x['cost']['CNY'])
-
-                for res in results:
-                    m = res['model']
-                    c = res['cost']
-
-                    with st.container(border=True):
-                        col_main, col_cost = st.columns([3, 1])
-                        with col_main:
-                            st.markdown(f"**{m['name']}** <small style='color:gray'>({m['platform_name']})</small>",
-                                        unsafe_allow_html=True)
-                            st.caption(
-                                f"Input: {', '.join(m['supported_inputs'])} | Output: {', '.join(m['supported_outputs'])}")
-                        with col_cost:
-                            st.markdown(f"#### ¥ {c['CNY']:,.2f}")
-                            st.caption(f"$ {c['USD']:,.2f}")
-
-    def render_config_tab(self):
-        st.header("平台与模型管理")
-
-        if st.button("➕ 添加新平台"):
-            self.dm.data['platforms'].append({
-                "name": "新平台", "limits": {"daily_limit": 0}, "models": []
-            })
+        if st.button(f"➕ 添加{'输入' if io_type == 'inputs' else '输出'}", key=f"{io_type}_add"):
+            st.session_state[state_key].append({'type': 'text', 'tokens': 0})
             st.rerun()
 
-        platforms = self.dm.data['platforms']
+    # --- 平台与模型标签页 ---
+    def render_platform_and_model_tab(self):
+        st.header("平台与模型库")
 
-        for p_idx, platform in enumerate(platforms):
-            with st.expander(f"🏢 {platform['name']}", expanded=False):
-                # 平台基本信息
-                c1, c2, c3 = st.columns([2, 2, 1])
-                new_p_name = c1.text_input("平台名称", platform['name'], key=f"p_name_{p_idx}")
-                new_p_limit = c2.number_input("每日限制 (0为无限)", 0, value=platform.get('limits', {}).get('daily_limit', 0),
-                                              key=f"p_lim_{p_idx}")
-
-                if c3.button("❌ 删除平台", key=f"del_p_{p_idx}"):
-                    platforms.pop(p_idx)
-                    st.rerun()
-
-                # 更新平台基本信息
-                platform['name'] = new_p_name
-                platform['limits'] = {"daily_limit": new_p_limit}
-
-                st.divider()
-
-                # --- 模型管理区域 (重构：不使用表格编辑复杂对象，改用列表+详情) ---
-                st.markdown(f"**{len(platform['models'])} 个模型**")
-
-                if st.button("✚ 添加模型", key=f"add_m_{p_idx}"):
-                    platform['models'].append({
-                        "name": "新模型",
-                        "supported_inputs": ["text"],
-                        "supported_outputs": ["text"],
-                        "pricing": [],
-                        "is_free": False
+        with st.expander("➕ 添加新平台"):
+            with st.form("new_platform_form", clear_on_submit=True):
+                platform_name = st.text_input("平台名称")
+                platform_limits = st.text_area("平台限制说明（可选）", help="例如：所有免费模型总请求次数不超过50次/天")
+                submitted = st.form_submit_button("添加平台")
+                if submitted and platform_name:
+                    self.dm.add_or_update_platform({
+                        "name": platform_name,
+                        "limits": platform_limits,
+                        "models": []
                     })
+                    st.success(f"平台 '{platform_name}' 已添加。")
                     st.rerun()
 
-                for m_idx, model in enumerate(platform['models']):
-                    # 使用 container 区分每个模型
-                    with st.container(border=True):
-                        mc1, mc2 = st.columns([4, 1])
-                        model['name'] = mc1.text_input("模型名称", model['name'], key=f"m_name_{p_idx}_{m_idx}")
-                        if mc2.button("删除", key=f"del_m_{p_idx}_{m_idx}"):
-                            platform['models'].pop(m_idx)
-                            st.rerun()
+        platforms = self.dm.get_platforms()
+        if not platforms:
+            st.info("尚未配置任何AI平台。")
+            return
 
-                        # 输入输出多选 (解决了之前无法在表格里选多个的问题)
-                        c_io1, c_io2 = st.columns(2)
-                        model['supported_inputs'] = c_io1.multiselect(
-                            "支持输入", INPUT_FORMATS, default=model.get('supported_inputs', []),
-                            key=f"m_in_{p_idx}_{m_idx}"
+        for platform in platforms:
+            with st.container(border=True):
+                st.subheader(f"平台: {platform['name']}")
+                st.caption(platform.get('limits', '无特定限制'))
+
+                if st.button("🗑️ 删除平台", key=f"del_platform_{platform['id']}"):
+                    self.dm.delete_platform(platform['id'])
+                    st.rerun()
+
+                st.markdown("---")
+                st.markdown("**模型列表**")
+
+                for model in platform.get('models', []):
+                    with st.expander(f"模型: {model['name']}", expanded=False):
+                        self.render_model_form(platform['id'], model['id'])
+
+                with st.expander("➕ 添加新模型到此平台"):
+                    self.render_model_form(platform['id'])
+
+    def render_model_form(self, platform_id, model_id=None):
+        is_editing = model_id is not None
+        model_data = None
+        if is_editing:
+            platform = next((p for p in self.dm.get_platforms() if p['id'] == platform_id), None)
+            if platform:
+                model_data = next((m for m in platform.get('models', []) if m['id'] == model_id), None)
+
+        default_model = {
+            "name": "", "is_free": False, "supported_inputs": [], "supported_outputs": [],
+            "pricing": {}, "rate_limits": ""
+        }
+        model_data = model_data or default_model
+
+        with st.form(key=f"model_form_{platform_id}_{model_id or 'new'}"):
+            name = st.text_input("模型名称", value=model_data['name'])
+            is_free = st.checkbox("这是一个免费模型", value=model_data.get('is_free', False))
+
+            supported_inputs = st.multiselect(
+                "支持的输入类型", self.config.INPUT_OUTPUT_TYPES, default=model_data['supported_inputs']
+            )
+            supported_outputs = st.multiselect(
+                "支持的输出类型", self.config.INPUT_OUTPUT_TYPES, default=model_data['supported_outputs']
+            )
+
+            st.markdown("**定价信息 (如果非免费)**")
+            pricing = copy.deepcopy(model_data.get('pricing', {}))
+
+            if not is_free:
+                # 定价配置
+                all_io_types = sorted(list(set(supported_inputs + supported_outputs)))
+                for io_type in all_io_types:
+                    st.markdown(f"**{io_type.capitalize()} 定价:**")
+                    cols = st.columns(3)
+
+                    pricing_info = pricing.get(io_type,
+                                               {'unit': list(self.config.PRICING_UNITS.values())[0], 'rate': 0.0,
+                                                'currency': 'USD'})
+
+                    with cols[0]:
+                        unit_key = st.selectbox(
+                            f"计价单位 ({io_type})", options=self.config.PRICING_UNITS.keys(),
+                            key=f"unit_{platform_id}_{model_id}_{io_type}",
+                            index=list(self.config.PRICING_UNITS.values()).index(pricing_info['unit'])
                         )
-                        model['supported_outputs'] = c_io2.multiselect(
-                            "支持输出", OUTPUT_FORMATS, default=model.get('supported_outputs', []),
-                            key=f"m_out_{p_idx}_{m_idx}"
+                        pricing_info['unit'] = self.config.PRICING_UNITS[unit_key]
+
+                    with cols[1]:
+                        pricing_info['rate'] = st.number_input(
+                            f"费率 ({io_type})", min_value=0.0, format="%.6f",
+                            value=float(pricing_info.get('rate', 0.0)),
+                            key=f"rate_{platform_id}_{model_id}_{io_type}"
                         )
 
-                        # 速率限制
-                        c_rl1, c_rl2 = st.columns(2)
-                        limits = model.get('rate_limits', {})
-                        limits['rpm'] = c_rl1.number_input("RPM (每分请求)", 0, value=limits.get('rpm', 0),
-                                                           key=f"rpm_{p_idx}_{m_idx}")
-                        limits['tpm'] = c_rl2.number_input("TPM (每分Token)", 0, value=limits.get('tpm', 0),
-                                                           key=f"tpm_{p_idx}_{m_idx}")
-                        model['rate_limits'] = limits
+                    with cols[2]:
+                        pricing_info['currency'] = st.selectbox(
+                            f"货币 ({io_type})", self.config.CURRENCIES,
+                            index=self.config.CURRENCIES.index(pricing_info.get('currency', 'USD')),
+                            key=f"currency_{platform_id}_{model_id}_{io_type}"
+                        )
+                    pricing[io_type] = pricing_info
 
-                        # 定价规则
-                        st.markdown("**定价策略**")
-                        is_free = st.checkbox("完全免费", value=model.get('is_free', False), key=f"free_{p_idx}_{m_idx}")
-                        model['is_free'] = is_free
+            rate_limits = st.text_area("速率限制说明 (可选)", value=model_data['rate_limits'], help="例如：RPM: 60, TPM: 100000")
 
-                        if not is_free:
-                            # 使用 Pandas DataFrame 管理定价列表
-                            pricing_data = model.get('pricing', [])
-                            if not isinstance(pricing_data, list): pricing_data = []  # 防止旧数据错误
+            submit_btn = st.form_submit_button("✅ 保存模型")
 
-                            df_pricing = pd.DataFrame(pricing_data) if pricing_data else pd.DataFrame(
-                                columns=['io_type', 'format', 'method', 'price', 'unit', 'currency'])
+            if submit_btn:
+                if not name:
+                    st.error("模型名称不能为空！")
+                else:
+                    new_model_data = {
+                        "id": model_id,
+                        "name": name,
+                        "is_free": is_free,
+                        "supported_inputs": supported_inputs,
+                        "supported_outputs": supported_outputs,
+                        "pricing": {} if is_free else pricing,
+                        "rate_limits": rate_limits
+                    }
+                    self.dm.add_or_update_model(platform_id, new_model_data, model_id)
+                    st.success(f"模型 '{name}' 已保存。")
+                    st.rerun()
 
-                            edited_pricing = st.data_editor(
-                                df_pricing,
-                                num_rows="dynamic",
-                                key=f"pr_ed_{p_idx}_{m_idx}",
-                                use_container_width=True,
-                                column_config={
-                                    "io_type": st.column_config.SelectboxColumn("类型", options=['input', 'output'],
-                                                                                required=True),
-                                    "format": st.column_config.SelectboxColumn("格式", options=INPUT_FORMATS,
-                                                                               required=True),
-                                    "method": st.column_config.SelectboxColumn("计价方式", options=PRICING_METHODS,
-                                                                               required=True),
-                                    "price": st.column_config.NumberColumn("价格", format="%.6f", required=True),
-                                    "unit": st.column_config.NumberColumn("单位(如1k=1000)", min_value=1, required=True),
-                                    "currency": st.column_config.SelectboxColumn("货币", options=CURRENCIES,
-                                                                                 required=True)
-                                }
-                            )
-                            # 实时写回数据
-                            model['pricing'] = edited_pricing.to_dict('records')
-                        else:
-                            model['pricing'] = []
+        if is_editing:
+            if st.button("🗑️ 删除模型", key=f"del_model_{platform_id}_{model_id}"):
+                self.dm.delete_model(platform_id, model_id)
+                st.rerun()
+
+    # --- 核心计算逻辑 ---
+    def calculate_and_display_costs(self, task):
+        required_inputs = {item['type'] for item in task['inputs']}
+        required_outputs = {item['type'] for item in task['outputs']}
+
+        compatible_models = []
+        platforms = self.dm.get_platforms()
+
+        for platform in platforms:
+            for model in platform.get('models', []):
+                supported_inputs = set(model.get('supported_inputs', []))
+                supported_outputs = set(model.get('supported_outputs', []))
+
+                if required_inputs.issubset(supported_inputs) and required_outputs.issubset(supported_outputs):
+                    cost_usd, cost_cny = self._calculate_single_model_cost(task, model)
+                    compatible_models.append({
+                        "platform": platform['name'],
+                        "model": model['name'],
+                        "cost_usd": cost_usd,
+                        "cost_cny": cost_cny,
+                        "is_free": model.get('is_free', False),
+                        "rate_limits": model.get('rate_limits', 'N/A')
+                    })
+
+        if not compatible_models:
+            st.warning("根据当前任务的输入/输出配置，没有找到任何兼容的模型。")
+            return
+
+        # 排序：免费的在前，然后按美元价格升序
+        sorted_models = sorted(compatible_models, key=lambda x: (x['is_free'], -x['cost_usd']), reverse=True)
+
+        st.dataframe(
+            [
+                {
+                    "平台": m['platform'], "模型": m['model'],
+                    "成本 (USD)": "免费" if m['is_free'] else f"${m['cost_usd']:.4f}",
+                    "成本 (CNY)": "免费" if m['is_free'] else f"¥{m['cost_cny']:.4f}",
+                    "速率限制": m['rate_limits']
+                } for m in sorted_models
+            ],
+            use_container_width=True
+        )
+
+    def _calculate_single_model_cost(self, task, model):
+        if model.get('is_free', False):
+            return 0.0, 0.0
+
+        total_cost_usd = 0.0
+        task_count = task['total_count']
+        pricing = model.get('pricing', {})
+
+        # 计算输入成本
+        for item in task['inputs']:
+            io_type = item['type']
+            tokens = item['tokens']
+
+            if io_type in pricing:
+                price_info = pricing[io_type]
+                rate = price_info.get('rate', 0.0)
+                unit = price_info.get('unit')
+                currency = price_info.get('currency', 'USD')
+
+                cost = 0.0
+                if unit == 'per_token_m':  # 每百万Token
+                    cost = (task_count * tokens * rate) / 1_000_000
+                elif unit == 'per_token_k':  # 每千Token
+                    cost = (task_count * tokens * rate) / 1_000
+                elif unit == 'per_call_k':  # 每千次调用
+                    cost = (task_count * rate) / 1_000
+                elif unit == 'per_call_single':  # 每一次调用
+                    cost = task_count * rate
+
+                if currency == 'CNY':
+                    total_cost_usd += cost / self.config.USD_TO_CNY_RATE
+                else:
+                    total_cost_usd += cost
+
+        # 计算输出成本
+        for item in task['outputs']:
+            io_type = item['type']
+            tokens = item['tokens']
+
+            if io_type in pricing:
+                price_info = pricing[io_type]
+                rate = price_info.get('rate', 0.0)
+                unit = price_info.get('unit')
+                currency = price_info.get('currency', 'USD')
+
+                cost = 0.0
+                if unit == 'per_token_m':
+                    cost = (task_count * tokens * rate) / 1_000_000
+                elif unit == 'per_token_k':
+                    cost = (task_count * tokens * rate) / 1_000
+                elif unit == 'per_call_k':
+                    cost = (task_count * rate) / 1_000
+                elif unit == 'per_call_single':
+                    cost = task_count * rate
+
+                if currency == 'CNY':
+                    total_cost_usd += cost / self.config.USD_TO_CNY_RATE
+                else:
+                    total_cost_usd += cost
+
+        total_cost_cny = total_cost_usd * self.config.USD_TO_CNY_RATE
+        return total_cost_usd, total_cost_cny
 
 
+# --- 主程序入口 ---
 if __name__ == "__main__":
-    if 'data_manager' not in st.session_state:
-        st.session_state.data_manager = DataManager(st.session_state)
-    UIManager(st.session_state.data_manager).run()
+    data_manager = DataManager()
+    app = StreamlitApp(data_manager)
+    app.render()
