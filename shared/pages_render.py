@@ -21,6 +21,11 @@ SCRIPTS_BY_GROUP = {
             "path": r"pages/8_杂质统计.py",
             "description": None
         },
+        {
+            "label": "🚀 AI模型成本计算器",
+            "path": r"pages/2_ai模型调用成本计算器.py",
+            "description": None
+        },
     ],
     "📊 运营工具": [
         {
