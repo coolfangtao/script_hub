@@ -137,20 +137,6 @@ def main():
         3. 如果您想恢复自动跳转功能，请在浏览器地址栏处设置，**允许本网站的弹出窗口**。
         """)
 
-        # 调试信息（可选）
-        with st.expander("🔧 调试信息"):
-            st.write(f"文件路径: `{html_file_path}`")
-            st.write(f"文件大小: {len(html_bytes)} 字节")
-            st.write(f"Base64 长度: {len(html_base64)} 字符")
-
-            # 显示文件前几行内容（用于调试）
-            try:
-                # 再次强调，这里使用 errors='ignore' 仅用于预览/调试，不影响实际的 Blob 跳转
-                content_preview = html_bytes.decode('utf-8', errors='ignore')[:500]
-                st.text_area("文件内容预览 (UTF-8 编码):", content_preview, height=150)
-            except:
-                st.write("无法预览文件内容")
-
     except Exception as e:
         st.error(f"读取文件时出错: {str(e)}")
         st.info("请检查文件编码或文件是否完整")
