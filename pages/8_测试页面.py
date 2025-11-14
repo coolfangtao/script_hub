@@ -99,16 +99,28 @@ def main():
     """
 
     # 3. 定义一个函数，在按钮点击时调用
+    # 3. 定义一个函数，在按钮点击时调用
     def redirect_on_click():
         """在 Streamlit 按钮点击时渲染带有执行脚本的 components.html"""
+
+        # 增加计数器，确保每次点击都渲染新的组件 (通过改变 height 来避免缓存问题)
+        # 注意：需要先增加计数器，才能用于 height 或 width 的计算
+        st.session_state['redirect_count'] = st.session_state.get('redirect_count', 0) + 1
+        current_count = st.session_state['redirect_count']
+
         # 渲染包含了 Base64 内容和自动执行逻辑的 JS
         js_to_execute = js_func_template.format(base64_content=st.session_state['html_base64'])
 
-        # 使用 key 强制 Streamlit 重新渲染 components.html 组件
-        components.html(js_to_execute, height=0, width=0, key=f"redirect_{st.session_state.get('redirect_count', 0)}")
+        # *** 关键修改：移除 key 参数，通过改变 height (使用计数器) 来强制重新渲染 ***
+        # 使用 count 确保每次渲染的 height 都不同，从而绕过 Streamlit 的组件缓存
+        # 我们使用一个极小的 height，例如 1 像素 + 计数器的模 100
+        # 这样 height 变化很小，但能保证 Streamlit 认为它是一个新组件
+        calculated_height = 1 + (current_count % 100)
 
-        # 增加计数器，确保每次点击都渲染新的组件 (避免缓存问题)
-        st.session_state['redirect_count'] = st.session_state.get('redirect_count', 0) + 1
+        components.html(js_to_execute, height=calculated_height, width=0)
+
+        # 这里不需要再设置 session state，因为已经在上面设置了
+        # st.session_state['redirect_count'] = st.session_state.get('redirect_count', 0) + 1
 
     st.markdown("""
         <div style="padding: 10px; background-color: #262730; border-radius: 8px; margin-bottom: 20px;">
