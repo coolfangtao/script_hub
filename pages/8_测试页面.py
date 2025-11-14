@@ -122,14 +122,6 @@ def main():
         # 这里不需要再设置 session state，因为已经在上面设置了
         # st.session_state['redirect_count'] = st.session_state.get('redirect_count', 0) + 1
 
-    st.markdown("""
-        <div style="padding: 10px; background-color: #262730; border-radius: 8px; margin-bottom: 20px;">
-            <p style="font-size: 1.1em; color: #f0f2f6;">
-                💡 请点击下方按钮在新窗口中打开 AI 模型计算器：
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
     # 4. 创建按钮，点击时调用 redirect_on_click
     st.button(
         "🚀 在新窗口打开计算器",
@@ -139,9 +131,8 @@ def main():
 
     st.info("""
     **✅ 功能说明：**
-    - 页面加载时不会自动跳转。
     - **点击按钮后**，计算器页面将在新标签页中打开。
-    - 由于跳转是由用户点击直接触发的，因此通常**不会被浏览器阻止**。
+    - 如果需要重新打开计算器，需要在本页面按F5刷新此页面后再点击**🚀 在新窗口打开计算器**。
     """)
 
 
