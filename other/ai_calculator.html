@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Model Cost Calculator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'gray-900': '#1a202c',
+              'gray-800': '#2d3748',
+              'gray-700': '#4a5568',
+              'gray-600': '#718096',
+              'indigo-500': '#667eea',
+              'indigo-600': '#5a67d8',
+            }
+          }
+        }
+      }
+    </script>
+    <!-- React & ReactDOM from CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Babel Standalone for in-browser JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-900 text-white">
+    <div id="root"></div>
+    <script type="text/babel">
+      // All application code is bundled here.
+      // The original file structure is preserved in comments for clarity.
+
+      // ===== FROM: types.ts =====
+      const MediaType = {
+        TEXT: 'text',
+        IMAGE: 'image',
+        FILE: 'file',
+        AUDIO: 'audio',
+        VIDEO: 'video',
+      };
+
+      const Currency = {
+        USD: 'USD',
+        CNY: 'CNY',
+      };
+
+      // ===== FROM: constants.ts =====
+      const USD_TO_CNY_RATE = 7.25;
+      const INITIAL_PLATFORMS = [];
+
+      // ===== FROM: components/Icons.tsx =====
+      const AddIcon = ({ className }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      );
+
+      const RemoveIcon = ({ className }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+        </svg>
+      );
+
+      const WarningIcon = ({ className }) => (
+          <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+      );
+
+      const ChartIcon = ({ className }) => (
+          <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+      );
+
+      const LogoIcon = ({ className }) => (
+          <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="currentColor">
+              <path d="M7.5,5.5A2,2,0,0,1,9.5,7.5V16.5A2,2,0,0,1,7.5,18.5H5.5A2,2,0,0,1,3.5,16.5V7.5A2,2,0,0,1,5.5,5.5H7.5M18.5,5.5A2,2,0,0,1,20.5,7.5V16.5A2,2,0,0,1,18.5,18.5H16.5A2,2,0,0,1,14.5,16.5V7.5A2,2,0,0,1,16.5,5.5H18.5M13,3.5A2,2,0,0,1,15,5.5V18.5A2,2,0,0,1,13,20.5H11A2,2,0,0,1,9,18.5V5.5A2,2,0,0,1,11,3.5H13Z" />
+          </svg>
+      );
+
+      const TrashIcon = ({ className }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      );
+
+      const EditIcon = ({ className }) => (
+          <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+      );
+
+      const ChevronDownIcon = ({ className }) => (
+          <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+      );
+
+      const PlusCircleIcon = ({ className }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      );
+
+      const XIcon = ({ className }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      );
+
+      const ExportIcon = ({ className }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+      );
+
+      const ImportIcon = ({ className }) => (
+        <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+      );
+
+
+      // ===== FROM: components/ModelResultCard.tsx =====
+      const ModelResultCard = ({ result }) => {
+        const { model, costInUSD, costInCNY, isRateLimited } = result;
+
+        const formatCurrency = (amount, currency) => {
+          return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 5,
+          }).format(amount);
+        };
+
+        const mediaTypeTranslations = {
+          [MediaType.TEXT]: '文本',
+          [MediaType.IMAGE]: '图像',
+          [MediaType.AUDIO]: '音频',
+          [MediaType.VIDEO]: '视频',
+          [MediaType.FILE]: '文件',
+        };
+
+        const MediaTypeTag = ({ type }) => {
+          const colors = {
+            [MediaType.TEXT]: 'bg-blue-900/50 text-blue-300',
+            [MediaType.IMAGE]: 'bg-purple-900/50 text-purple-300',
+            [MediaType.AUDIO]: 'bg-green-900/50 text-green-300',
+            [MediaType.VIDEO]: 'bg-red-900/50 text-red-300',
+            [MediaType.FILE]: 'bg-yellow-900/50 text-yellow-300',
+          };
+          return (
+            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${colors[type]}`}>
+              {mediaTypeTranslations[type]}
+            </span>
+          );
+        };
+
+        return (
+          <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 hover:border-indigo-500 transition-all duration-300">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex-grow">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-sm font-medium text-gray-400 bg-gray-700 px-2 py-1 rounded">{model.platform}</span>
+                  <h3 className="text-lg font-semibold text-white">{model.name}</h3>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-gray-400">输入:</span>
+                    {model.supportedInputs.map(t => <MediaTypeTag key={t} type={t} />)}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-gray-400">输出:</span>
+                    {model.supportedOutputs.map(t => <MediaTypeTag key={t} type={t} />)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 text-left sm:text-right w-full sm:w-auto">
+                {model.pricing.isFree ? (
+                  <p className="text-2xl font-bold text-green-400">免费</p>
+                ) : (
+                  <React.Fragment>
+                    <p className="text-2xl font-bold text-indigo-400">{formatCurrency(costInUSD, 'USD')}</p>
+                    <p className="text-sm text-gray-400">{formatCurrency(costInCNY, 'CNY')}</p>
+                  </React.Fragment>
+                )}
+              </div>
+            </div>
+            {isRateLimited && (
+              <div className="mt-3 p-2 bg-yellow-900/30 border border-yellow-700/50 rounded-md text-yellow-300 text-sm flex items-center gap-2">
+                <WarningIcon className="w-5 h-5 flex-shrink-0" />
+                <span>
+                  任务数量超过了该模型每日 {model.rateLimits?.requestsPerDay} 次的限制。
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // ===== FROM: components/ResultsDisplay.tsx =====
+      const ResultsDisplay = ({ results, task }) => {
+        if (!task) {
+          return (
+            <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+              <h2 className="text-xl font-bold mb-4 text-white">3. 成本计算结果</h2>
+              <div className="text-center py-12">
+                  <ChartIcon className="mx-auto h-12 w-12 text-gray-500" />
+                  <p className="mt-4 text-gray-400">选择或创建一个新任务以查看成本计算。</p>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700">
+            <h2 className="text-xl font-bold mb-4 text-white">3. 成本计算结果</h2>
+            {task.totalTasks <= 0 ? (
+              <div className="text-center py-12">
+                  <ChartIcon className="mx-auto h-12 w-12 text-gray-500" />
+                  <p className="mt-4 text-gray-400">请输入任务数量以查看成本计算。</p>
+              </div>
+            ) : results.length > 0 ? (
+              <div className="space-y-4">
+                {results.map((result) => (
+                  <ModelResultCard key={`${result.model.platform}-${result.model.id}`} result={result} />
+                ))}
+              </div>
+            ) : (
+               <div className="text-center py-12">
+                  <ChartIcon className="mx-auto h-12 w-12 text-gray-500" />
+                  <p className="mt-4 text-gray-400">未找到与所定义任务I/O兼容的模型。</p>
+                  <p className="text-sm text-gray-500">请尝试调整输入/输出类型或添加新模型。</p>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // ===== FROM: components/TaskPanel.tsx =====
+      const TaskPanel = ({ tasks, setTasks, activeTaskId, setActiveTaskId }) => {
+        const activeTask = tasks.find(t => t.id === activeTaskId);
+
+        const handleTaskChange = (updatedTask) => {
+          setTasks(prevTasks => prevTasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+        };
+
+        const handleAddTask = () => {
+          const newId = `task-${Date.now()}`;
+          const newTask = {
+            id: newId,
+            name: `新任务 ${tasks.length + 1}`,
+            totalTasks: 1000,
+            inputs: [{ type: MediaType.TEXT, tokens: 10 }],
+            outputs: [{ type: MediaType.TEXT, tokens: 10 }],
+          };
+          setTasks(prev => [...prev, newTask]);
+          setActiveTaskId(newId);
+        };
+
+        const handleDeleteTask = () => {
+          if (!activeTaskId) return;
+          if (window.confirm('您确定要删除此任务吗？')) {
+              setTasks(prevTasks => prevTasks.filter(t => t.id !== activeTaskId));
+          }
+        };
+
+        const TaskForm = ({ task, onTaskChange }) => {
+            const mediaTypeTranslations = {
+              [MediaType.TEXT]: '文本',
+              [MediaType.IMAGE]: '图像',
+              [MediaType.AUDIO]: '音频',
+              [MediaType.VIDEO]: '视频',
+              [MediaType.FILE]: '文件',
+            };
+
+            const handleIOChange = (field, index, key, value) => {
+              const updatedIO = [...task[field]];
+              if (key === 'tokens') {
+                updatedIO[index] = { ...updatedIO[index], [key]: Math.max(0, Number(value)) };
+              } else {
+                updatedIO[index] = { ...updatedIO[index], [key]: value };
+              }
+              onTaskChange({ ...task, [field]: updatedIO });
+            };
+
+            const addIO = (field) => {
+              const newIO = { type: MediaType.TEXT, tokens: 10 };
+              onTaskChange({ ...task, [field]: [...task[field], newIO] });
+            };
+
+            const removeIO = (field, index) => {
+              if (task[field].length > 1) {
+                const updatedIO = task[field].filter((_, i) => i !== index);
+                onTaskChange({ ...task, [field]: updatedIO });
+              }
+            };
+
+            const renderIOTable = (field) => (
+              <div className="space-y-3">
+                {task[field].map((io, index) => (
+                  <div key={index} className="grid grid-cols-10 gap-2 items-center">
+                    <div className="col-span-5">
+                      <select
+                        value={io.type}
+                        onChange={(e) => handleIOChange(field, index, 'type', e.target.value)}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        {Object.entries(mediaTypeTranslations).map(([key, value]) => (
+                          <option key={key} value={key}>{value}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-span-4 relative">
+                      <input
+                        type="number"
+                        value={io.tokens}
+                        onChange={(e) => handleIOChange(field, index, 'tokens', e.target.value)}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pr-16"
+                        placeholder="Token数"
+                      />
+                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 text-sm">
+                        tokens
+                      </span>
+                    </div>
+                    <div className="col-span-1 flex justify-center">
+                      <button
+                        onClick={() => removeIO(field, index)}
+                        disabled={task[field].length <= 1}
+                        className="p-2 text-gray-400 hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        aria-label={`移除${field === 'inputs' ? '输入' : '输出'}`}
+                      >
+                        <RemoveIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  onClick={() => addIO(field)}
+                  className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-indigo-300 hover:text-indigo-200 bg-indigo-900/20 hover:bg-indigo-900/40 rounded-md py-2 transition-colors"
+                >
+                  <AddIcon className="w-4 h-4" />
+                  添加{field === 'inputs' ? '输入' : '输出'}
+                </button>
+              </div>
+            );
+
+            return (
+              <div className="space-y-6">
+                <div>
+                  <label htmlFor="taskName" className="block text-sm font-medium text-gray-300 mb-1">任务名称</label>
+                  <input
+                    type="text"
+                    id="taskName"
+                    value={task.name}
+                    onChange={(e) => onTaskChange({ ...task, name: e.target.value })}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="totalTasks" className="block text-sm font-medium text-gray-300 mb-1">任务总数</label>
+                  <input
+                    type="number"
+                    id="totalTasks"
+                    value={task.totalTasks}
+                    onChange={(e) => onTaskChange({ ...task, totalTasks: Math.max(0, Number(e.target.value)) })}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-200 mb-2">输入</h3>
+                  {renderIOTable('inputs')}
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-200 mb-2">输出</h3>
+                  {renderIOTable('outputs')}
+                </div>
+              </div>
+            );
+        };
+
+        return (
+          <div className="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 h-full">
+            <h2 className="text-xl font-bold mb-4 text-white">1. 管理和定义任务</h2>
+
+            <div className="mb-6">
+              <label htmlFor="task-selector" className="block text-sm font-medium text-gray-300 mb-1">当前任务</label>
+              <div className="flex gap-2">
+                <select
+                  id="task-selector"
+                  value={activeTaskId ?? ''}
+                  onChange={(e) => setActiveTaskId(e.target.value)}
+                  className="flex-grow w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  disabled={tasks.length === 0}
+                >
+                  {tasks.map(task => (
+                    <option key={task.id} value={task.id}>{task.name}</option>
+                  ))}
+                </select>
+                <button onClick={handleAddTask} className="p-2 bg-indigo-600 hover:bg-indigo-500 rounded-md" aria-label="添加新任务">
+                  <AddIcon className="w-5 h-5" />
+                </button>
+                 <button onClick={handleDeleteTask} disabled={!activeTask} className="p-2 bg-gray-600 hover:bg-red-500 rounded-md disabled:opacity-50 disabled:cursor-not-allowed" aria-label="删除当前任务">
+                  <TrashIcon className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {activeTask ? (
+              <TaskForm task={activeTask} onTaskChange={handleTaskChange} />
+            ) : (
+              <div className="text-center py-10">
+                <p className="text-gray-400">没有任务。请创建一个新任务。</p>
+                <button onClick={handleAddTask} className="mt-2 text-indigo-400 hover:underline">创建一个新任务</button>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // ===== FROM: components/PlatformPanel.tsx =====
+      const PlatformPanel = ({ platforms, setPlatforms }) => {
+        const { useState } = React;
+        const [openPlatformId, setOpenPlatformId] = useState(platforms.length > 0 ? platforms[0].id : null);
+
+        const [isPlatformModalOpen, setPlatformModalOpen] = useState(false);
+        const [editingPlatform, setEditingPlatform] = useState(null);
+
+        const [isModelModalOpen, setModelModalOpen] = useState(false);
+        const [editingModel, setEditingModel] = useState(null);
+        const [activePlatformIdForModal, setActivePlatformIdForModal] = useState(null);
+
+        const mediaTypeTranslations = {
+          [MediaType.TEXT]: '文本',
+          [MediaType.IMAGE]: '图像',
+          [MediaType.AUDIO]: '音频',
+          [MediaType.VIDEO]: '视频',
+          [MediaType.FILE]: '文件',
+        };
+
+        const Modal = ({ isOpen, onClose, title, children }) => {
+          if (!isOpen) return null;
+          return (
+            <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex justify-center items-start pt-16" onClick={onClose}>
+              <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl border border-gray-700 max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-4 border-b border-gray-700 sticky top-0 bg-gray-800">
+                  <h3 className="text-lg font-semibold text-white">{title}</h3>
+                  <button onClick={onClose} className="text-gray-400 hover:text-white">
+                    <XIcon className="w-6 h-6" />
+                  </button>
+                </div>
+                <div className="p-6 overflow-y-auto">{children}</div>
+              </div>
+            </div>
+          );
+        };
+
+        const PlatformForm = ({ platform, onSave, onCancel }) => {
+          const [name, setName] = useState(platform?.name || '');
+
+          const handleSubmit = (e) => {
+            e.preventDefault();
+            if (name.trim()) {
+              onSave(name.trim());
+            }
+          };
+
+          return (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="platformName" className="block text-sm font-medium text-gray-300 mb-1">平台名称</label>
+                <input
+                  id="platformName"
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-indigo-500"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md font-semibold">取消</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md font-semibold">保存</button>
+              </div>
+            </form>
+          );
+        };
+
+        const ModelForm = ({ model, onSave, onCancel }) => {
+            const DEFAULT_MODEL = {
+              name: '',
+              supportedInputs: [MediaType.TEXT],
+              supportedOutputs: [MediaType.TEXT],
+              pricing: { currency: Currency.USD, isFree: false, inputTokensCost: 0, outputTokensCost: 0 },
+              rateLimits: {},
+            };
+          const [formData, setFormData] = useState(model ? { ...model } : { ...DEFAULT_MODEL });
+
+          const handleSubmit = (e) => {
+            e.preventDefault();
+            onSave(formData);
+          };
+
+          const handleFieldChange = (field, value) => {
+            setFormData(prev => ({ ...prev, [field]: value }));
+          };
+
+          const handlePricingChange = (field, value) => {
+            setFormData(prev => ({...prev, pricing: {...prev.pricing, [field]: value}}));
+          };
+
+          const handleRateLimitChange = (field, value) => {
+            setFormData(prev => ({...prev, rateLimits: {...prev.rateLimits, [field]: value ? Number(value) : undefined}}));
+          };
+
+          const handleMediaTypeToggle = (field, type) => {
+            const currentTypes = formData[field];
+            const newTypes = currentTypes.includes(type)
+              ? currentTypes.filter(t => t !== type)
+              : [...currentTypes, type];
+            handleFieldChange(field, newTypes);
+          };
+
+          const handleMediaCostChange = (direction, index, field, value) => {
+              const fieldName = direction === 'input' ? 'inputMediaCost' : 'outputMediaCost';
+              const costs = formData.pricing[fieldName] || [];
+              const updatedCosts = [...costs];
+              updatedCosts[index] = {...updatedCosts[index], [field]: value };
+              handlePricingChange(fieldName, updatedCosts);
+          };
+
+          const addMediaCost = (direction) => {
+              const fieldName = direction === 'input' ? 'inputMediaCost' : 'outputMediaCost';
+              const costs = formData.pricing[fieldName] || [];
+              const newCost = { type: MediaType.IMAGE, cost: 0, per: 1000};
+              handlePricingChange(fieldName, [...costs, newCost]);
+          };
+
+          const removeMediaCost = (direction, index) => {
+              const fieldName = direction === 'input' ? 'inputMediaCost' : 'outputMediaCost';
+              const costs = formData.pricing[fieldName] || [];
+              handlePricingChange(fieldName, costs.filter((_, i) => i !== index));
+          };
+
+          const renderMediaCostEditor = (direction) => (
+            <div className="space-y-3">
+                {(formData.pricing[direction === 'input' ? 'inputMediaCost' : 'outputMediaCost'] || []).map((mc, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-2 items-center text-sm">
+                        <span className="col-span-1 text-right text-gray-400">每</span>
+                        <input type="number" placeholder="数量" value={mc.per} onChange={e => handleMediaCostChange(direction, index, 'per', Number(e.target.value))} className="col-span-3 bg-gray-600 border-gray-500 rounded p-2"/>
+                        <span className="col-span-1 text-center text-gray-400">个</span>
+                        <select value={mc.type} onChange={e => handleMediaCostChange(direction, index, 'type', e.target.value)} className="col-span-3 bg-gray-600 border-gray-500 rounded p-2">
+                            {Object.entries(mediaTypeTranslations).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+                        </select>
+                        <input type="number" step="any" placeholder="成本" value={mc.cost} onChange={e => handleMediaCostChange(direction, index, 'cost', Number(e.target.value))} className="col-span-3 bg-gray-600 border-gray-500 rounded p-2"/>
+                        <button type="button" onClick={() => removeMediaCost(direction, index)} className="col-span-1 text-gray-400 hover:text-red-400"><RemoveIcon className="w-5 h-5 mx-auto"/></button>
+                    </div>
+                ))}
+                <button type="button" onClick={() => addMediaCost(direction)} className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-indigo-300 hover:text-indigo-200 bg-indigo-900/20 hover:bg-indigo-900/40 rounded-md py-2 transition-colors">
+                    <AddIcon className="w-4 h-4"/> 添加{direction === 'input' ? '输入' : '输出'}媒体成本
+                </button>
+            </div>
+          );
+
+          return (
+            <form onSubmit={handleSubmit} className="space-y-6 text-gray-300">
+              <div className="space-y-4">
+                <h4 className="font-semibold text-lg text-white">基本信息</h4>
+                <div>
+                  <label className="block text-sm font-medium mb-1">模型名称</label>
+                  <input type="text" value={formData.name} onChange={e => handleFieldChange('name', e.target.value)} required className="w-full bg-gray-700 border-gray-600 rounded p-2 text-white"/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">支持的输入类型</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {Object.entries(mediaTypeTranslations).map(([key, value]) => (
+                        <label key={key} className="flex items-center gap-2 p-2 bg-gray-700 rounded-md">
+                            <input type="checkbox" checked={formData.supportedInputs.includes(key)} onChange={() => handleMediaTypeToggle('supportedInputs', key)} className="form-checkbox h-4 w-4 bg-gray-600 border-gray-500 rounded text-indigo-500 focus:ring-indigo-500"/>
+                            <span>{value}</span>
+                        </label>
+                    ))}
+                  </div>
+                </div>
+                 <div>
+                  <label className="block text-sm font-medium mb-2">支持的输出类型</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {Object.entries(mediaTypeTranslations).map(([key, value]) => (
+                        <label key={key} className="flex items-center gap-2 p-2 bg-gray-700 rounded-md">
+                            <input type="checkbox" checked={formData.supportedOutputs.includes(key)} onChange={() => handleMediaTypeToggle('supportedOutputs', key)} className="form-checkbox h-4 w-4 bg-gray-600 border-gray-500 rounded text-indigo-500 focus:ring-indigo-500"/>
+                            <span>{value}</span>
+                        </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 border-t border-gray-700 pt-6">
+                <div className="flex justify-between items-center">
+                    <h4 className="font-semibold text-lg text-white">定价</h4>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={formData.pricing.isFree} onChange={e => handlePricingChange('isFree', e.target.checked)} className="form-checkbox h-4 w-4 bg-gray-600 border-gray-500 rounded text-indigo-500 focus:ring-indigo-500"/>
+                        <span className="font-medium">免费</span>
+                    </label>
+                </div>
+
+                {!formData.pricing.isFree && (
+                    <div className="space-y-4 p-4 bg-gray-900/50 rounded-md">
+                        <div>
+                            <label className="block text-sm font-medium mb-1">货币</label>
+                            <select value={formData.pricing.currency} onChange={e => handlePricingChange('currency', e.target.value)} className="w-full bg-gray-700 border-gray-600 rounded p-2">
+                                {Object.values(Currency).map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">输入Token成本 (每百万)</label>
+                                <input type="number" step="any" value={formData.pricing.inputTokensCost || 0} onChange={e => handlePricingChange('inputTokensCost', Number(e.target.value))} className="w-full bg-gray-700 border-gray-600 rounded p-2"/>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-1">输出Token成本 (每百万)</label>
+                                <input type="number" step="any" value={formData.pricing.outputTokensCost || 0} onChange={e => handlePricingChange('outputTokensCost', Number(e.target.value))} className="w-full bg-gray-700 border-gray-600 rounded p-2"/>
+                            </div>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium mb-1">单次请求成本</label>
+                            <input type="number" step="any" value={formData.pricing.perRequestCost || 0} onChange={e => handlePricingChange('perRequestCost', Number(e.target.value))} className="w-full bg-gray-700 border-gray-600 rounded p-2"/>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-2">特定媒体输入成本</label>
+                            {renderMediaCostEditor('input')}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium mb-2">特定媒体输出成本</label>
+                            {renderMediaCostEditor('output')}
+                        </div>
+                    </div>
+                )}
+              </div>
+
+               <div className="space-y-4 border-t border-gray-700 pt-6">
+                <h4 className="font-semibold text-lg text-white">速率限制</h4>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1">请求/天</label>
+                        <input type="number" value={formData.rateLimits?.requestsPerDay || ''} onChange={e => handleRateLimitChange('requestsPerDay', e.target.value)} className="w-full bg-gray-700 border-gray-600 rounded p-2"/>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1">请求/分钟</label>
+                        <input type="number" value={formData.rateLimits?.requestsPerMinute || ''} onChange={e => handleRateLimitChange('requestsPerMinute', e.target.value)} className="w-full bg-gray-700 border-gray-600 rounded p-2"/>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium mb-1">Token/分钟</label>
+                        <input type="number" value={formData.rateLimits?.tokensPerMinute || ''} onChange={e => handleRateLimitChange('tokensPerMinute', e.target.value)} className="w-full bg-gray-700 border-gray-600 rounded p-2"/>
+                    </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-6 border-t border-gray-700">
+                <button type="button" onClick={onCancel} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md font-semibold">取消</button>
+                <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-md font-semibold">保存模型</button>
+              </div>
+            </form>
+          )
+        };
+
+        const handleOpenPlatformModal = (platform) => {
+          setEditingPlatform(platform || null);
+          setPlatformModalOpen(true);
+        };
+
+        const handleSavePlatform = (name) => {
+          if (editingPlatform) {
+            setPlatforms(ps => ps.map(p => p.id === editingPlatform.id ? { ...p, name } : p));
+          } else {
+            const newPlatform = { id: `platform-${Date.now()}`, name, models: [] };
+            setPlatforms(ps => [...ps, newPlatform]);
+          }
+          setPlatformModalOpen(false);
+        };
+
+        const handleDeletePlatform = (platformId) => {
+          if (window.confirm('您确定要删除此平台及其所有模型吗？')) {
+            setPlatforms(ps => ps.filter(p => p.id !== platformId));
+          }
+        };
+
+        const handleOpenModelModal = (platformId, model) => {
+          setActivePlatformIdForModal(platformId);
+          setEditingModel(model || null);
+          setModelModalOpen(true);
+        };
+
+        const handleSaveModel = (modelData) => {
+          setPlatforms(ps => ps.map(p => {
+              if (p.id === activePlatformIdForModal) {
+                  const newModels = editingModel
+                    ? p.models.map(m => m.id === editingModel.id ? { ...m, ...modelData } : m)
+                    : [...p.models, { ...modelData, id: `model-${Date.now()}`, platform: p.name }];
+                  return { ...p, models: newModels };
+              }
+              return p;
+          }));
+          setModelModalOpen(false);
+        };
+
+        const handleDeleteModel = (platformId, modelId) => {
+          if (window.confirm('您确定要删除此模型吗？')) {
+            setPlatforms(ps => ps.map(p => {
+              if (p.id === platformId) {
+                return { ...p, models: p.models.filter(m => m.id !== modelId) };
+              }
+              return p;
+            }));
+          }
+        };
+
+        const MediaTypeTag = ({ type }) => {
+          const colors = {
+            [MediaType.TEXT]: 'bg-blue-900/50 text-blue-300',
+            [MediaType.IMAGE]: 'bg-purple-900/50 text-purple-300',
+            [MediaType.AUDIO]: 'bg-green-900/50 text-green-300',
+            [MediaType.VIDEO]: 'bg-red-900/50 text-red-300',
+            [MediaType.FILE]: 'bg-yellow-900/50 text-yellow-300',
+          };
+          return (
+            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${colors[type]}`}>
+              {mediaTypeTranslations[type]}
+            </span>
+          );
+        };
+
+        const formatPricing = (pricing) => {
+            if (pricing.isFree) return <span className="text-green-400 font-semibold">免费</span>;
+
+            const parts = [];
+            const symbol = pricing.currency === 'USD' ? '$' : '¥';
+
+            if (pricing.inputTokensCost) {
+                parts.push(`输入: ${symbol}${pricing.inputTokensCost.toFixed(2)}/百万 tok`);
+            }
+            if (pricing.outputTokensCost) {
+                parts.push(`输出: ${symbol}${pricing.outputTokensCost.toFixed(2)}/百万 tok`);
+            }
+            if (pricing.perRequestCost) {
+                parts.push(`${symbol}${pricing.perRequestCost.toFixed(2)}/次`);
+            }
+
+            pricing.inputMediaCost?.forEach(mc => {
+                parts.push(`${mediaTypeTranslations[mc.type]}输入: ${symbol}${mc.cost}/${mc.per}`);
+            });
+
+            pricing.outputMediaCost?.forEach(mc => {
+                parts.push(`${mediaTypeTranslations[mc.type]}输出: ${symbol}${mc.cost}/${mc.per}`);
+            });
+
+            if (parts.length === 0) return "未定义价格";
+
+            return parts.join(' | ');
+        };
+
+        return (
+          <div className="bg-gray-800 rounded-xl shadow-lg border border-gray-700 p-6 h-full">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-white">2. 平台和模型</h2>
+              <button onClick={() => handleOpenPlatformModal()} className="flex items-center gap-2 text-sm font-semibold text-indigo-300 hover:text-indigo-200">
+                <PlusCircleIcon className="w-5 h-5"/> 添加平台
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {platforms.map(platform => (
+                <div key={platform.id} className="bg-gray-900/50 rounded-lg border border-gray-700">
+                  <div className="w-full flex justify-between items-center p-3 text-left font-semibold">
+                    <button
+                      onClick={() => setOpenPlatformId(openPlatformId === platform.id ? null : platform.id)}
+                      className="flex-grow flex items-center gap-2 text-left"
+                    >
+                      <ChevronDownIcon className={`w-5 h-5 transition-transform ${openPlatformId === platform.id ? 'rotate-180' : ''}`} />
+                      <span>{platform.name}</span>
+                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={(e) => { e.stopPropagation(); handleOpenPlatformModal(platform);}} className="text-gray-400 hover:text-indigo-400"><EditIcon className="w-4 h-4" /></button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeletePlatform(platform.id); }} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+
+                  {openPlatformId === platform.id && (
+                    <div className="p-3 border-t border-gray-700">
+                      {platform.models.length > 0 ? (
+                        <ul className="space-y-3 text-sm">
+                          {platform.models.map(model => (
+                             <li key={model.id} className="p-3 bg-gray-700/50 rounded-md space-y-2 border border-transparent hover:border-gray-600 transition-colors">
+                              <div className="flex justify-between items-center">
+                                <span className="font-semibold text-white">{model.name}</span>
+                                <div className="flex gap-2">
+                                  <button onClick={(e) => { e.stopPropagation(); handleOpenModelModal(platform.id, model); }} className="text-gray-400 hover:text-indigo-400"><EditIcon className="w-4 h-4" /></button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleDeleteModel(platform.id, model.id); }} className="text-gray-400 hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-gray-400">输入:</span>
+                                  {model.supportedInputs.length > 0 ?
+                                    model.supportedInputs.map(t => <MediaTypeTag key={`in-${t}`} type={t} />) :
+                                    <span className="text-gray-500">无</span>
+                                  }
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-gray-400">输出:</span>
+                                   {model.supportedOutputs.length > 0 ?
+                                     model.supportedOutputs.map(t => <MediaTypeTag key={`out-${t}`} type={t} />) :
+                                     <span className="text-gray-500">无</span>
+                                   }
+                                </div>
+                              </div>
+
+                              <div className="text-xs text-gray-300 pt-2 border-t border-gray-700/50">
+                                  <div className="flex items-start gap-1.5">
+                                      <span className="font-semibold text-gray-400 shrink-0">定价:</span>
+                                      <span className="break-words">{formatPricing(model.pricing)}</span>
+                                  </div>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                          <p className="text-center text-sm text-gray-500 py-2">没有模型。</p>
+                      )}
+                      <button onClick={() => handleOpenModelModal(platform.id)} className="w-full mt-3 flex items-center justify-center gap-2 text-sm font-semibold text-indigo-300 hover:text-indigo-200 bg-indigo-900/20 hover:bg-indigo-900/40 rounded-md py-2 transition-colors">
+                        <AddIcon className="w-4 h-4" />
+                        添加模型
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <Modal
+              isOpen={isPlatformModalOpen}
+              onClose={() => setPlatformModalOpen(false)}
+              title={editingPlatform ? '编辑平台' : '添加新平台'}
+            >
+              <PlatformForm
+                platform={editingPlatform || undefined}
+                onSave={handleSavePlatform}
+                onCancel={() => setPlatformModalOpen(false)}
+              />
+            </Modal>
+
+            <Modal
+              isOpen={isModelModalOpen}
+              onClose={() => setModelModalOpen(false)}
+              title={editingModel ? '编辑模型' : '添加新模型'}
+             >
+              <ModelForm
+                  model={editingModel || undefined}
+                  onSave={handleSaveModel}
+                  onCancel={() => setModelModalOpen(false)}
+              />
+            </Modal>
+          </div>
+        );
+      };
+
+
+      // ===== FROM: App.tsx =====
+      const App = () => {
+        const { useState, useMemo, useEffect, useRef } = React;
+
+        function useLocalStorage(key, initialValue) {
+          const [storedValue, setStoredValue] = useState(() => {
+            if (typeof window === 'undefined') {
+              return initialValue;
+            }
+            try {
+              const item = window.localStorage.getItem(key);
+              return item ? JSON.parse(item) : initialValue;
+            } catch (error) {
+              console.error(error);
+              return initialValue;
+            }
+          });
+
+          useEffect(() => {
+            try {
+              if (typeof window !== 'undefined') {
+                window.localStorage.setItem(key, JSON.stringify(storedValue));
+              }
+            } catch (error) {
+              console.error(error);
+            }
+          }, [key, storedValue]);
+
+          return [storedValue, setStoredValue];
+        }
+
+        const [platforms, setPlatforms] = useLocalStorage('platforms', INITIAL_PLATFORMS);
+        const [tasks, setTasks] = useLocalStorage('tasks', []);
+        const [activeTaskId, setActiveTaskId] = useState(null);
+        const fileInputRef = useRef(null);
+
+        const activeTask = useMemo(() => tasks.find(t => t.id === activeTaskId), [tasks, activeTaskId]);
+
+        useEffect(() => {
+          const activeTaskExists = tasks.some(t => t.id === activeTaskId);
+          if (!activeTaskExists && tasks.length > 0) {
+            setActiveTaskId(tasks[0].id);
+          } else if (tasks.length === 0) {
+            setActiveTaskId(null);
+          }
+        }, [tasks, activeTaskId]);
+
+        const calculationResults = useMemo(() => {
+          if (!activeTask || activeTask.totalTasks <= 0) return [];
+
+          const allModels = platforms.flatMap(p => p.models.map(m => ({ ...m, platform: p.name })));
+
+          const compatibleModels = allModels.filter(model => {
+            const taskInputTypes = new Set(activeTask.inputs.map(i => i.type));
+            const taskOutputTypes = new Set(activeTask.outputs.map(o => o.type));
+            const modelInputTypes = new Set(model.supportedInputs);
+            const modelOutputTypes = new Set(model.supportedOutputs);
+
+            const hasAllInputs = [...taskInputTypes].every(type => modelInputTypes.has(type));
+            const hasAllOutputs = [...taskOutputTypes].every(type => modelOutputTypes.has(type));
+
+            return hasAllInputs && hasAllOutputs;
+          });
+
+          return compatibleModels.map(model => {
+            let totalCostPerTask = 0;
+
+            if (model.pricing.isFree) {
+              totalCostPerTask = 0;
+            } else {
+              const totalInputTokens = activeTask.inputs.reduce((sum, i) => sum + i.tokens, 0);
+              const totalOutputTokens = activeTask.outputs.reduce((sum, o) => sum + o.tokens, 0);
+
+              if (model.pricing.inputTokensCost) {
+                totalCostPerTask += (totalInputTokens / 1_000_000) * model.pricing.inputTokensCost;
+              }
+              if (model.pricing.outputTokensCost) {
+                totalCostPerTask += (totalOutputTokens / 1_000_000) * model.pricing.outputTokensCost;
+              }
+
+              activeTask.inputs.forEach(input => {
+                const mediaCostRule = model.pricing.inputMediaCost?.find(r => r.type === input.type);
+                if (mediaCostRule) {
+                  totalCostPerTask += mediaCostRule.cost / mediaCostRule.per;
+                }
+              });
+
+              activeTask.outputs.forEach(output => {
+                const mediaCostRule = model.pricing.outputMediaCost?.find(r => r.type === output.type);
+                if (mediaCostRule) {
+                  totalCostPerTask += mediaCostRule.cost / mediaCostRule.per;
+                }
+              });
+
+              if(model.pricing.perRequestCost){
+                  totalCostPerTask += model.pricing.perRequestCost;
+              }
+            }
+
+            const totalCost = totalCostPerTask * activeTask.totalTasks;
+            const isRateLimited = model.rateLimits?.requestsPerDay ? activeTask.totalTasks > model.rateLimits.requestsPerDay : false;
+
+            const costInUSD = model.pricing.currency === 'USD' ? totalCost : totalCost / USD_TO_CNY_RATE;
+            const costInCNY = model.pricing.currency === 'CNY' ? totalCost : totalCost * USD_TO_CNY_RATE;
+
+            return {
+              model,
+              totalCost,
+              costInUSD,
+              costInCNY,
+              isRateLimited,
+            };
+          }).sort((a, b) => a.costInUSD - b.costInUSD);
+
+        }, [activeTask, platforms]);
+
+        const handleExport = () => {
+          const config = {
+            tasks,
+            platforms,
+          };
+          const dataStr = JSON.stringify(config, null, 2);
+          const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+
+          const exportFileDefaultName = 'ai-cost-calculator-config.json';
+
+          const linkElement = document.createElement('a');
+          linkElement.setAttribute('href', dataUri);
+          linkElement.setAttribute('download', exportFileDefaultName);
+          linkElement.click();
+        };
+
+        const handleImportClick = () => {
+          fileInputRef.current?.click();
+        };
+
+        const handleFileChange = (event) => {
+          const file = event.target.files?.[0];
+          const inputElement = event.target;
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              const text = e.target?.result;
+              if (typeof text !== 'string') {
+                throw new Error("File content is not readable.");
+              }
+              const parsed = JSON.parse(text);
+
+              if (Array.isArray(parsed.tasks) && Array.isArray(parsed.platforms)) {
+                if (window.confirm("这将覆盖您当前的配置。您确定要继续吗？")) {
+                  setTasks(parsed.tasks);
+                  setPlatforms(parsed.platforms);
+                  alert("配置已成功导入！");
+                }
+              } else {
+                throw new Error("无效的配置文件格式。");
+              }
+            } catch (error) {
+              console.error("导入失败:", error);
+              alert(`导入配置文件失败: ${error instanceof Error ? error.message : "未知错误"}`);
+            } finally {
+              if (inputElement) {
+                inputElement.value = '';
+              }
+            }
+          };
+          reader.readAsText(file);
+        };
+
+        return (
+          <div className="min-h-screen bg-gray-900 text-gray-200 font-sans">
+            <header className="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 sticky top-0 z-10">
+              <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <LogoIcon className="h-8 w-8 text-indigo-400" />
+                  <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight">AI 模型成本计算器</h1>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".json" className="hidden" />
+                  <button onClick={handleImportClick} title="导入配置" className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-md transition-colors">
+                      <ImportIcon className="w-4 h-4" />
+                      <span className="hidden sm:inline">导入配置</span>
+                  </button>
+                  <button onClick={handleExport} title="导出配置" className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-gray-300 hover:text-white bg-gray-700 hover:bg-gray-600 rounded-md transition-colors">
+                      <ExportIcon className="w-4 h-4" />
+                      <span className="hidden sm:inline">导出配置</span>
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            <main className="container mx-auto p-4 sm:p-6 lg:p-8">
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                  <TaskPanel
+                    tasks={tasks}
+                    setTasks={setTasks}
+                    activeTaskId={activeTaskId}
+                    setActiveTaskId={setActiveTaskId}
+                  />
+                  <PlatformPanel
+                    platforms={platforms}
+                    setPlatforms={setPlatforms}
+                  />
+                </div>
+                <div>
+                  <ResultsDisplay results={calculationResults} task={activeTask} />
+                </div>
+              </div>
+            </main>
+          </div>
+        );
+      };
+
+      // ===== FROM: index.tsx (Mounting Logic) =====
+      const rootElement = document.getElementById('root');
+      if (!rootElement) {
+        throw new Error("Could not find root element to mount to");
+      }
+
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(
+        <React.StrictMode>
+          <App />
+        </React.StrictMode>
+      );
+    </script>
+  </body>
+</html>
