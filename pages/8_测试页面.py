@@ -185,7 +185,12 @@ class StreamlitApp:
                 edit_btn, delete_btn = st.columns(2)
                 if edit_btn.button("✏️ 编辑此任务"):
                     st.session_state.editing_task_id = task_id
-                    st.rerun()  # Rerun to populate the form
+                    # 当开始编辑时，将当前任务数据加载到session_state中
+                    if 'task_form_inputs' not in st.session_state:
+                        st.session_state.task_form_inputs = task.get('inputs', [])
+                    if 'task_form_outputs' not in st.session_state:
+                        st.session_state.task_form_outputs = task.get('outputs', [])
+                    st.rerun()
                 if delete_btn.button("🗑️ 删除此任务", key=f"del_{task_id}"):
                     self.dm.delete_task(task_id)
                     st.success(f"任务 '{task['name']}' 已删除。")
@@ -204,28 +209,29 @@ class StreamlitApp:
             task_to_edit = next((t for t in self.dm.get_tasks() if t['id'] == task_id), None)
 
         default_task = {
-            'name': '', 'total_count': 1000, 'inputs': [], 'outputs': []
+            'name': '', 'total_count': 1000, 'inputs': [{'type': 'text', 'tokens': 100}],
+            'outputs': [{'type': 'text', 'tokens': 100}]
         }
         task_data = task_to_edit or default_task
 
-        with st.form(key="task_form", clear_on_submit=not is_editing):
+        # 初始化表单状态
+        if 'task_form_inputs' not in st.session_state:
+            st.session_state.task_form_inputs = copy.deepcopy(task_data.get('inputs', []))
+        if 'task_form_outputs' not in st.session_state:
+            st.session_state.task_form_outputs = copy.deepcopy(task_data.get('outputs', []))
+
+        # 表单本身，只包含数据输入字段
+        with st.form(key="task_form"):
             name = st.text_input("任务名称", value=task_data['name'])
             total_count = st.number_input("任务总数", min_value=1, value=task_data['total_count'])
 
             st.markdown("---")
             st.markdown("**输入配置**")
-            # 使用 session_state 来动态管理输入/输出行
-            if 'task_form_inputs' not in st.session_state or not is_editing:
-                st.session_state.task_form_inputs = task_data.get('inputs', [{'type': 'text', 'tokens': 100}])
-
-            self._render_io_rows('inputs')
+            self._render_io_widgets_in_form('inputs')
 
             st.markdown("---")
             st.markdown("**输出配置**")
-            if 'task_form_outputs' not in st.session_state or not is_editing:
-                st.session_state.task_form_outputs = task_data.get('outputs', [{'type': 'text', 'tokens': 100}])
-
-            self._render_io_rows('outputs')
+            self._render_io_widgets_in_form('outputs')
 
             submitted = st.form_submit_button("✅ 保存任务" if is_editing else "➕ 添加任务")
             if submitted:
@@ -242,10 +248,18 @@ class StreamlitApp:
                     self.dm.add_or_update_task(final_task, task_id)
                     st.success(f"任务 '{name}' 已成功保存！")
                     # 清理状态
-                    del st.session_state.editing_task_id
+                    if 'editing_task_id' in st.session_state:
+                        del st.session_state.editing_task_id
                     del st.session_state.task_form_inputs
                     del st.session_state.task_form_outputs
                     st.rerun()
+
+        # 管理按钮，放在表单外部
+        st.markdown("---")
+        st.markdown("**管理输入/输出行**")
+        self._render_io_management_buttons('inputs')
+        self._render_io_management_buttons('outputs')
+
         if is_editing:
             if st.button("❌ 取消编辑"):
                 del st.session_state.editing_task_id
@@ -253,15 +267,15 @@ class StreamlitApp:
                 del st.session_state.task_form_outputs
                 st.rerun()
 
-    def _render_io_rows(self, io_type):
-        """辅助函数，用于渲染输入或输出的动态行"""
+    def _render_io_widgets_in_form(self, io_type: str):
+        """仅在表单内部渲染输入和输出的字段（无按钮）"""
         state_key = f'task_form_{io_type}'
 
         for i in range(len(st.session_state[state_key])):
-            cols = st.columns([3, 3, 1])
+            cols = st.columns([3, 3])
             with cols[0]:
                 st.session_state[state_key][i]['type'] = st.selectbox(
-                    f"格式", self.config.INPUT_OUTPUT_TYPES,
+                    "格式", self.config.INPUT_OUTPUT_TYPES,
                     index=self.config.INPUT_OUTPUT_TYPES.index(st.session_state[state_key][i]['type']),
                     key=f"{io_type}_type_{i}"
                 )
@@ -271,12 +285,22 @@ class StreamlitApp:
                     value=st.session_state[state_key][i]['tokens'],
                     key=f"{io_type}_tokens_{i}"
                 )
-            with cols[2]:
-                if st.button("➖", key=f"{io_type}_del_{i}"):
-                    st.session_state[state_key].pop(i)
-                    st.rerun()
 
-        if st.button(f"➕ 添加{'输入' if io_type == 'inputs' else '输出'}", key=f"{io_type}_add"):
+    def _render_io_management_buttons(self, io_type: str):
+        """在表单外部渲染用于添加和删除行的按钮"""
+        state_key = f'task_form_{io_type}'
+        io_label = '输入' if io_type == 'inputs' else '输出'
+
+        # 倒序遍历以安全删除
+        for i in reversed(range(len(st.session_state[state_key]))):
+            cols = st.columns([6, 1])
+            item = st.session_state[state_key][i]
+            cols[0].info(f"{io_label}行 #{i + 1}: 类型={item['type'].capitalize()}, Tokens={item['tokens']}")
+            if cols[1].button("➖", key=f"{io_type}_del_{i}", help=f"删除此{io_label}行"):
+                st.session_state[state_key].pop(i)
+                st.rerun()
+
+        if st.button(f"➕ 添加{io_label}行", key=f"{io_type}_add"):
             st.session_state[state_key].append({'type': 'text', 'tokens': 0})
             st.rerun()
 
