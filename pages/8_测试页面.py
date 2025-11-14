@@ -7,12 +7,12 @@ from pathlib import Path
 
 def main():
     st.set_page_config(
-        page_title="自动HTML跳转",
+        page_title="ai模型计算器（自动跳转）",
         page_icon="🚀",
         layout="centered"
     )
 
-    st.title("🚀 HTML自动跳转")
+    st.title("🚀 ai模型计算器")
 
     # 获取HTML文件路径
     html_file_path = Path(__file__).parent.parent / "other" / "ai_calculator.html"
@@ -124,7 +124,7 @@ def main():
                 """
 
         # 执行JavaScript
-        components.html(auto_redirect_js, height=300)
+        components.html(auto_redirect_js, height=10)
 
         # 添加重新打开按钮
         if st.button("🔄 重新尝试打开"):
