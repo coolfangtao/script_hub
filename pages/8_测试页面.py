@@ -31,66 +31,74 @@ def main():
 
         # 自动跳转的JavaScript代码 - 修复版本
         auto_redirect_js = f"""
-        <script>
-        // 页面加载后执行跳转
-        function redirectToHTML() {{
-            try {{
-                // 解码base64内容
-                const htmlContent = atob("{html_base64}");
-                // 创建blob URL
-                const blob = new Blob([htmlContent], {{ type: 'text/html; charset=utf-8' }});
-                const url = URL.createObjectURL(blob);
-
-                // 尝试自动打开新窗口
-                const newWindow = window.open(url, '_blank');
-
-                // 检查是否打开成功
-                if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {{
-                    // 显示手动链接
-                    document.getElementById('manualLink').style.display = 'block';
-                    document.getElementById('autoRedirectMessage').innerHTML = 
-                        '⚠️ 浏览器阻止了自动弹出窗口，请点击下方链接手动打开';
-                    // 保存URL到全局变量供手动链接使用
-                    window.htmlBlobUrl = url;
-                }} else {{
-                    document.getElementById('autoRedirectMessage').innerHTML = 
-                        '✅ HTML页面已在新窗口打开！';
-                    // 清理URL对象
-                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                <script>
+                // *** 修复乱码的关键：将 Base64 解码为 Uint8Array，以正确处理 UTF-8 中文字符 ***
+                function base64ToUint8Array(base64) {{
+                    const binary_string = atob(base64);
+                    const len = binary_string.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {{
+                        bytes[i] = binary_string.charCodeAt(i);
+                    }}
+                    return bytes;
                 }}
-            }} catch (error) {{
-                document.getElementById('autoRedirectMessage').innerHTML = 
-                    '❌ 打开页面时出错：' + error.message;
-                console.error('跳转错误:', error);
-            }}
-        }}
 
-        // 手动打开函数
-        function openManual() {{
-            if (window.htmlBlobUrl) {{
-                window.open(window.htmlBlobUrl, '_blank');
-            }}
-        }}
+                // 页面加载后执行跳转
+                function redirectToHTML() {{
+                    try {{
+                        // 使用新的函数解码 Base64 字符串为二进制数组
+                        const htmlUint8Array = base64ToUint8Array("{html_base64}");
 
-        // 页面加载完成后执行跳转
-        if (document.readyState === 'loading') {{
-            document.addEventListener('DOMContentLoaded', redirectToHTML);
-        }} else {{
-            redirectToHTML();
-        }}
-        </script>
+                        // 使用二进制数组创建 Blob 对象
+                        // 此时 MIME 类型中的 charset=utf-8 才能正确生效
+                        const blob = new Blob([htmlUint8Array], {{ type: 'text/html; charset=utf-8' }});
+                        const url = URL.createObjectURL(blob);
 
-        <div id="autoRedirectMessage" style="color: #0cce6b; font-weight: bold; margin: 10px 0;">
-        🔄 正在尝试自动打开新页面...
-        </div>
+                        // ... (后续的跳转逻辑不变)
+                        // 尝试自动打开新窗口
+                        const newWindow = window.open(url, '_blank');
 
-        <div id="manualLink" style="display: none; margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 8px; border-left: 4px solid #ff6b6b;">
-        <p style="margin: 0 0 10px 0; color: #ff6b6b;">⚠️ 浏览器阻止了自动弹出窗口</p>
-        <button onclick="openManual()" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
-            点击手动打开HTML页面
-        </button>
-        </div>
-        """
+                        // 检查是否打开成功
+                        if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {{
+                            // 显示手动链接
+                            document.getElementById('manualLink').style.display = 'block';
+                            document.getElementById('autoRedirectMessage').innerHTML = 
+                                '⚠️ 浏览器阻止了自动弹出窗口，请点击下方链接手动打开';
+                            // 保存URL到全局变量供手动链接使用
+                            window.htmlBlobUrl = url;
+                        }} else {{
+                            document.getElementById('autoRedirectMessage').innerHTML = 
+                                '✅ HTML页面已在新窗口打开！';
+                            // 清理URL对象
+                            setTimeout(() => URL.revokeObjectURL(url), 1000);
+                        }}
+
+                    }} catch (error) {{
+                        document.getElementById('autoRedirectMessage').innerHTML = 
+                            '❌ 打开页面时出错：' + error.message;
+                        console.error('跳转错误:', error);
+                    }}
+                }}
+                // ... (跳转和手动链接调用逻辑不变)
+                if (document.readyState === 'loading') {{
+                    document.addEventListener('DOMContentLoaded', redirectToHTML);
+                }} else {{
+                    redirectToHTML();
+                }}
+                // ... (其他 HTML 和样式不变)
+                </script>
+
+                <div id="autoRedirectMessage" style="color: #0cce6b; font-weight: bold; margin: 10px 0;">
+                🔄 正在尝试自动打开新页面...
+                </div>
+
+                <div id="manualLink" style="display: none; margin-top: 20px; padding: 15px; background: #1a1a1a; border-radius: 8px; border-left: 4px solid #ff6b6b;">
+                <p style="margin: 0 0 10px 0; color: #ff6b6b;">⚠️ 浏览器阻止了自动弹出窗口</p>
+                <button onclick="openManual()" style="background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                    点击手动打开HTML页面
+                </button>
+                </div>
+                """
 
         # 执行JavaScript
         components.html(auto_redirect_js, height=200)
