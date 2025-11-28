@@ -376,7 +376,7 @@ class AppUI:
         freq_df = pd.DataFrame(word_counts.items(), columns=["单词", "出现次数"])
         freq_df["频率"] = freq_df["出现次数"] / total_words
         freq_df = freq_df.sort_values(by="出现次数", ascending=False)
-        st.dataframe(freq_df.head(20).style.format({"频率": "{:.2%}"}), height=600, use_container_width=True)
+        st.dataframe(freq_df.head(50).style.format({"频率": "{:.2%}"}), height=600, use_container_width=True)
 
     def display_asin_traffic_contribution_chart(self, df: pd.DataFrame):
         """展示各ASIN流量贡献对比的柱状图"""
